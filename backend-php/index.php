@@ -4,10 +4,26 @@
  * Main entry point for all API requests
  */
 
+// Load composer autoloader
+if (file_exists(__DIR__ . '/vendor/autoload.php')) {
+    require_once __DIR__ . '/vendor/autoload.php';
+} else {
+    http_response_code(500);
+    echo json_encode([
+        'error' => 'Composer dependencies not installed',
+        'message' => 'Run: composer install in backend-php/ directory'
+    ]);
+    exit;
+}
+
 // Load environment variables
-require_once __DIR__ . '/vendor/autoload.php';
-$dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
-$dotenv->load();
+if (file_exists(__DIR__ . '/.env')) {
+    $dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
+    $dotenv->load();
+} else {
+    // Don't fail if .env doesn't exist - use defaults
+    error_log('⚠️ .env file not found - using default values');
+}
 
 // Set headers
 header('Content-Type: application/json; charset=utf-8');

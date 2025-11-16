@@ -3,20 +3,20 @@
 let detectedBackendURL = null;
 let isDetectingPort = false;
 
-// Auto-detect backend (PHP preferred, then Node.js fallback)
+// Auto-detect PHP backend
 async function detectBackendPort() {
     // Check if running on production domain
     if (window.location.hostname === 'trendydresses.co.ke' || 
         window.location.hostname === 'www.trendydresses.co.ke') {
-        // Production: PHP backend on same domain with /api path (recommended)
+        // Production: PHP backend on same domain with /api path
         return window.location.origin + '/api';
     }
     
-    // Development: Try PHP backend first (port 80 or 8000), then Node.js
+    // Development: Try PHP backend (port 80 or 8000)
     // PHP backend typically runs on port 80 (via web server) or 8000 (built-in server)
     const phpPorts = [80, 8000];
     
-    // Try PHP backend first
+    // Try PHP backend ports
     for (const port of phpPorts) {
         try {
             const testURL = `http://localhost:${port}/api/server-info`;
@@ -33,40 +33,8 @@ async function detectBackendPort() {
             
             if (response.ok) {
                 const serverInfo = await response.json();
-                // Check if it's PHP backend
-                if (serverInfo.backend === 'PHP' || port === 80 || port === 8000) {
-                    const detectedURL = serverInfo.baseURL || `http://localhost:${port}/api`;
-                    console.log(`✅ Detected PHP backend on port ${port}`);
-                    return detectedURL;
-                }
-            }
-        } catch (error) {
-            // Port not available, try next one
-            continue;
-        }
-    }
-    
-    // Fallback: Try Node.js backend (ports 3001, 3002, 3000, etc.)
-    const nodePorts = [3001, 3002, 3000, 3003, 3004, 3005];
-    
-    for (const port of nodePorts) {
-        try {
-            const testURL = `http://localhost:${port}/api/server-info`;
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 500);
-            
-            const response = await fetch(testURL, {
-                signal: controller.signal,
-                method: 'GET',
-                headers: { 'Accept': 'application/json' }
-            });
-            
-            clearTimeout(timeoutId);
-            
-            if (response.ok) {
-                const serverInfo = await response.json();
-                const detectedURL = serverInfo.baseURL || `http://localhost:${serverInfo.port}/api`;
-                console.log(`✅ Detected Node.js backend on port ${serverInfo.port}`);
+                const detectedURL = serverInfo.baseURL || `http://localhost:${port}/api`;
+                console.log(`✅ Detected PHP backend on port ${port}`);
                 return detectedURL;
             }
         } catch (error) {
@@ -75,9 +43,9 @@ async function detectBackendPort() {
         }
     }
     
-    // Final fallback: Try PHP on default port, then Node.js
-    console.warn('⚠️ Could not auto-detect backend, trying PHP first, then Node.js');
-    return 'http://localhost:80/api'; // PHP default (will fallback to Node.js if not available)
+    // Fallback: Use PHP default port
+    console.warn('⚠️ Could not auto-detect PHP backend, using default port 80');
+    return 'http://localhost:80/api';
 }
 
 // Initialize backend URL
@@ -103,18 +71,18 @@ const getBackendURL = async () => {
         return detectedBackendURL;
     } catch (error) {
         console.error('❌ Error detecting backend port:', error);
-        return 'http://localhost:80/api'; // PHP default (will fallback to Node.js if needed)
+        return 'http://localhost:80/api'; // PHP default
     } finally {
         isDetectingPort = false;
     }
 };
 
 // Initialize with default URL (will be updated after detection)
-// Prefer PHP backend (port 80) in production, fallback to Node.js (3001) in development
+// PHP backend on same domain in production, port 80 in development
 let API_BASE_URL = (window.location.hostname === 'trendydresses.co.ke' || 
                     window.location.hostname === 'www.trendydresses.co.ke')
     ? window.location.origin + '/api'  // PHP backend on same domain
-    : 'http://localhost:80/api';  // PHP default (will auto-detect and fallback to Node.js if needed)
+    : 'http://localhost:80/api';  // PHP default port
 
 class ApiService {
     constructor() {

@@ -64,14 +64,16 @@ async function migrateProductsToMongoDB(overwrite = false) {
     // Check if backend is available
     const backendAvailable = await apiService.checkBackend();
     if (!backendAvailable) {
-        const errorMsg = 'MongoDB backend is not available. Please start the backend server first.';
+        const errorMsg = 'PHP backend server is not available. Please deploy PHP backend.';
         console.error('❌', errorMsg);
         showNotification(errorMsg + ' See console for instructions.', 'error');
-        console.warn('⚠️ To start the backend:');
-        console.warn('   1. Navigate to the "backend" folder');
-        console.warn('   2. Run: npm start');
-        console.warn('   3. Wait for "✅ Connected to MongoDB successfully"');
-        console.warn('   4. Refresh this page and try again');
+        console.warn('⚠️ To deploy PHP backend:');
+        console.warn('   1. Upload backend-php/ folder to your server');
+        console.warn('   2. Run: composer install in backend-php/');
+        console.warn('   3. Configure .env file with MongoDB connection');
+        console.warn('   4. Configure web server to route /api to PHP');
+        console.warn('   5. Test: curl https://trendydresses.co.ke/api/health');
+        console.warn('   6. Refresh this page and try again');
         return false;
     }
     
@@ -325,14 +327,16 @@ async function migrateFromIndexedDBToMongoDB() {
     // Check if backend is available
     const backendAvailable = await apiService.checkBackend();
     if (!backendAvailable) {
-        const errorMsg = 'MongoDB backend is not available. Please start the backend server first.';
+        const errorMsg = 'PHP backend server is not available. Please deploy PHP backend.';
         console.error('❌', errorMsg);
         showNotification(errorMsg + ' See console for instructions.', 'error');
-        console.warn('⚠️ To start the backend:');
-        console.warn('   1. Navigate to the "backend" folder');
-        console.warn('   2. Run: npm start');
-        console.warn('   3. Wait for "✅ Connected to MongoDB successfully"');
-        console.warn('   4. Refresh this page and try again');
+        console.warn('⚠️ To deploy PHP backend:');
+        console.warn('   1. Upload backend-php/ folder to your server');
+        console.warn('   2. Run: composer install in backend-php/');
+        console.warn('   3. Configure .env file with MongoDB connection');
+        console.warn('   4. Configure web server to route /api to PHP');
+        console.warn('   5. Test: curl https://trendydresses.co.ke/api/health');
+        console.warn('   6. Refresh this page and try again');
         return false;
     }
     
@@ -1504,7 +1508,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!useMongoDB) {
         setTimeout(async () => {
             console.warn('⚠️ Using localStorage (temporary) - MongoDB is preferred');
-            console.warn('⚠️ Start the backend server to use MongoDB for unlimited storage');
+            console.warn('⚠️ Deploy PHP backend to use MongoDB for unlimited storage');
             const storageInfo = await checkStorageUsage();
             if (storageInfo.warning) {
                 console.warn(`⚠️ Storage Usage: ${storageInfo.size.toFixed(2)}MB / ${storageInfo.quota.toFixed(2)}MB limit`);

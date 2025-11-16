@@ -1,8 +1,10 @@
 # Dependencies
-node_modules/
-backend/node_modules/
 backend-php/vendor/
 backend-php/composer.lock
+
+# Node.js backend (removed - use PHP backend only)
+backend/
+node_modules/
 
 # Environment variables and secrets
 .env
@@ -14,8 +16,6 @@ backend-php/composer.lock
 .env.staging
 *.env
 .envrc
-backend/.env
-backend/.env.*
 backend-php/.env
 backend-php/.env.*
 
@@ -28,20 +28,15 @@ backend-php/.env.*
 *.mongodb
 *.dump
 *.backup
-backend/database/*.db
-backend/database/*.db-journal
-
 # Scripts with hardcoded credentials
-backend/START_MONGODB.bat
-backend/START_MONGODB.ps1
 *credentials*.bat
 *credentials*.ps1
 *secrets*.bat
 *secrets*.ps1
 
-# PM2 logs and process files
-backend/logs/
-backend/.pm2/
+# PM2 logs and process files (if any)
+logs/
+.pm2/
 *.pid
 *.pid.lock
 

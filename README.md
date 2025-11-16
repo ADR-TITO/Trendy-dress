@@ -28,8 +28,7 @@ A modern e-commerce website for Trendy Dresses featuring product catalog, shoppi
 - Responsive design
 
 ### Backend
-- **PHP** (Primary) - RESTful API with MongoDB
-- **Node.js** (Alternative) - Express.js with MongoDB (optional)
+- **PHP** - RESTful API with MongoDB
 
 ### Database
 - MongoDB Atlas (Cloud)
@@ -45,14 +44,10 @@ trendy-dresses/
 ├── script.js               # Main JavaScript
 ├── api-service.js          # API service layer
 ├── storage-manager.js      # IndexedDB manager
-├── backend-php/            # PHP Backend (Primary)
+├── backend-php/            # PHP Backend
 │   ├── index.php          # Router
 │   ├── config/            # Configuration
 │   ├── src/               # Models & Services
-│   └── routes/            # API routes
-├── backend/                # Node.js Backend (Alternative)
-│   ├── server.js          # Express server
-│   ├── models/            # Mongoose models
 │   └── routes/            # API routes
 └── README.md               # This file
 ```
@@ -61,13 +56,13 @@ trendy-dresses/
 
 ### Prerequisites
 
-- Web server (Apache/Nginx) with PHP 7.4+ OR Node.js 14+
+- Web server (Apache/Nginx) with PHP 7.4+
 - MongoDB Atlas account
 - M-Pesa API credentials (for payment processing)
 
 ### Quick Start
 
-#### Option 1: PHP Backend (Recommended)
+### PHP Backend Setup
 
 1. **Install PHP Backend**
    ```bash
@@ -91,38 +86,18 @@ trendy-dresses/
    - Configure web server to route `/api` to PHP
    - Test: `curl https://trendydresses.co.ke/api/health`
 
-#### Option 2: Node.js Backend
-
-1. **Install Dependencies**
-   ```bash
-   cd backend
-   npm install
-   ```
-
-2. **Configure Environment**
-   ```bash
-   cp ENV_TEMPLATE.txt .env
-   # Edit .env with your MongoDB connection string
-   ```
-
-3. **Start Server**
-   ```bash
-   npm start
-   ```
-
 ### Frontend Setup
 
 1. **Open `index.html`** in a web browser
-2. The frontend will automatically detect the backend (PHP or Node.js)
-3. For local development, ensure backend is running
+2. The frontend will automatically connect to the PHP backend
+3. For local development, ensure PHP backend is running
 
 ## 🔧 Configuration
 
 ### MongoDB Connection
 
 Add your MongoDB Atlas connection string to:
-- `backend-php/.env` (for PHP backend)
-- `backend/.env` (for Node.js backend)
+- `backend-php/.env`
 
 Format:
 ```
@@ -180,9 +155,9 @@ All endpoints are available at `/api/*`:
 ## 📝 Documentation
 
 - [PHP Backend Setup](backend-php/README.md)
-- [Node.js Backend Setup](backend/README.md)
 - [MongoDB Setup](MONGODB_ATLAS_SETUP.md)
-- [M-Pesa Integration](backend/MPESA_SETUP.md)
+- [M-Pesa Integration](backend-php/README.md#m-pesa-configuration)
+- [Deployment Guide](DEPLOY_PHP_BACKEND_PRODUCTION.md)
 
 ## 🔒 Security
 

@@ -3,8 +3,8 @@
 ## Pre-Push Checklist
 
 ✅ **All sensitive files are excluded:**
-- `.env` files (both `backend/` and `backend-php/`)
-- `node_modules/` and `vendor/`
+- `.env` files (`backend-php/`)
+- `vendor/` folder
 - Database files
 - Log files
 - Credentials and API keys
@@ -35,9 +35,7 @@ git status
 ```
 
 **Important:** Check that these files are NOT included:
-- ❌ `backend/.env`
 - ❌ `backend-php/.env`
-- ❌ `node_modules/`
 - ❌ `backend-php/vendor/`
 - ❌ Any `.log` files
 - ❌ Any credentials files
@@ -79,19 +77,13 @@ trendy-dresses/
 ├── storage-manager.js
 ├── README.md
 ├── .gitignore
-├── backend-php/          # PHP Backend (Primary)
+├── backend-php/          # PHP Backend
 │   ├── index.php
 │   ├── composer.json
 │   ├── .htaccess
 │   ├── .env.example
 │   ├── config/
 │   ├── src/
-│   └── routes/
-├── backend/              # Node.js Backend (Alternative)
-│   ├── server.js
-│   ├── package.json
-│   ├── ENV_TEMPLATE.txt
-│   ├── models/
 │   └── routes/
 └── Documentation files
 ```
@@ -103,11 +95,10 @@ trendy-dresses/
 - ✅ `.env.example` files are included (templates)
 - ❌ `.env` files are excluded (actual credentials)
 
-### Backend Choice
+### Backend
 
-- **PHP Backend** is the primary backend (used in production)
-- **Node.js Backend** is included as an alternative
-- Frontend automatically detects and uses PHP backend
+- **PHP Backend** is the only backend (used in production)
+- Frontend automatically connects to PHP backend
 
 ### Security
 
