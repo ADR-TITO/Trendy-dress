@@ -1,5 +1,22 @@
 // API Service for MongoDB Backend
-const API_BASE_URL = 'http://localhost:3000/api';
+// Auto-detect backend URL based on current domain
+const getBackendURL = () => {
+    // Check if running on production domain
+    if (window.location.hostname === 'trendydresses.co.ke' || 
+        window.location.hostname === 'www.trendydresses.co.ke') {
+        // Production: Use production backend API
+        // Update this to your actual production backend URL
+        // For now, assuming backend is on the same domain or subdomain
+        return window.location.protocol + '//' + window.location.hostname + ':3000/api';
+        // Or if backend is on a subdomain: 'https://api.trendydresses.co.ke/api'
+        // Or if backend is on same server: window.location.origin + '/api'
+    } else {
+        // Development: Use localhost
+        return 'http://localhost:3000/api';
+    }
+};
+
+const API_BASE_URL = getBackendURL();
 
 class ApiService {
     constructor() {
@@ -9,9 +26,9 @@ class ApiService {
     // Check if backend is available
     async checkBackend() {
         try {
-            // Use a shorter timeout to avoid hanging
+            // Use a longer timeout to avoid false negatives
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
             
             const response = await fetch(`${this.baseURL}/health`, {
                 signal: controller.signal,
@@ -21,16 +38,22 @@ class ApiService {
                 },
             });
             clearTimeout(timeoutId);
-            return response.ok;
+            const isAvailable = response.ok;
+            console.log(`🔍 Backend check: ${isAvailable ? '✅ Available' : '❌ Not available'} (${response.status})`);
+            return isAvailable;
         } catch (error) {
-            // Silently handle network errors when backend is not available
-            // This is expected when running without backend (using localStorage only)
-            if (error.name === 'AbortError' || error.name === 'TypeError' || error.message?.includes('fetch')) {
-                // Backend is not available - this is normal when using localStorage
-                return false;
+            // Log the error for debugging
+            const errorName = error.name || '';
+            const errorMsg = error.message || '';
+            
+            if (errorName === 'AbortError' || errorMsg.includes('aborted')) {
+                console.warn('⚠️ Backend check timed out (5s) - may not be available');
+            } else if (errorName === 'TypeError' || errorMsg.includes('fetch')) {
+                console.warn('⚠️ Backend check failed - network error or CORS issue');
+            } else {
+                console.warn('⚠️ Backend check failed:', error.message);
             }
-            // Only log unexpected errors
-            console.warn('Backend check failed:', error.message);
+            
             return false;
         }
     }
@@ -39,39 +62,73 @@ class ApiService {
     async checkMongoDBStatus() {
         try {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 2000);
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // Increased timeout to 5 seconds
             
             const response = await fetch(`${this.baseURL}/db-status`, {
                 signal: controller.signal,
+                headers: {
+                    'Accept': 'application/json',
+                },
             });
             clearTimeout(timeoutId);
             
-            if (!response.ok) throw new Error('Failed to get DB status');
+            if (!response.ok) {
+                throw new Error(`Failed to get DB status: ${response.status} ${response.statusText}`);
+            }
+            
             const status = await response.json();
+            console.log(`🔍 MongoDB status check: ${status.readyStateText || 'unknown'} (ReadyState: ${status.readyState || 0})`);
             return status;
         } catch (error) {
-            // Silently handle when backend is not available
-            if (error.name === 'AbortError' || error.name === 'TypeError' || error.message?.includes('fetch')) {
-                return { readyState: 0, readyStateText: 'backend not available', error: 'Backend server not running' };
+            // Handle errors gracefully
+            const errorName = error.name || '';
+            const errorMsg = error.message || '';
+            
+            if (errorName === 'AbortError' || errorMsg.includes('aborted')) {
+                console.warn('⚠️ MongoDB status check timed out (5s)');
+                return { readyState: 0, readyStateText: 'timeout', error: 'Status check timed out' };
+            } else if (errorName === 'TypeError' || errorMsg.includes('fetch')) {
+                console.warn('⚠️ MongoDB status check failed - network error');
+                return { readyState: 0, readyStateText: 'network error', error: 'Network error or CORS issue' };
+            } else {
+                console.warn('⚠️ MongoDB status check failed:', errorMsg);
+                return { readyState: 0, readyStateText: 'error', error: errorMsg };
             }
-            return { readyState: 0, readyStateText: 'unknown', error: error.message };
         }
     }
 
-    // Get all products
-    async getProducts(category = 'all') {
+    // Get all products (optimized - without images by default)
+    async getProducts(category = 'all', includeImages = false) {
         try {
+            // OPTIMIZATION: Don't include images in list request (reduces response from 28MB to ~100KB)
             const url = category && category !== 'all' 
-                ? `${this.baseURL}/products?category=${category}`
-                : `${this.baseURL}/products`;
+                ? `${this.baseURL}/products?category=${category}${includeImages ? '&includeImages=true' : ''}`
+                : `${this.baseURL}/products${includeImages ? '?includeImages=true' : ''}`;
             
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 3000);
+            // Reduced timeout to 10 seconds since we're not loading images
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
             
+            console.log(`📡 Fetching products from MongoDB API (${includeImages ? 'with' : 'without'} images)...`);
             const response = await fetch(url, {
                 signal: controller.signal,
+                headers: {
+                    'Accept': 'application/json',
+                },
             });
             clearTimeout(timeoutId);
+            
+            console.log(`📡 Response received: ${response.status} ${response.statusText}`);
+            const contentLength = response.headers.get('content-length');
+            if (contentLength) {
+                const sizeMB = (parseInt(contentLength) / (1024 * 1024)).toFixed(2);
+                const sizeKB = (parseInt(contentLength) / 1024).toFixed(2);
+                if (parseInt(contentLength) > 1024 * 1024) {
+                    console.log(`📦 Response size: ${sizeMB} MB`);
+                } else {
+                    console.log(`📦 Response size: ${sizeKB} KB (optimized - no images)`);
+                }
+            }
             
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
@@ -80,13 +137,25 @@ class ApiService {
                 }
                 throw new Error(errorData.error || 'Failed to fetch products');
             }
-            return await response.json();
+            const products = await response.json();
+            console.log(`✅ Successfully loaded ${products.length} products from MongoDB API`);
+            return products;
         } catch (error) {
-            // Re-throw network errors silently - they will be caught by caller
-            if (error.name === 'AbortError' || error.name === 'TypeError' || error.message?.includes('fetch')) {
-                throw error; // Let caller handle fallback
+            // Log error details for debugging
+            const errorName = error.name || '';
+            const errorMsg = error.message || '';
+            
+            if (errorName === 'AbortError') {
+                console.warn(`⚠️ Product fetch timed out (30s) - response may be too large or backend is slow`);
+                console.warn(`   Tip: Products with images can be large (20-30MB). Try refreshing or check network speed.`);
+            } else if (errorName === 'TypeError' || errorMsg.includes('fetch')) {
+                console.warn(`⚠️ Product fetch failed - network error or CORS issue`);
+                console.warn(`   Check if backend is running on ${this.baseURL}`);
+            } else {
+                console.error('❌ Error fetching products from API:', errorMsg);
             }
-            console.error('Error fetching products from API:', error.message);
+            
+            // Re-throw error so caller can handle fallback
             throw error;
         }
     }
@@ -273,6 +342,85 @@ class ApiService {
             return await response.json();
         } catch (error) {
             console.error('Error getting orders via API:', error);
+            throw error;
+        }
+    }
+
+    // Initiate STK Push (M-Pesa Prompt) payment
+    async initiateSTKPush(phoneNumber, amount, accountReference, transactionDesc) {
+        try {
+            const response = await fetch(`${this.baseURL}/mpesa/stk-push`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    phoneNumber,
+                    amount,
+                    accountReference: accountReference || 'TrendyDresses',
+                    transactionDesc: transactionDesc || 'Payment for order'
+                })
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || error.message || 'Failed to initiate M-Pesa payment prompt');
+            }
+            
+            return await response.json();
+        } catch (error) {
+            console.error('Error initiating STK Push:', error);
+            throw error;
+        }
+    }
+
+    // Query STK Push status
+    async querySTKPushStatus(checkoutRequestID) {
+        try {
+            const response = await fetch(`${this.baseURL}/mpesa/stk-push-status`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    checkoutRequestID
+                })
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || error.message || 'Failed to query STK Push status');
+            }
+            
+            return await response.json();
+        } catch (error) {
+            console.error('Error querying STK Push status:', error);
+            throw error;
+        }
+    }
+
+    // Update delivery status
+    async updateDeliveryStatus(orderId, deliveryStatus, deliveredBy = null) {
+        try {
+            const response = await fetch(`${this.baseURL}/orders/${orderId}/delivery-status`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    deliveryStatus,
+                    deliveredBy: deliveredBy || 'admin'
+                })
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || error.message || 'Failed to update delivery status');
+            }
+            
+            return await response.json();
+        } catch (error) {
+            console.error('Error updating delivery status:', error);
             throw error;
         }
     }

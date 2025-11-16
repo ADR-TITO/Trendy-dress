@@ -80,6 +80,52 @@ const orderSchema = new mongoose.Schema({
         enum: ['pending', 'verified', 'failed', 'duplicate'],
         default: 'pending'
     },
+    delivery: {
+        option: {
+            type: String,
+            default: 'pickup'
+        },
+        optionText: {
+            type: String,
+            default: 'Shop Pickup'
+        },
+        cost: {
+            type: Number,
+            default: 0
+        },
+        address: {
+            type: String,
+            default: ''
+        },
+        status: {
+            type: String,
+            enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled'],
+            default: 'pending'
+        },
+        deliveredAt: {
+            type: Date
+        },
+        deliveredBy: {
+            type: String,
+            default: ''
+        }
+    },
+    subtotal: {
+        type: Number,
+        default: 0
+    },
+    totalPaid: {
+        type: Number,
+        default: 0
+    },
+    mpesaCodes: [{
+        code: String,
+        amount: Number
+    }],
+    mpesaCodesString: {
+        type: String,
+        default: ''
+    },
     verificationDetails: {
         amountMatch: {
             type: Boolean,

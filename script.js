@@ -499,7 +499,29 @@ async function checkAllStorageFacilities() {
                     })));
                 }
             } catch (error) {
-                console.log(`   ⚠️ MongoDB: Backend available but error fetching products: ${error.message}`);
+                // Check if it's an expected error (timeout, network, abort)
+                const errorName = error.name || '';
+                const errorMsg = error.message || '';
+                
+                const isExpectedError = 
+                    errorName === 'AbortError' || 
+                    errorName === 'TypeError' || 
+                    errorMsg.includes('aborted') || 
+                    errorMsg.includes('Aborted') ||
+                    errorMsg.includes('fetch') || 
+                    errorMsg.includes('network') ||
+                    errorMsg.includes('Network') ||
+                    errorMsg.includes('timeout') ||
+                    errorMsg.includes('Timeout');
+                
+                if (!isExpectedError) {
+                    // Only log unexpected errors
+                    console.log(`   ⚠️ MongoDB: Backend available but error fetching products: ${error.message}`);
+                } else {
+                    // Silently handle expected errors (backend might be slow or not responding)
+                    // Don't log this - it's expected when backend is not fully available
+                    results.mongodb.available = false;
+                }
             }
         } else {
             console.log('   ❌ MongoDB: Backend not available');
@@ -699,6 +721,7 @@ async function checkAllStorageFacilities() {
 }
 
 // Unified function to sync products to ALL storage locations (MongoDB, localStorage, IndexedDB)
+// PRIORITY: MongoDB first, then localStorage/IndexedDB as backup
 async function syncProductsToAllStorage(productsToSync, options = {}) {
     const {
         skipMongoDB = false,
@@ -706,6 +729,11 @@ async function syncProductsToAllStorage(productsToSync, options = {}) {
         skipIndexedDB = false,
         preserveImages = true
     } = options;
+    
+    console.log(`🔄 [syncProductsToAllStorage] Syncing ${productsToSync.length} products...`);
+    console.log(`   MongoDB: ${skipMongoDB ? '⏭️ Skipped' : '✅ Enabled'}`);
+    console.log(`   localStorage: ${skipLocalStorage ? '⏭️ Skipped' : '✅ Enabled (backup)'}`);
+    console.log(`   IndexedDB: ${skipIndexedDB ? '⏭️ Skipped' : '✅ Enabled (backup)'}`);
     
     console.log('🔄 [syncProductsToAllStorage] Starting sync to all storage locations...');
     console.log('🔄 Products to sync:', productsToSync.length);
@@ -1589,6 +1617,82 @@ function normalizeSize(size) {
     return sizeKey || 'M';
 }
 
+// Get display name for category
+function getCategoryDisplayName(category) {
+    const categoryMap = {
+        'dresses': 'Dresses',
+        'tracksuits': 'Tracksuits',
+        'others': 'Others',
+        'khaki-pants-jeans': 'Khaki Pants & Jeans'
+    };
+    return categoryMap[category] || category.charAt(0).toUpperCase() + category.slice(1).replace(/-/g, ' ');
+}
+
+// Lazy load product images in background (optimization for faster initial page load)
+async function loadProductImagesLazy(products) {
+    try {
+        const useMongoDB = localStorage.getItem('useMongoDB') === 'true';
+        if (!useMongoDB) {
+            // If not using MongoDB, images should already be in localStorage
+            return;
+        }
+        
+        // Filter products that need images loaded
+        const productsNeedingImages = products.filter(p => {
+            const hasImageFlag = p.hasImage === true;
+            const noImageData = !p.image || p.image.trim() === '';
+            return hasImageFlag && noImageData;
+        });
+        
+        if (productsNeedingImages.length === 0) {
+            return; // All images already loaded
+        }
+        
+        console.log(`🖼️ Loading images for ${productsNeedingImages.length} products in background...`);
+        
+        // Load images in batches to avoid overwhelming the server
+        const batchSize = 5;
+        for (let i = 0; i < productsNeedingImages.length; i += batchSize) {
+            const batch = productsNeedingImages.slice(i, i + batchSize);
+            
+            // Load images for this batch in parallel
+            await Promise.all(batch.map(async (product) => {
+                try {
+                    const productId = product._id || product.id;
+                    if (!productId) return;
+                    
+                    // Fetch full product with image
+                    const fullProduct = await apiService.getProduct(productId);
+                    if (fullProduct && fullProduct.image) {
+                        // Update product in products array
+                        const productIndex = products.findIndex(p => 
+                            (p._id || p.id) === productId
+                        );
+                        if (productIndex !== -1) {
+                            products[productIndex].image = fullProduct.image;
+                            // Update display if this product is visible
+                            displayProducts(currentCategory);
+                        }
+                    }
+                } catch (imgError) {
+                    // Silently fail - image will remain empty
+                    console.warn(`⚠️ Failed to load image for product ${product.name}:`, imgError.message);
+                }
+            }));
+            
+            // Small delay between batches to avoid overwhelming server
+            if (i + batchSize < productsNeedingImages.length) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+        }
+        
+        console.log(`✅ Finished loading product images in background`);
+    } catch (error) {
+        console.warn('⚠️ Error in lazy image loading:', error.message);
+        // Don't throw - this is a background optimization
+    }
+}
+
 // Calculate final price with discount
 function getFinalPrice(product) {
     const discount = product.discount || 0;
@@ -1799,7 +1903,7 @@ function displayProducts(filterCategory = 'all') {
             ">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap;">
                     <div style="flex: 1; min-width: 180px;">
-                        <div class="product-category" style="color: var(--primary-color); font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">${mainProduct.category}</div>
+                        <div class="product-category" style="color: var(--primary-color); font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">${getCategoryDisplayName(mainProduct.category)}</div>
                         <div class="product-name" style="font-size: 1rem; font-weight: bold; color: var(--dark-color); margin-bottom: 8px; line-height: 1.2;">${mainProduct.name}</div>
                         <div style="margin: 8px 0;">
                             <div style="font-size: 0.7rem; color: #666; margin-bottom: 6px; font-weight: 500;">
@@ -2252,10 +2356,51 @@ function openPaymentModal() {
     overlay.style.display = 'block';
 }
 
+// Update payment method UI based on selection
+function updatePaymentMethod() {
+    const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked')?.value || 'till';
+    const mpesaCodeGroup = document.getElementById('mpesaCodeGroup');
+    const mpesaCodeInput = document.getElementById('mpesaCode');
+    const tillPaymentSteps = document.getElementById('tillPaymentSteps');
+    const stkPushPaymentSteps = document.getElementById('stkPushPaymentSteps');
+    
+    if (paymentMethod === 'stk-push') {
+        // Hide M-Pesa code input for STK Push
+        if (mpesaCodeGroup) {
+            mpesaCodeGroup.style.display = 'none';
+        }
+        if (mpesaCodeInput) {
+            mpesaCodeInput.removeAttribute('required');
+        }
+        // Show STK Push steps, hide Till steps
+        if (tillPaymentSteps) {
+            tillPaymentSteps.style.display = 'none';
+        }
+        if (stkPushPaymentSteps) {
+            stkPushPaymentSteps.style.display = 'block';
+        }
+    } else {
+        // Show M-Pesa code input for Till payment
+        if (mpesaCodeGroup) {
+            mpesaCodeGroup.style.display = 'block';
+        }
+        if (mpesaCodeInput) {
+            mpesaCodeInput.setAttribute('required', 'required');
+        }
+        // Show Till steps, hide STK Push steps
+        if (tillPaymentSteps) {
+            tillPaymentSteps.style.display = 'block';
+        }
+        if (stkPushPaymentSteps) {
+            stkPushPaymentSteps.style.display = 'none';
+        }
+    }
+}
+
 // Update payment steps (simplified - only Till Number)
 function updatePaymentSteps() {
     // Payment steps are now static since we only support Till Number
-    // This function is kept for compatibility but doesn't need to do anything
+    updatePaymentMethod(); // Also update payment method UI
 }
 
 // Show Secure Till Payment Modal
@@ -3600,8 +3745,8 @@ async function processPayment(event) {
             return;
         }
         
-        // Payment method is always 'till' now (Paybill removed)
-        const paymentMethod = 'till';
+        // Get selected payment method
+        const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked')?.value || 'till';
         const deliveryOption = document.querySelector('input[name="deliveryOption"]:checked');
         const deliveryAddress = document.getElementById('deliveryAddress')?.value || '';
         
@@ -3618,6 +3763,13 @@ async function processPayment(event) {
         const deliveryCost = getDeliveryCost();
         const total = subtotal + deliveryCost;
         
+        // Handle STK Push payment differently
+        if (paymentMethod === 'stk-push') {
+            await processSTKPushPayment(customerName, customerPhone, customerEmail, total, deliveryOption, deliveryAddress, subtotal, deliveryCost);
+            return;
+        }
+        
+        // Handle Till Number payment (existing flow)
         // Get all M-Pesa codes (first + additional)
         const allMpesaCodes = getAllMpesaCodes();
         
@@ -4038,15 +4190,6 @@ async function processPayment(event) {
             // Continue even if display fails
         }
         
-        // Generate PDF receipt
-        try {
-            generateReceiptPDF(order);
-        } catch (pdfError) {
-            console.error('❌ Error generating PDF receipt:', pdfError);
-            alert('Error generating PDF receipt. Please try again or contact support.');
-            return;
-        }
-        
         // Store order
         currentOrder = order;
         
@@ -4055,7 +4198,7 @@ async function processPayment(event) {
         
         // Automatically send receipt to WhatsApp via backend (no notification on website)
         try {
-            // Generate PDF first if not already generated
+            // Generate PDF first (await to ensure it's ready)
             if (!currentOrderPDF) {
                 await generateReceiptPDF(order);
             }
@@ -4095,6 +4238,296 @@ async function processPayment(event) {
         console.error('❌ Error processing payment:', error);
         alert('An error occurred while processing your payment. Please try again or contact support.\n\nError: ' + error.message);
         showNotification('Payment processing failed. Please try again.', 'error');
+    }
+}
+
+// Process STK Push (M-Pesa Prompt) payment
+async function processSTKPushPayment(customerName, customerPhone, customerEmail, total, deliveryOption, deliveryAddress, subtotal, deliveryCost) {
+    try {
+        // Show loading modal
+        showPaymentVerificationModal();
+        
+        // Check if MongoDB is available
+        const useMongoDB = localStorage.getItem('useMongoDB') === 'true';
+        
+        if (!useMongoDB) {
+            hidePaymentVerificationModal();
+            alert('STK Push payment requires MongoDB backend. Please ensure the backend server is running.');
+            return;
+        }
+        
+        // Generate order ID first
+        const orderId = 'ORD-' + Date.now();
+        
+        // Get delivery option text
+        let deliveryOptionText = 'Shop Pickup';
+        if (deliveryOption) {
+            switch(deliveryOption.value) {
+                case 'pickup':
+                    deliveryOptionText = 'Shop Pickup';
+                    break;
+                case 'nairobi-cbd':
+                    deliveryOptionText = 'Delivery within Nairobi CBD (KSh 250)';
+                    break;
+                case 'elsewhere':
+                    deliveryOptionText = 'Delivery Elsewhere (within Kenya) (KSh 300)';
+                    break;
+            }
+        }
+        
+        // Initiate STK Push
+        console.log('📱 Initiating STK Push payment...');
+        const stkResult = await apiService.initiateSTKPush(
+            customerPhone,
+            total,
+            orderId,
+            `Payment for order ${orderId}`
+        );
+        
+        if (!stkResult.success) {
+            hidePaymentVerificationModal();
+            alert(`Failed to initiate M-Pesa payment prompt:\n\n${stkResult.responseDescription || 'Unknown error'}`);
+            return;
+        }
+        
+        // Show waiting message
+        const verificationModal = document.getElementById('paymentVerificationModal');
+        const verificationText = verificationModal?.querySelector('p');
+        if (verificationText) {
+            verificationText.textContent = 'A payment prompt has been sent to your phone. Please enter your M-Pesa PIN to complete the payment...';
+        }
+        
+        console.log('✅ STK Push initiated:', stkResult.checkoutRequestID);
+        console.log('📱 Customer message:', stkResult.customerMessage);
+        
+        // Poll for payment completion
+        const checkoutRequestID = stkResult.checkoutRequestID;
+        let attempts = 0;
+        const maxAttempts = 60; // Poll for up to 2 minutes (60 * 2 seconds)
+        
+        const pollPaymentStatus = async () => {
+            attempts++;
+            
+            try {
+                // Query STK Push status
+                const statusResult = await apiService.querySTKPushStatus(checkoutRequestID);
+                
+                if (statusResult.resultCode === '0') {
+                    // Payment successful! Check for transaction in database
+                    console.log('✅ Payment completed via STK Push');
+                    
+                    // Wait a moment for webhook to process
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    
+                    // Check for transaction in database by checking recent transactions
+                    if (useMongoDB) {
+                        try {
+                            // Try to get transactions from API
+                            const response = await fetch(`${apiService.baseURL}/mpesa/transactions?phoneNumber=${customerPhone.replace(/^0/, '254')}&limit=1`);
+                            if (response.ok) {
+                                const data = await response.json();
+                                if (data.success && data.transactions && data.transactions.length > 0) {
+                                    const transaction = data.transactions[0];
+                                    const receiptNumber = transaction.receiptNumber;
+                                    const transactionAmount = transaction.amount;
+                                    
+                                    // Verify amount matches
+                                    if (Math.abs(transactionAmount - total) < 1) {
+                                        // Create order with the receipt number
+                                        await createOrderFromSTKPush(
+                                            orderId,
+                                            customerName,
+                                            customerPhone,
+                                            customerEmail,
+                                            total,
+                                            deliveryOption,
+                                            deliveryAddress,
+                                            subtotal,
+                                            deliveryCost,
+                                            deliveryOptionText,
+                                            receiptNumber
+                                        );
+                                        return; // Exit polling
+                                    }
+                                }
+                            }
+                        } catch (checkError) {
+                            console.error('Error checking transaction:', checkError);
+                        }
+                    }
+                    
+                    // If we couldn't find transaction, still create order (transaction will be linked via webhook)
+                    await createOrderFromSTKPush(
+                        orderId,
+                        customerName,
+                        customerPhone,
+                        customerEmail,
+                        total,
+                        deliveryOption,
+                        deliveryAddress,
+                        subtotal,
+                        deliveryCost,
+                        deliveryOptionText,
+                        null // Receipt number will come from webhook
+                    );
+                    return; // Exit polling
+                } else if (statusResult.resultCode === '1032') {
+                    // User cancelled or timeout - keep polling
+                    if (attempts < maxAttempts) {
+                        setTimeout(pollPaymentStatus, 2000);
+                    } else {
+                        hidePaymentVerificationModal();
+                        alert('Payment timeout. Please try again or use Till Number payment method.');
+                    }
+                } else {
+                    // Payment failed or error
+                    hidePaymentVerificationModal();
+                    alert(`Payment failed:\n\n${statusResult.resultDesc || 'Unknown error'}`);
+                }
+            } catch (error) {
+                console.error('Error polling STK Push status:', error);
+                if (attempts < maxAttempts) {
+                    setTimeout(pollPaymentStatus, 2000);
+                } else {
+                    hidePaymentVerificationModal();
+                    alert('Error checking payment status. Please check your M-Pesa messages or use Till Number payment method.');
+                }
+            }
+        };
+        
+        // Start polling
+        setTimeout(pollPaymentStatus, 2000); // Start after 2 seconds
+        
+    } catch (error) {
+        hidePaymentVerificationModal();
+        console.error('❌ Error processing STK Push payment:', error);
+        alert(`Failed to initiate M-Pesa payment:\n\n${error.message}\n\nPlease try again or use Till Number payment method.`);
+    }
+}
+
+// Create order from STK Push payment
+async function createOrderFromSTKPush(orderId, customerName, customerPhone, customerEmail, total, deliveryOption, deliveryAddress, subtotal, deliveryCost, deliveryOptionText, mpesaCode) {
+    try {
+        hidePaymentVerificationModal();
+        
+        // Create order object
+        const order = {
+            orderId: orderId,
+            date: new Date().toLocaleString('en-KE'),
+            customer: {
+                name: customerName,
+                phone: customerPhone,
+                email: customerEmail
+            },
+            items: cart.map(item => {
+                const product = products.find(p => p.id === item.id);
+                return {
+                    name: item.name,
+                    quantity: item.quantity,
+                    price: item.price,
+                    subtotal: item.price * item.quantity,
+                    productId: item.id || '',
+                    image: product?.image || item.image || ''
+                };
+            }),
+            subtotal: subtotal,
+            delivery: {
+                option: deliveryOption ? deliveryOption.value : 'pickup',
+                optionText: deliveryOptionText,
+                cost: deliveryCost,
+                address: deliveryAddress || ''
+            },
+            total: total,
+            totalPaid: total,
+            paymentMethod: 'M-Pesa STK Push',
+            mpesaCode: mpesaCode || 'PENDING',
+            mpesaCodes: mpesaCode ? [{ code: mpesaCode, amount: total }] : [],
+            mpesaCodesString: mpesaCode || 'Pending'
+        };
+        
+        // Save order to localStorage first
+        saveOrderToLocalStorage(order);
+        console.log('✅ Order saved to localStorage');
+        
+        // Save order to MongoDB if available
+        const useMongoDB = localStorage.getItem('useMongoDB') === 'true';
+        if (useMongoDB) {
+            try {
+                await apiService.createOrder(order);
+                console.log('✅ Order saved to MongoDB');
+            } catch (orderError) {
+                console.error('❌ Error saving order:', orderError);
+                // Continue even if MongoDB save fails
+            }
+        }
+        
+        // Subtract quantity from products
+        cart.forEach(cartItem => {
+            const product = products.find(p => p.id === cartItem.id);
+            if (product) {
+                const currentQuantity = product.quantity || 0;
+                const purchasedQuantity = cartItem.quantity;
+                product.quantity = Math.max(0, currentQuantity - purchasedQuantity);
+            }
+        });
+        
+        // Save updated products
+        try {
+            await saveProducts();
+        } catch (saveError) {
+            console.error('❌ Error saving products:', saveError);
+        }
+        
+        // Refresh product display
+        try {
+            displayProducts(currentCategory);
+        } catch (displayError) {
+            console.error('❌ Error displaying products:', displayError);
+        }
+        
+        // Generate PDF receipt
+        try {
+            await generateReceiptPDF(order);
+        } catch (pdfError) {
+            console.error('❌ Error generating PDF receipt:', pdfError);
+        }
+        
+        // Store order
+        currentOrder = order;
+        
+        // Close payment modal
+        closePaymentModal();
+        
+        // Send receipt to WhatsApp
+        try {
+            if (!currentOrderPDF) {
+                await generateReceiptPDF(order);
+            }
+            
+            if (useMongoDB) {
+                try {
+                    await apiService.sendReceiptToWhatsApp(order, currentOrderPDF);
+                    console.log('✅ Receipt and PDF sent to WhatsApp via backend');
+                } catch (backendError) {
+                    console.error('❌ Backend WhatsApp send failed:', backendError);
+                    sendReceiptViaWhatsAppSilent();
+                }
+            } else {
+                sendReceiptViaWhatsAppSilent();
+            }
+        } catch (whatsappError) {
+            console.error('❌ Error sending receipt to WhatsApp:', whatsappError);
+        }
+        
+        // Clear cart
+        cart = [];
+        updateCartUI();
+        saveCart();
+        toggleCart();
+        
+    } catch (error) {
+        console.error('❌ Error creating order from STK Push:', error);
+        alert('Error creating order. Please contact support.');
     }
 }
 
@@ -4208,38 +4641,70 @@ async function generateReceiptPDF(order) {
     for (const item of order.items) {
         doc.setFontSize(10);
         
-        // Find product to get image
-        const product = products.find(p => p.id === item.productId || p.name === item.name);
-        const itemImage = product?.image || item.image || '';
+        // Find product to get image - try multiple ways
+        let itemImage = item.image || '';
+        if (!itemImage || itemImage.trim() === '') {
+            const product = products.find(p => 
+                p.id === item.productId || 
+                p._id === item.productId ||
+                (p.name && item.name && p.name.toLowerCase() === item.name.toLowerCase())
+            );
+            itemImage = product?.image || '';
+        }
         
-        // Add item image if available
-        if (itemImage && itemImage.trim() !== '') {
+        const hasImage = itemImage && itemImage.trim() !== '';
+        
+        // Add item image if available - ensure it's visible
+        if (hasImage) {
             try {
-                // Add image (30x30mm, left side)
-                const imgWidth = 30;
-                const imgHeight = 30;
+                // Add image (35x35mm for better visibility, left side)
+                const imgWidth = 35;
+                const imgHeight = 35;
                 const imgX = 20;
-                const imgY = yPos - 25;
+                const imgY = yPos - 30;
                 
                 // Convert base64 data URL to usable format
-                let imageData = itemImage;
-                if (itemImage.startsWith('data:image')) {
-                    // Already a data URL
-                    doc.addImage(imageData, 'JPEG', imgX, imgY, imgWidth, imgHeight);
-                } else if (itemImage.startsWith('http')) {
-                    // URL - would need to fetch, for now skip
-                    console.log('⚠️ Image URL not supported in PDF, skipping:', item.name);
+                let imageData = itemImage.trim();
+                
+                // Handle different image formats
+                if (imageData.startsWith('data:image/')) {
+                    // Already a data URL with format
+                    const formatMatch = imageData.match(/data:image\/(\w+);base64,/);
+                    const format = formatMatch ? formatMatch[1].toUpperCase() : 'JPEG';
+                    // Extract base64 part
+                    const base64Data = imageData.split(',')[1];
+                    imageData = `data:image/${format.toLowerCase()};base64,${base64Data}`;
+                    
+                    // Try to add image
+                    try {
+                        doc.addImage(imageData, format, imgX, imgY, imgWidth, imgHeight);
+                    } catch (formatError) {
+                        // If format fails, try JPEG
+                        doc.addImage(imageData, 'JPEG', imgX, imgY, imgWidth, imgHeight);
+                    }
+                } else if (imageData.startsWith('http://') || imageData.startsWith('https://')) {
+                    // URL - log warning but don't skip, user can see it's an image URL
+                    console.log('⚠️ Image URL not directly supported in PDF:', item.name);
+                    // Still show item name
+                    doc.text(item.name.substring(0, 40), imgX + imgWidth + 5, yPos);
                 } else {
-                    // Assume base64 without data URL prefix
-                    imageData = 'data:image/jpeg;base64,' + itemImage;
-                    doc.addImage(imageData, 'JPEG', imgX, imgY, imgWidth, imgHeight);
+                    // Assume base64 without data URL prefix - try JPEG first
+                    imageData = 'data:image/jpeg;base64,' + imageData;
+                    try {
+                        doc.addImage(imageData, 'JPEG', imgX, imgY, imgWidth, imgHeight);
+                    } catch (jpegError) {
+                        // Try PNG
+                        imageData = 'data:image/png;base64,' + itemImage;
+                        doc.addImage(imageData, 'PNG', imgX, imgY, imgWidth, imgHeight);
+                    }
                 }
                 
                 // Item name (moved to the right of image)
-                doc.text(item.name.substring(0, 30), imgX + imgWidth + 5, yPos);
-                yPos += 10; // Extra space for image
+                doc.text(item.name.substring(0, 30), imgX + imgWidth + 8, yPos);
+                yPos += 12; // Extra space for image
             } catch (imgError) {
                 console.error('Error adding image to PDF for item:', item.name, imgError);
+                console.error('Image data preview:', itemImage.substring(0, 50));
                 // Fallback to text only
                 doc.text(item.name.substring(0, 40), 20, yPos);
             }
@@ -4249,12 +4714,12 @@ async function generateReceiptPDF(order) {
         }
         
         // Quantity, Price, Subtotal (shifted right if image exists)
-        const textStartX = (itemImage && itemImage.trim() !== '') ? 55 : 120;
+        const textStartX = hasImage ? 60 : 120;
         doc.text(item.quantity.toString(), textStartX, yPos);
         doc.text(`KSh ${item.price.toLocaleString('en-KE')}`, textStartX + 30, yPos);
         doc.text(`KSh ${item.subtotal.toLocaleString('en-KE')}`, textStartX + 50, yPos);
         
-        yPos += (itemImage && itemImage.trim() !== '') ? 35 : 6; // More space if image exists
+        yPos += hasImage ? 40 : 6; // More space if image exists (increased for better visibility)
         
         // Check if we need a new page
         if (yPos > 250) {
@@ -4669,8 +5134,17 @@ function switchAdminTab(tabName) {
     
     // Show selected tab
     document.getElementById(tabName + 'Tab').classList.add('active');
-    const clickedBtn = event.target;
-    clickedBtn.classList.add('active');
+    const clickedBtn = event.target.closest('.admin-tab');
+    if (clickedBtn) {
+        clickedBtn.classList.add('active');
+    }
+    
+    // Load orders if orders tab is selected
+    if (tabName === 'orders') {
+        loadAdminOrders();
+    } else if (tabName === 'completed') {
+        loadCompletedOrders();
+    }
 }
 
 // Product Management
@@ -5813,25 +6287,48 @@ async function loadProducts() {
         let loadSource = 'none';
         
         // Check if MongoDB backend is available AND database is actually connected
-        const backendAvailable = await apiService.checkBackend();
         let useMongoDB = false;
         let mongoDBConnected = false;
         
-        if (backendAvailable) {
-            try {
-                const dbStatus = await apiService.checkMongoDBStatus();
-                mongoDBConnected = (dbStatus.readyState === 1);
-                if (mongoDBConnected) {
-                    useMongoDB = true;
-                    console.log('✅ MongoDB is connected - will load from MongoDB');
-                } else {
-                    console.log(`ℹ️ MongoDB backend available but database not connected (ReadyState: ${dbStatus.readyState}) - will load from localStorage/IndexedDB`);
+        try {
+            console.log('🔍 Checking MongoDB backend availability...');
+            const backendAvailable = await apiService.checkBackend();
+            
+            if (backendAvailable) {
+                console.log('🔍 Backend is available - checking MongoDB connection...');
+                try {
+                    const dbStatus = await apiService.checkMongoDBStatus();
+                    mongoDBConnected = dbStatus && dbStatus.readyState === 1;
+                    
+                    if (mongoDBConnected) {
+                        useMongoDB = true;
+                        localStorage.setItem('useMongoDB', 'true');
+                        console.log('✅ MongoDB is connected - will use MongoDB');
+                        console.log(`   Database: ${dbStatus.name || 'trendy-dresses'}`);
+                        console.log(`   Host: ${dbStatus.host || 'connected'}`);
+                    } else {
+                        const statusText = dbStatus?.readyStateText || 'unknown';
+                        const readyState = dbStatus?.readyState || 0;
+                        console.warn(`⚠️ MongoDB backend available but database not connected`);
+                        console.warn(`   Status: ${statusText} (ReadyState: ${readyState})`);
+                        console.warn(`   Will use fallback storage (localStorage/IndexedDB)`);
+                        useMongoDB = false;
+                        localStorage.setItem('useMongoDB', 'false');
+                    }
+                } catch (dbError) {
+                    console.warn('⚠️ Error checking MongoDB connection status:', dbError.message);
                     useMongoDB = false;
+                    localStorage.setItem('useMongoDB', 'false');
                 }
-            } catch (error) {
-                console.log('ℹ️ Could not check MongoDB connection status - will load from localStorage/IndexedDB');
+            } else {
+                console.log('ℹ️ Backend not available - will use fallback storage');
                 useMongoDB = false;
+                localStorage.setItem('useMongoDB', 'false');
             }
+        } catch (checkError) {
+            console.warn('⚠️ Error during MongoDB availability check:', checkError.message);
+            useMongoDB = false;
+            localStorage.setItem('useMongoDB', 'false');
         }
         
         // Check localStorage/IndexedDB first to see what we have locally
@@ -5866,124 +6363,123 @@ async function loadProducts() {
             console.error('❌ Error checking local storage:', error);
         }
         
-        // Try MongoDB API first (only if database is actually connected)
+        // PRIORITY: Use MongoDB ONLY when available, sync all local products to MongoDB
         if (useMongoDB && mongoDBConnected) {
             // Update localStorage preference to MongoDB
             localStorage.setItem('useMongoDB', 'true');
-            localStorage.setItem('preferredStorage', 'mongodb'); // Set preference
+            localStorage.setItem('preferredStorage', 'mongodb');
+            
             try {
-                const mongoProducts = await apiService.getProducts('all');
-                console.log(`📦 Loaded ${mongoProducts.length} products from MongoDB API`);
-                console.log(`📦 Found ${localProductCount} products in localStorage/IndexedDB`);
+                // Step 1: Load products from MongoDB (primary source) - WITHOUT images for faster loading
+                const mongoProducts = await apiService.getProducts('all', false);
+                console.log(`📦 Loaded ${mongoProducts.length} products from MongoDB (without images for faster loading)`);
                 
-                // CRITICAL FIX: Determine which source is more up-to-date
-                // If localStorage/IndexedDB has fewer products than MongoDB, it means products were deleted locally
-                // In this case, use local products as source of truth (they're more up-to-date after deletion)
-                if (localProductCount > 0 && localProductCount < mongoProducts.length) {
-                    // Local storage has fewer products - products were deleted locally
-                    console.log(`⚠️ localStorage/IndexedDB has ${localProductCount} products, MongoDB has ${mongoProducts.length}`);
-                    console.log(`🔄 This suggests products were deleted locally but MongoDB wasn't synced`);
-                    console.log(`🔄 Using local products as source of truth (they're more up-to-date after deletion)...`);
-                    
-                    // Use local products (they're more up-to-date after deletion)
-                    loadedProducts = localProducts.map(p => ({
-                        ...p,
-                        id: p.id || p._id,
-                        image: p.image || ''
-                    }));
-                    loadSource = 'localStorage/IndexedDB (source of truth after deletion)';
-                    console.log(`📦 Using ${loadedProducts.length} products from localStorage/IndexedDB (more up-to-date after deletion)`);
-                    
-                    // Sync local products to MongoDB (this will delete products not in local list)
-                    try {
-                        console.log(`🔄 Syncing local products to MongoDB to remove deleted products...`);
-                        await syncProductsToAllStorage(localProducts, { preserveImages: true });
-                        console.log(`✅ Synced local products to MongoDB - deleted products should now be removed`);
-                    } catch (syncError) {
-                        console.error('❌ Error syncing to MongoDB:', syncError);
-                        // Continue using local products even if sync failed
-                    }
-                } else if (localProductCount === 0 && mongoProducts.length > 0) {
-                    // Local storage is empty but MongoDB has products - use MongoDB
-                    console.log(`ℹ️ Local storage is empty, using ${mongoProducts.length} products from MongoDB`);
-                    loadedProducts = mongoProducts.map(p => ({
-                        ...p,
-                        id: p._id || p.id,
-                        image: p.image || ''
-                    }));
-                    loadSource = 'MongoDB';
-                } else if (localProductCount > 0 && localProductCount === mongoProducts.length) {
-                    // Same count - use MongoDB (more reliable, has images if available)
-                    console.log(`✅ Product counts match (${localProductCount}) - using MongoDB`);
-                    loadedProducts = mongoProducts.map(p => ({
-                        ...p,
-                        id: p._id || p.id,
-                        image: p.image || ''
-                    }));
-                    loadSource = 'MongoDB';
-                } else if (mongoProducts.length > 0) {
-                    // MongoDB has more products or equal - use MongoDB
-                    console.log(`ℹ️ Using ${mongoProducts.length} products from MongoDB`);
-                    loadedProducts = mongoProducts.map(p => ({
-                        ...p,
-                        id: p._id || p.id,
-                        image: p.image || ''
-                    }));
-                    loadSource = 'MongoDB';
-                } else if (localProductCount > 0) {
-                    // Only local has products, use local and sync to MongoDB
-                    console.log(`ℹ️ MongoDB is empty, using ${localProductCount} products from localStorage/IndexedDB`);
-                    loadedProducts = localProducts.map(p => ({
-                        ...p,
-                        id: p.id || p._id,
-                        image: p.image || ''
-                    }));
-                    loadSource = 'localStorage/IndexedDB';
-                    
-                    // Sync to MongoDB
-                    try {
-                        console.log(`🔄 Syncing local products to MongoDB...`);
-                        await syncProductsToAllStorage(localProducts, { preserveImages: true });
-                        console.log(`✅ Synced local products to MongoDB`);
-                    } catch (syncError) {
-                        console.error('❌ Error syncing to MongoDB:', syncError);
-                    }
+                // Step 1.5: Load images for products that have them (lazy load)
+                // This is done asynchronously after initial display
+                if (mongoProducts.length > 0) {
+                    console.log('🖼️ Loading product images in background...');
+                    loadProductImagesLazy(mongoProducts).catch(err => {
+                        console.warn('⚠️ Some product images failed to load:', err.message);
+                    });
                 }
                 
-                if (loadedProducts.length > 0) {
-                    console.log('📦 First product:', loadedProducts[0] ? { id: loadedProducts[0].id, name: loadedProducts[0].name } : 'none');
-                    console.log('📦 Last product:', loadedProducts[loadedProducts.length - 1] ? { id: loadedProducts[loadedProducts.length - 1].id, name: loadedProducts[loadedProducts.length - 1].name } : 'none');
-                    console.log('📦 All product IDs:', loadedProducts.map(p => p.id));
-                    console.log('📦 All product names:', loadedProducts.map(p => p.name));
+                // Step 2: If we have local products, sync them to MongoDB (ensure all products are in MongoDB)
+                if (localProductCount > 0 && localProducts.length > 0) {
+                    console.log(`🔄 Found ${localProductCount} products in localStorage/IndexedDB - syncing to MongoDB...`);
+                    try {
+                        await syncProductsToAllStorage(localProducts, { preserveImages: true });
+                        console.log(`✅ Synced ${localProductCount} local products to MongoDB`);
+                        
+                        // Reload from MongoDB after sync to get the latest data (without images for speed)
+                        const updatedMongoProducts = await apiService.getProducts('all', false);
+                        loadedProducts = updatedMongoProducts.map(p => ({
+                            ...p,
+                            id: p._id || p.id,
+                            image: p.image || '' // Will be empty, loaded lazily
+                        }));
+                        loadSource = 'MongoDB (synced from local)';
+                        console.log(`📦 Using ${loadedProducts.length} products from MongoDB (after sync)`);
+                        
+                        // Load images in background
+                        loadProductImagesLazy(loadedProducts).catch(err => {
+                            console.warn('⚠️ Some product images failed to load:', err.message);
+                        });
+                    } catch (syncError) {
+                        console.error('❌ Error syncing to MongoDB:', syncError);
+                        // If sync fails, still use MongoDB products (they're the source of truth)
+                        loadedProducts = mongoProducts.map(p => ({
+                            ...p,
+                            id: p._id || p.id,
+                            image: p.image || ''
+                        }));
+                        loadSource = 'MongoDB';
+                    }
                 } else {
-                    console.log('ℹ️ MongoDB returned 0 products (database is empty)');
+                    // No local products - use MongoDB directly
+                    loadedProducts = mongoProducts.map(p => ({
+                        ...p,
+                        id: p._id || p.id,
+                        image: p.image || '' // Will be empty, loaded lazily
+                    }));
+                    loadSource = 'MongoDB';
+                    console.log(`📦 Using ${loadedProducts.length} products from MongoDB`);
+                    
+                    // Load images in background for products that have them
+                    loadProductImagesLazy(loadedProducts).catch(err => {
+                        console.warn('⚠️ Some product images failed to load:', err.message);
+                    });
                 }
                 
-                // Log image status for debugging
-                loadedProducts.forEach(product => {
-                    if (product.image && product.image.length > 0) {
-                        console.log(`📷 Product "${product.name}" has image (${product.image.length} chars)`);
-                    } else {
-                        console.log(`⚠️ Product "${product.name}" has NO image`);
-                    }
-                });
             } catch (error) {
-                // Silently handle network errors when backend is not available
-                // Only log if it's not a network error (backend might not be running)
+                // MongoDB failed - check if it's a transient error or permanent failure
                 const errorMsg = error.message || error.toString() || '';
-                if (!errorMsg.includes('Database not connected') && !errorMsg.includes('MongoDB connection') && 
-                    error.name !== 'TypeError' && !errorMsg.includes('fetch') && !errorMsg.includes('network')) {
+                const errorName = error.name || '';
+                
+                const isExpectedError = 
+                    errorName === 'AbortError' || 
+                    errorName === 'TypeError' || 
+                    errorMsg.includes('aborted') || 
+                    errorMsg.includes('Aborted') ||
+                    errorMsg.includes('fetch') || 
+                    errorMsg.includes('network') ||
+                    errorMsg.includes('Network') ||
+                    errorMsg.includes('Database not connected') || 
+                    errorMsg.includes('MongoDB connection') ||
+                    errorMsg.includes('backend not available') ||
+                    errorMsg.includes('Failed to fetch');
+                
+                if (!isExpectedError) {
                     console.error('❌ MongoDB API load error:', errorMsg);
+                    console.error('❌ Error details:', error);
+                } else {
+                    // Expected error (timeout, network issue) - don't log as error
+                    console.warn(`⚠️ MongoDB request ${errorName === 'AbortError' ? 'timed out' : 'failed'}: ${errorMsg}`);
                 }
+                
+                // Only fall back if it's a real failure, not just a timeout
+                if (errorName === 'AbortError') {
+                    console.warn('⚠️ MongoDB request timed out - using fallback storage');
+                } else {
+                    console.warn('⚠️ MongoDB not available - falling back to localStorage/IndexedDB');
+                }
+                
+                // Mark MongoDB as unavailable for this session
                 useMongoDB = false;
                 localStorage.setItem('useMongoDB', 'false');
-                console.log('ℹ️ Failed to load from MongoDB - will load from localStorage/IndexedDB');
+                
+                // Will fall through to localStorage/IndexedDB fallback below
             }
         }
         
-        // Fallback to localStorage and IndexedDB if MongoDB is not available or not connected
-        // OR if we haven't loaded any products yet
+        // FALLBACK: Only use localStorage/IndexedDB if MongoDB is not available or failed to load
         if (loadedProducts.length === 0) {
+            if (useMongoDB && mongoDBConnected) {
+                // MongoDB was available but failed to load products
+                console.warn('⚠️ MongoDB was connected but failed to load products - using fallback storage');
+            } else {
+                console.log('⚠️ MongoDB not available - using localStorage/IndexedDB as fallback');
+            }
+            
             // Use local products if we found them earlier
             if (localProductCount > 0 && localProducts.length > 0) {
                 loadedProducts = localProducts.map(p => ({
@@ -5992,7 +6488,7 @@ async function loadProducts() {
                     image: p.image || ''
                 }));
                 loadSource = localProductCount === localProducts.length ? 'localStorage/IndexedDB' : 'IndexedDB';
-                console.log(`📦 Using ${loadedProducts.length} products from ${loadSource} (MongoDB not available or not connected)`);
+                console.log(`📦 Using ${loadedProducts.length} products from ${loadSource} (MongoDB not available - fallback mode)`);
             } else {
                 // Check localStorage again if we didn't check earlier
                 const savedProducts = localStorage.getItem('products');
@@ -7167,7 +7663,485 @@ if (typeof window !== 'undefined') {
     window.confirmDelete = confirmDelete;
     window.validateMpesaCode = validateMpesaCode;
     window.validateMpesaCodeInput = validateMpesaCodeInput;
+    window.loadAdminOrders = loadAdminOrders;
+    window.loadCompletedOrders = loadCompletedOrders;
+    window.searchAdminOrders = searchAdminOrders;
+    window.searchCompletedOrders = searchCompletedOrders;
+    window.viewOrderDetails = viewOrderDetails;
+    window.downloadOrderReceipt = downloadOrderReceipt;
+    window.toggleDeliveryStatus = toggleDeliveryStatus;
     // Initialize pending delete storage
     window.pendingDelete = null;
+}
+
+// Admin Orders Management
+let allAdminOrders = [];
+let filteredAdminOrders = [];
+let allCompletedOrders = [];
+let filteredCompletedOrders = [];
+
+async function loadAdminOrders(searchQuery = '') {
+    // Load only non-delivered orders (active orders)
+    await loadAdminOrdersInternal(searchQuery, false);
+}
+
+async function loadCompletedOrders(searchQuery = '') {
+    // Load only delivered orders (completed orders)
+    await loadAdminOrdersInternal(searchQuery, true);
+}
+
+async function loadAdminOrdersInternal(searchQuery = '', completedOnly = false) {
+    const ordersList = completedOnly ? document.getElementById('adminCompletedList') : document.getElementById('adminOrdersList');
+    const searchResults = completedOnly ? document.getElementById('adminCompletedSearchResults') : document.getElementById('adminOrderSearchResults');
+    const totalCountElement = completedOnly ? document.getElementById('adminTotalCompletedCount') : document.getElementById('adminTotalOrdersCount');
+    
+    if (!ordersList) return;
+    
+    try {
+        // Show loading
+        ordersList.innerHTML = `
+            <div style="text-align: center; padding: 40px 20px; color: #666;">
+                <div class="spinner" style="border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
+                <p>Loading orders...</p>
+            </div>
+        `;
+        
+        const useMongoDB = localStorage.getItem('useMongoDB') === 'true';
+        
+        if (useMongoDB) {
+            try {
+                // Load orders from MongoDB
+                const orders = await apiService.getOrders();
+                allAdminOrders = orders || [];
+                console.log(`✅ Loaded ${allAdminOrders.length} orders from MongoDB`);
+            } catch (apiError) {
+                console.error('❌ Error loading orders from MongoDB:', apiError);
+                allAdminOrders = [];
+            }
+        }
+        
+        // Also load from localStorage as backup
+        try {
+            const localOrdersJson = localStorage.getItem('orders');
+            if (localOrdersJson) {
+                const localOrders = JSON.parse(localOrdersJson);
+                // Merge with MongoDB orders (avoid duplicates)
+                localOrders.forEach(localOrder => {
+                    const exists = allAdminOrders.find(o => o.orderId === localOrder.orderId);
+                    if (!exists) {
+                        allAdminOrders.push(localOrder);
+                    }
+                });
+            }
+        } catch (localError) {
+            console.error('Error loading orders from localStorage:', localError);
+        }
+        
+        // Separate delivered and non-delivered orders
+        const deliveredOrders = allAdminOrders.filter(order => {
+            const deliveryStatus = order.delivery?.status || 'pending';
+            return deliveryStatus === 'delivered';
+        });
+        
+        const activeOrders = allAdminOrders.filter(order => {
+            const deliveryStatus = order.delivery?.status || 'pending';
+            return deliveryStatus !== 'delivered';
+        });
+        
+        // Update global arrays for tracking
+        allCompletedOrders = deliveredOrders;
+        
+        // Use appropriate list based on completedOnly flag
+        let ordersToDisplay = completedOnly ? deliveredOrders : activeOrders;
+        
+        // Sort orders by date (newest first)
+        ordersToDisplay.sort((a, b) => {
+            const dateA = new Date(a.createdAt || a.date || 0);
+            const dateB = new Date(b.createdAt || b.date || 0);
+            return dateB - dateA;
+        });
+        
+        // Filter orders if search query provided
+        let filteredList = ordersToDisplay;
+        if (searchQuery && searchQuery.trim() !== '') {
+            const query = searchQuery.toLowerCase().trim();
+            filteredList = ordersToDisplay.filter(order => {
+                const orderId = (order.orderId || '').toLowerCase();
+                const customerName = (order.customer?.name || '').toLowerCase();
+                const customerPhone = (order.customer?.phone || '').toLowerCase();
+                const mpesaCode = (order.mpesaCode || '').toLowerCase();
+                return orderId.includes(query) || 
+                       customerName.includes(query) || 
+                       customerPhone.includes(query) ||
+                       mpesaCode.includes(query);
+            });
+        }
+        
+        // Update filtered arrays
+        if (completedOnly) {
+            filteredCompletedOrders = filteredList;
+        } else {
+            filteredAdminOrders = filteredList;
+        }
+        
+        // Update count
+        if (totalCountElement) {
+            totalCountElement.textContent = filteredList.length;
+        }
+        
+        // Update badge counts
+        updateOrderBadges();
+        
+        // Update search results message
+        if (searchResults) {
+            if (searchQuery && searchQuery.trim() !== '') {
+                if (filteredList.length === 0) {
+                    searchResults.textContent = `No ${completedOnly ? 'completed ' : ''}orders found matching "${searchQuery}"`;
+                    searchResults.style.color = '#f44336';
+                } else {
+                    searchResults.textContent = `Found ${filteredList.length} ${completedOnly ? 'completed ' : ''}order(s) matching "${searchQuery}"`;
+                    searchResults.style.color = '#4caf50';
+                }
+            } else {
+                searchResults.textContent = '';
+            }
+        }
+        
+        // Display orders
+        if (filteredList.length === 0) {
+            ordersList.innerHTML = `
+                <div style="text-align: center; padding: 40px 20px; color: #666;">
+                    <i class="fas fa-receipt" style="font-size: 3rem; margin-bottom: 15px; opacity: 0.3;"></i>
+                    <p style="font-size: 1.1rem; margin-bottom: 10px;">No orders found</p>
+                    <p style="font-size: 0.9rem;">Orders will appear here once customers make payments.</p>
+                </div>
+            `;
+        } else {
+            // Store completedOnly flag for use in template
+            const isCompletedTab = completedOnly;
+            
+            ordersList.innerHTML = filteredList.map(order => {
+                const orderDate = order.date || order.createdAt || new Date().toLocaleString('en-KE');
+                const customerName = order.customer?.name || 'N/A';
+                const customerPhone = order.customer?.phone || 'N/A';
+                const total = order.total || 0;
+                const paymentMethod = order.paymentMethod || 'N/A';
+                const mpesaCode = order.mpesaCode || 'N/A';
+                const verified = order.verified ? '✅ Verified' : '⚠️ Pending';
+                const deliveryStatus = order.delivery?.status || 'pending';
+                const deliveryStatusColor = deliveryStatus === 'delivered' ? '#4caf50' : 
+                                           deliveryStatus === 'shipped' ? '#2196F3' : 
+                                           deliveryStatus === 'processing' ? '#ff9800' : '#666';
+                const deliveryStatusIcon = deliveryStatus === 'delivered' ? '✅' : 
+                                          deliveryStatus === 'shipped' ? '🚚' : 
+                                          deliveryStatus === 'processing' ? '⏳' : '📦';
+                
+                const deliveryInfo = order.delivery?.option !== 'pickup' 
+                    ? `<div style="margin-top: 8px; padding: 10px; background: #f0f7ff; border-radius: 5px; border-left: 3px solid ${deliveryStatusColor};">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                            <strong>Delivery:</strong>
+                            <span style="color: ${deliveryStatusColor}; font-weight: bold; font-size: 0.9rem;">
+                                ${deliveryStatusIcon} ${deliveryStatus.charAt(0).toUpperCase() + deliveryStatus.slice(1)}
+                            </span>
+                        </div>
+                        <div style="font-size: 0.9rem; margin-bottom: 5px;">${order.delivery?.optionText || 'N/A'}</div>
+                        <div style="font-size: 0.85rem; color: #666;">📍 ${order.delivery?.address || 'N/A'}</div>
+                    </div>`
+                    : `<div style="margin-top: 8px; padding: 10px; background: #f0f7ff; border-radius: 5px; border-left: 3px solid ${deliveryStatusColor};">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <strong>Delivery:</strong>
+                            <span style="color: ${deliveryStatusColor}; font-weight: bold; font-size: 0.9rem;">
+                                ${deliveryStatusIcon} ${deliveryStatus.charAt(0).toUpperCase() + deliveryStatus.slice(1)}
+                            </span>
+                        </div>
+                        <div style="font-size: 0.9rem; margin-top: 5px;">Shop Pickup</div>
+                    </div>`;
+                
+                return `
+                    <div style="border: 1px solid #ddd; border-radius: 8px; padding: 20px; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                            <div style="flex: 1;">
+                                <h4 style="margin: 0 0 8px 0; color: var(--primary-color); font-size: 1.1rem;">
+                                    <i class="fas fa-receipt"></i> ${order.orderId}
+                                </h4>
+                                <div style="font-size: 0.9rem; color: #666;">
+                                    <i class="far fa-clock"></i> ${orderDate}
+                                </div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-size: 1.3rem; font-weight: bold; color: var(--success-color);">
+                                    KSh ${total.toLocaleString('en-KE')}
+                                </div>
+                                <div style="font-size: 0.85rem; color: #666; margin-top: 4px;">
+                                    ${verified}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div style="border-top: 1px solid #eee; padding-top: 15px; margin-top: 15px;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                                <div>
+                                    <strong style="color: #666; font-size: 0.85rem;">Customer:</strong>
+                                    <div style="margin-top: 4px; font-size: 0.95rem;">${customerName}</div>
+                                    <div style="font-size: 0.85rem; color: #666; margin-top: 2px;">
+                                        <i class="fas fa-phone"></i> ${customerPhone}
+                                    </div>
+                                </div>
+                                <div>
+                                    <strong style="color: #666; font-size: 0.85rem;">Payment:</strong>
+                                    <div style="margin-top: 4px; font-size: 0.95rem;">${paymentMethod}</div>
+                                    <div style="font-size: 0.85rem; color: #666; margin-top: 2px;">
+                                        <i class="fas fa-qrcode"></i> ${mpesaCode}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            ${deliveryInfo}
+                            
+                            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;">
+                                <strong style="color: #666; font-size: 0.85rem;">Items (${order.items?.length || 0}):</strong>
+                                <div style="margin-top: 8px; max-height: 150px; overflow-y: auto;">
+                                    ${(order.items || []).map(item => `
+                                        <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f0f0f0;">
+                                            <span style="font-size: 0.9rem;">${item.name} x${item.quantity}</span>
+                                            <span style="font-weight: bold; color: var(--primary-color);">KSh ${item.subtotal?.toLocaleString('en-KE') || '0'}</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 2px solid #eee; font-weight: bold;">
+                                    <span>Total:</span>
+                                    <span style="color: var(--success-color); font-size: 1.1rem;">KSh ${total.toLocaleString('en-KE')}</span>
+                                </div>
+                            </div>
+                            
+                            ${!isCompletedTab ? `
+                            <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
+                                <div style="display: flex; align-items: center; gap: 8px; padding: 8px; background: #f9f9f9; border-radius: 5px; flex: 1; min-width: 200px;">
+                                    <input type="checkbox" id="deliveryCheck_${order.orderId}" 
+                                           ${deliveryStatus === 'delivered' ? 'checked' : ''}
+                                           onchange="toggleDeliveryStatus('${order.orderId}', this.checked)"
+                                           style="width: 18px; height: 18px; cursor: pointer;">
+                                    <label for="deliveryCheck_${order.orderId}" style="cursor: pointer; font-weight: 500; font-size: 0.9rem; margin: 0; user-select: none;">
+                                        Mark as Delivered
+                                    </label>
+                                </div>
+                            </div>
+                            ` : `
+                            <div style="margin-top: 15px; padding: 10px; background: #e8f5e9; border-radius: 5px; border-left: 3px solid #4caf50;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-check-circle" style="color: #4caf50; font-size: 1.2rem;"></i>
+                                    <span style="color: #4caf50; font-weight: bold; font-size: 0.9rem;">
+                                        ✅ Order Completed${order.delivery?.deliveredAt ? ` - ${new Date(order.delivery.deliveredAt).toLocaleDateString('en-KE')}` : ''}
+                                    </span>
+                                </div>
+                            </div>
+                            `}
+                            <div style="margin-top: 10px; display: flex; gap: 10px;">
+                                <button onclick="viewOrderDetails('${order.orderId}')" class="btn-primary" style="flex: 1; padding: 10px;">
+                                    <i class="fas fa-eye"></i> View Details
+                                </button>
+                                <button onclick="downloadOrderReceipt('${order.orderId}')" class="btn-secondary" style="flex: 1; padding: 10px;">
+                                    <i class="fas fa-download"></i> Download PDF
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+    } catch (error) {
+        console.error('❌ Error loading admin orders:', error);
+        ordersList.innerHTML = `
+            <div style="text-align: center; padding: 40px 20px; color: #f44336;">
+                <i class="fas fa-exclamation-triangle" style="font-size: 3rem; margin-bottom: 15px;"></i>
+                <p style="font-size: 1.1rem; margin-bottom: 10px;">Error loading orders</p>
+                <p style="font-size: 0.9rem;">${error.message}</p>
+            </div>
+        `;
+    }
+}
+
+function searchAdminOrders(query) {
+    loadAdminOrders(query);
+}
+
+function searchCompletedOrders(query) {
+    loadCompletedOrders(query);
+}
+
+function updateOrderBadges() {
+    // Update badges for active and completed orders
+    const activeOrders = allAdminOrders.filter(order => {
+        const deliveryStatus = order.delivery?.status || 'pending';
+        return deliveryStatus !== 'delivered';
+    }).length;
+    
+    const completedOrders = allCompletedOrders.length;
+    
+    const ordersBadge = document.getElementById('ordersBadge');
+    const completedBadge = document.getElementById('completedBadge');
+    
+    if (ordersBadge) {
+        if (activeOrders > 0) {
+            ordersBadge.textContent = activeOrders;
+            ordersBadge.style.display = 'inline-block';
+        } else {
+            ordersBadge.style.display = 'none';
+        }
+    }
+    
+    if (completedBadge) {
+        if (completedOrders > 0) {
+            completedBadge.textContent = completedOrders;
+            completedBadge.style.display = 'inline-block';
+        } else {
+            completedBadge.style.display = 'none';
+        }
+    }
+}
+
+function viewOrderDetails(orderId) {
+    const order = allAdminOrders.find(o => o.orderId === orderId);
+    if (!order) {
+        alert('Order not found');
+        return;
+    }
+    
+    // Create detailed view modal
+    const details = `
+Order ID: ${order.orderId}
+Date: ${order.date || order.createdAt || 'N/A'}
+Customer: ${order.customer?.name || 'N/A'}
+Phone: ${order.customer?.phone || 'N/A'}
+Email: ${order.customer?.email || 'N/A'}
+
+Items:
+${(order.items || []).map(item => `• ${item.name} x${item.quantity} - KSh ${item.subtotal?.toLocaleString('en-KE') || '0'}`).join('\n')}
+
+Subtotal: KSh ${(order.subtotal || order.total || 0).toLocaleString('en-KE')}
+${order.delivery?.cost > 0 ? `Delivery: KSh ${order.delivery.cost.toLocaleString('en-KE')}\n` : ''}
+Total: KSh ${order.total?.toLocaleString('en-KE') || '0'}
+
+Payment Method: ${order.paymentMethod || 'N/A'}
+M-Pesa Code: ${order.mpesaCode || 'N/A'}
+Verified: ${order.verified ? 'Yes' : 'Pending'}
+
+${order.delivery?.option !== 'pickup' ? `Delivery Address:\n${order.delivery?.address || 'N/A'}\n` : ''}
+    `;
+    
+    alert(details);
+}
+
+async function downloadOrderReceipt(orderId) {
+    const order = allAdminOrders.find(o => o.orderId === orderId);
+    if (!order) {
+        alert('Order not found');
+        return;
+    }
+    
+    try {
+        // Generate PDF for this order
+        await generateReceiptPDF(order);
+        showNotification('Receipt downloaded successfully!', 'success');
+    } catch (error) {
+        console.error('Error generating receipt:', error);
+        alert('Error generating receipt. Please try again.');
+    }
+}
+
+async function toggleDeliveryStatus(orderId, isDelivered) {
+    try {
+        const order = allAdminOrders.find(o => o.orderId === orderId);
+        if (!order) {
+            alert('Order not found');
+            return;
+        }
+        
+        const deliveryStatus = isDelivered ? 'delivered' : 'pending';
+        
+        // Show loading
+        const checkbox = document.getElementById(`deliveryCheck_${orderId}`);
+        if (checkbox) {
+            checkbox.disabled = true;
+        }
+        
+        const useMongoDB = localStorage.getItem('useMongoDB') === 'true';
+        
+        if (useMongoDB) {
+            try {
+                // Update in MongoDB
+                await apiService.updateDeliveryStatus(orderId, deliveryStatus);
+                console.log(`✅ Delivery status updated for order ${orderId}: ${deliveryStatus}`);
+            } catch (apiError) {
+                console.error('Error updating delivery status:', apiError);
+                // Revert checkbox
+                if (checkbox) {
+                    checkbox.checked = !isDelivered;
+                }
+                alert(`Failed to update delivery status: ${apiError.message}`);
+                return;
+            }
+        }
+        
+        // Update local order
+        if (order.delivery) {
+            order.delivery.status = deliveryStatus;
+            if (isDelivered) {
+                order.delivery.deliveredAt = new Date();
+                order.delivery.deliveredBy = 'admin';
+            }
+        } else {
+            order.delivery = {
+                status: deliveryStatus,
+                deliveredAt: isDelivered ? new Date() : null,
+                deliveredBy: isDelivered ? 'admin' : ''
+            };
+        }
+        
+        // Update in allAdminOrders array
+        const orderIndex = allAdminOrders.findIndex(o => o.orderId === orderId);
+        if (orderIndex !== -1) {
+            allAdminOrders[orderIndex] = order;
+        }
+        
+        // Save to localStorage
+        try {
+            const ordersJson = localStorage.getItem('orders');
+            if (ordersJson) {
+                let localOrders = JSON.parse(ordersJson);
+                const localOrderIndex = localOrders.findIndex(o => o.orderId === orderId);
+                if (localOrderIndex !== -1) {
+                    localOrders[localOrderIndex] = order;
+                    localStorage.setItem('orders', JSON.stringify(localOrders));
+                }
+            }
+        } catch (localError) {
+            console.error('Error updating order in localStorage:', localError);
+        }
+        
+        // Reload orders display (both active and completed)
+        const searchQuery = document.getElementById('adminOrderSearch')?.value || '';
+        const completedSearchQuery = document.getElementById('adminCompletedSearch')?.value || '';
+        
+        await loadAdminOrders(searchQuery);
+        await loadCompletedOrders(completedSearchQuery);
+        
+        // Show notification
+        showNotification(
+            isDelivered ? '✅ Delivery marked as completed!' : '📦 Delivery status reset to pending',
+            isDelivered ? 'success' : 'info'
+        );
+        
+    } catch (error) {
+        console.error('Error toggling delivery status:', error);
+        alert(`Error updating delivery status: ${error.message}`);
+        
+        // Revert checkbox
+        const checkbox = document.getElementById(`deliveryCheck_${orderId}`);
+        if (checkbox) {
+            checkbox.checked = !isDelivered;
+            checkbox.disabled = false;
+        }
+    }
 }
 

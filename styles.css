@@ -1085,6 +1085,17 @@ body {
     display: block;
 }
 
+.badge {
+    display: inline-block;
+    padding: 2px 6px;
+    background: var(--success-color);
+    color: white;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    margin-left: 5px;
+}
+
 .btn-add {
     padding: 12px 24px;
     background: var(--success-color);

@@ -34,7 +34,7 @@ router.get('/', async (req, res) => {
             }
         }
         
-        const { category } = req.query;
+        const { category, includeImages } = req.query;
         let query = {};
         
         if (category && category !== 'all') {
@@ -44,7 +44,36 @@ router.get('/', async (req, res) => {
         console.log('Fetching products from MongoDB...');
         const products = await Product.find(query).sort({ createdAt: -1 });
         console.log(`✅ Found ${products.length} products`);
-        res.json(products);
+        
+        // OPTIMIZATION: Exclude images from list endpoint by default (dramatically reduces response size)
+        // Images can be loaded separately via /products/:id endpoint when needed
+        if (includeImages !== 'true') {
+            const productsWithoutImages = products.map(p => ({
+                _id: p._id,
+                name: p.name,
+                category: p.category,
+                price: p.price,
+                discount: p.discount,
+                quantity: p.quantity,
+                size: p.size,
+                image: '', // Exclude image data to reduce response size
+                hasImage: !!(p.image && p.image.trim().length > 0), // Flag to indicate image exists
+                createdAt: p.createdAt,
+                updatedAt: p.updatedAt
+            }));
+            
+            console.log(`📦 Returning ${productsWithoutImages.length} products without images (optimized)`);
+            // Add caching headers for better performance
+            res.set({
+                'Cache-Control': 'public, max-age=300', // Cache for 5 minutes
+                'ETag': `"${productsWithoutImages.length}-${Date.now()}"`
+            });
+            res.json(productsWithoutImages);
+        } else {
+            // Include images if explicitly requested
+            console.log(`📦 Returning ${products.length} products with images`);
+            res.json(products);
+        }
     } catch (error) {
         console.error('❌ Error fetching products:', error);
         console.error('Error details:', error.message);

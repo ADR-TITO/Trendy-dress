@@ -150,6 +150,87 @@ router.post('/sync-transaction', async (req, res) => {
     }
 });
 
+// Initiate STK Push (M-Pesa Prompt) payment
+router.post('/stk-push', async (req, res) => {
+    try {
+        const { phoneNumber, amount, accountReference, transactionDesc } = req.body;
+
+        if (!phoneNumber || !amount) {
+            return res.status(400).json({ 
+                error: 'Phone number and amount are required',
+                message: 'Please provide phone number and payment amount'
+            });
+        }
+
+        if (amount <= 0) {
+            return res.status(400).json({ 
+                error: 'Invalid amount',
+                message: 'Payment amount must be greater than 0'
+            });
+        }
+
+        // Validate phone number format (should be 10 digits starting with 0 or 12 digits starting with 254)
+        const phoneRegex = /^(0|254)[0-9]{9}$/;
+        if (!phoneRegex.test(phoneNumber.replace(/\s/g, ''))) {
+            return res.status(400).json({ 
+                error: 'Invalid phone number',
+                message: 'Phone number must be in format: 07XX XXX XXX or 2547XX XXX XXX'
+            });
+        }
+
+        console.log('📱 STK Push request:', { 
+            phoneNumber, 
+            amount, 
+            accountReference: accountReference || 'N/A' 
+        });
+
+        // Initiate STK Push
+        const result = await mpesaService.initiateSTKPush(
+            phoneNumber,
+            amount,
+            accountReference || 'TrendyDresses',
+            transactionDesc || 'Payment for order'
+        );
+
+        res.json({
+            success: true,
+            ...result
+        });
+    } catch (error) {
+        console.error('❌ Error initiating STK Push:', error);
+        res.status(500).json({ 
+            error: 'Failed to initiate M-Pesa payment',
+            message: error.message 
+        });
+    }
+});
+
+// Query STK Push status
+router.post('/stk-push-status', async (req, res) => {
+    try {
+        const { checkoutRequestID } = req.body;
+
+        if (!checkoutRequestID) {
+            return res.status(400).json({ 
+                error: 'Checkout Request ID is required' 
+            });
+        }
+
+        const result = await mpesaService.querySTKPushStatus(checkoutRequestID);
+
+        res.json({
+            success: true,
+            ...result
+        });
+    } catch (error) {
+        console.error('❌ Error querying STK Push status:', error);
+        res.status(500).json({ 
+            error: 'Failed to query STK Push status',
+            message: error.message 
+        });
+    }
+});
+
 // Get all M-Pesa transactions (Admin only)
 router.get('/transactions', async (req, res) => {
     try {
@@ -186,6 +267,7 @@ router.get('/transactions', async (req, res) => {
 });
 
 module.exports = router;
+
 
 
 

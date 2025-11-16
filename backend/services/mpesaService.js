@@ -179,6 +179,130 @@ class MpesaService {
             throw error;
         }
     }
+
+    // Initiate STK Push (M-Pesa Prompt) payment
+    async initiateSTKPush(phoneNumber, amount, accountReference, transactionDesc) {
+        try {
+            if (!this.consumerKey || !this.consumerSecret || !this.shortCode || !this.passkey) {
+                throw new Error('M-Pesa credentials not configured');
+            }
+
+            const token = await this.getAccessToken();
+            
+            // Format phone number (add country code if missing)
+            let formattedPhone = phoneNumber.trim();
+            if (!formattedPhone.startsWith('254')) {
+                // Remove leading 0 and add 254
+                if (formattedPhone.startsWith('0')) {
+                    formattedPhone = '254' + formattedPhone.substring(1);
+                } else {
+                    formattedPhone = '254' + formattedPhone;
+                }
+            }
+            
+            // Format timestamp: YYYYMMDDHHmmss
+            const timestamp = new Date().toISOString().replace(/[-:T]/g, '').split('.')[0];
+            
+            // Generate password (Base64 encoded Shortcode+Passkey+Timestamp)
+            const password = Buffer.from(`${this.shortCode}${this.passkey}${timestamp}`).toString('base64');
+            
+            // Get callback URL from environment or use default
+            const callbackURL = process.env.MPESA_CALLBACK_URL || 'http://localhost:3000/api/mpesa';
+            const stkCallbackURL = `${callbackURL}/webhook`;
+            
+            // STK Push request data
+            const requestData = {
+                BusinessShortCode: this.shortCode,
+                Password: password,
+                Timestamp: timestamp,
+                TransactionType: 'CustomerPayBillOnline',
+                Amount: Math.round(amount), // Amount in whole shillings
+                PartyA: formattedPhone,
+                PartyB: this.shortCode,
+                PhoneNumber: formattedPhone,
+                CallBackURL: stkCallbackURL,
+                AccountReference: accountReference || 'TrendyDresses',
+                TransactionDesc: transactionDesc || 'Payment for order'
+            };
+
+            console.log('📱 Initiating STK Push:', {
+                phoneNumber: formattedPhone,
+                amount: amount,
+                accountReference: accountReference
+            });
+
+            const response = await axios.post(
+                `${this.baseURL}/mpesa/stkpush/v1/processrequest`,
+                requestData,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            if (response.data && response.data.ResponseCode === '0') {
+                console.log('✅ STK Push initiated successfully:', response.data.CheckoutRequestID);
+                return {
+                    success: true,
+                    checkoutRequestID: response.data.CheckoutRequestID,
+                    merchantRequestID: response.data.MerchantRequestID,
+                    customerMessage: response.data.CustomerMessage,
+                    responseCode: response.data.ResponseCode,
+                    responseDescription: response.data.ResponseDescription
+                };
+            } else {
+                throw new Error(response.data?.ResponseDescription || 'Failed to initiate STK Push');
+            }
+        } catch (error) {
+            console.error('❌ Error initiating STK Push:', error.response?.data || error.message);
+            throw new Error(error.response?.data?.errorMessage || error.response?.data?.ResponseDescription || 'Failed to initiate M-Pesa payment prompt');
+        }
+    }
+
+    // Query STK Push status
+    async querySTKPushStatus(checkoutRequestID) {
+        try {
+            if (!this.consumerKey || !this.consumerSecret || !this.shortCode || !this.passkey) {
+                throw new Error('M-Pesa credentials not configured');
+            }
+
+            const token = await this.getAccessToken();
+            const timestamp = new Date().toISOString().replace(/[-:T]/g, '').split('.')[0];
+            const password = Buffer.from(`${this.shortCode}${this.passkey}${timestamp}`).toString('base64');
+
+            const requestData = {
+                BusinessShortCode: this.shortCode,
+                Password: password,
+                Timestamp: timestamp,
+                CheckoutRequestID: checkoutRequestID
+            };
+
+            const response = await axios.post(
+                `${this.baseURL}/mpesa/stkpushquery/v1/query`,
+                requestData,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            return {
+                success: response.data.ResponseCode === '0',
+                responseCode: response.data.ResponseCode,
+                responseDescription: response.data.ResponseDescription,
+                resultCode: response.data.ResultCode,
+                resultDesc: response.data.ResultDesc,
+                checkoutRequestID: checkoutRequestID
+            };
+        } catch (error) {
+            console.error('❌ Error querying STK Push status:', error.response?.data || error.message);
+            throw error;
+        }
+    }
 }
 
 module.exports = new MpesaService();

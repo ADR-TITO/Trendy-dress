@@ -383,7 +383,12 @@ router.post('/', async (req, res) => {
             items,
             total,
             paymentMethod,
-            mpesaCode
+            mpesaCode,
+            delivery,
+            subtotal,
+            totalPaid,
+            mpesaCodes,
+            mpesaCodesString
         } = req.body;
         
         // Validation
@@ -556,8 +561,25 @@ router.post('/', async (req, res) => {
                 image: item.image || '' // Include image in order items
             })),
             total,
+            subtotal: subtotal || total,
+            totalPaid: totalPaid || total,
             paymentMethod,
             mpesaCode: code,
+            mpesaCodes: mpesaCodes || [],
+            mpesaCodesString: mpesaCodesString || code,
+            delivery: delivery ? {
+                option: delivery.option || 'pickup',
+                optionText: delivery.optionText || 'Shop Pickup',
+                cost: delivery.cost || 0,
+                address: delivery.address || '',
+                status: 'pending' // Default status
+            } : {
+                option: 'pickup',
+                optionText: 'Shop Pickup',
+                cost: 0,
+                address: '',
+                status: 'pending'
+            },
             verified: verified,
             verificationDetails: {
                 status: verified ? 'verified' : (mpesaTransaction ? 'failed' : 'pending'),
@@ -601,17 +623,23 @@ router.post('/', async (req, res) => {
         
         console.log(`✅ Order created: ${savedOrder.orderId}, Verified: ${savedOrder.verified}`);
         
-        // Send admin notifications (WhatsApp and email) asynchronously
+        // Send admin notifications (WhatsApp, phone, and email) asynchronously
         try {
-            // Send receipt to WhatsApp (message only for now, PDF will be sent separately from frontend)
+            // Send receipt to customer WhatsApp (message only for now, PDF will be sent separately from frontend)
             sendReceiptToWhatsApp(savedOrder, null, null).catch(err => {
-                console.error('❌ Error sending receipt to WhatsApp (non-blocking):', err);
+                console.error('❌ Error sending receipt to customer WhatsApp (non-blocking):', err);
                 // Don't fail order creation if WhatsApp send fails
+            });
+            
+            // Send admin phone notification (WhatsApp/SMS)
+            sendAdminPhoneNotification(savedOrder).catch(err => {
+                console.error('❌ Error sending admin phone notification (non-blocking):', err);
+                // Don't fail order creation if notification fails
             });
             
             // Send admin email notification
             sendAdminNotification(savedOrder).catch(err => {
-                console.error('❌ Error sending admin notification (non-blocking):', err);
+                console.error('❌ Error sending admin email notification (non-blocking):', err);
                 // Don't fail order creation if notification fails
             });
             
@@ -716,6 +744,50 @@ router.patch('/:orderId/status', async (req, res) => {
     } catch (error) {
         console.error('Error updating order status:', error);
         res.status(500).json({ error: 'Failed to update order status' });
+    }
+});
+
+// Update delivery status (Admin only)
+router.patch('/:orderId/delivery-status', async (req, res) => {
+    try {
+        if (mongoose.connection.readyState !== 1) {
+            return res.status(503).json({ error: 'Database not connected' });
+        }
+        
+        const { deliveryStatus, deliveredBy } = req.body;
+        const orderId = req.params.orderId;
+        
+        const validStatuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
+        if (!validStatuses.includes(deliveryStatus)) {
+            return res.status(400).json({ error: 'Invalid delivery status' });
+        }
+        
+        const updateData = {
+            'delivery.status': deliveryStatus
+        };
+        
+        if (deliveryStatus === 'delivered') {
+            updateData['delivery.deliveredAt'] = new Date();
+            if (deliveredBy) {
+                updateData['delivery.deliveredBy'] = deliveredBy;
+            }
+        }
+        
+        const order = await Order.findOneAndUpdate(
+            { orderId },
+            { $set: updateData },
+            { new: true }
+        );
+        
+        if (!order) {
+            return res.status(404).json({ error: 'Order not found' });
+        }
+        
+        console.log(`✅ Delivery status updated for order ${orderId}: ${deliveryStatus}`);
+        res.json(order);
+    } catch (error) {
+        console.error('Error updating delivery status:', error);
+        res.status(500).json({ error: 'Failed to update delivery status' });
     }
 });
 
@@ -950,6 +1022,136 @@ async function sendReceiptToWhatsApp(order, pdfBase64, pdfFileName) {
         
     } catch (error) {
         console.error('❌ Error in sendReceiptToWhatsApp:', error);
+        throw error;
+    }
+}
+
+// Helper function to send admin phone notification (WhatsApp/SMS)
+async function sendAdminPhoneNotification(order) {
+    try {
+        // Get admin phone number from environment or use default
+        const adminPhone = process.env.ADMIN_PHONE || '254724904692';
+        
+        // Format phone number (remove + if present, ensure it starts with country code)
+        const phoneNumber = adminPhone.replace(/^\+/, '').replace(/\s/g, '');
+        
+        // Create admin notification message
+        const message = `🔔 *NEW ORDER RECEIVED!* 📦\n\n` +
+            `*Order ID:* ${order.orderId}\n` +
+            `*Date:* ${order.date}\n` +
+            `*Customer:* ${order.customer.name}\n` +
+            `*Phone:* ${order.customer.phone}\n` +
+            `${order.customer.email ? `*Email:* ${order.customer.email}\n` : ''}\n` +
+            `*Items:*\n` +
+            `${order.items.map(item => `• ${item.name} x${item.quantity} - KSh ${item.subtotal.toLocaleString('en-KE')}`).join('\n')}\n\n` +
+            `*Subtotal:* KSh ${(order.subtotal || order.total).toLocaleString('en-KE')}\n` +
+            `${order.delivery && order.delivery.cost > 0 ? `*Delivery (${order.delivery.optionText}):* KSh ${order.delivery.cost.toLocaleString('en-KE')}\n` : ''}` +
+            `*Total:* KSh ${order.total.toLocaleString('en-KE')}\n\n` +
+            `*Payment Method:* ${order.paymentMethod}\n` +
+            `*M-Pesa Code:* ${order.mpesaCode}\n` +
+            `*Verified:* ${order.verified ? '✅ Yes' : '⚠️ Pending'}\n\n` +
+            `${order.delivery && order.delivery.option !== 'pickup' ? `*Delivery Address:*\n${order.delivery.address}\n\n` : ''}` +
+            `📱 Check admin panel for full details`;
+        
+        // Option 1: Use Green API (free WhatsApp API service)
+        if (process.env.WHATSAPP_GREEN_API_ID && process.env.WHATSAPP_GREEN_API_TOKEN) {
+            try {
+                const instanceId = process.env.WHATSAPP_GREEN_API_ID;
+                const apiToken = process.env.WHATSAPP_GREEN_API_TOKEN;
+                const chatId = phoneNumber + '@c.us';
+                
+                const messageUrl = `https://api.green-api.com/waInstance${instanceId}/sendMessage/${apiToken}`;
+                await axios.post(messageUrl, {
+                    chatId: chatId,
+                    message: message
+                });
+                console.log('✅ Admin notification sent to WhatsApp via Green API');
+                return { success: true, method: 'green_api', phone: phoneNumber };
+            } catch (apiError) {
+                console.error('❌ Green API error:', apiError.message);
+                // Fall through to other methods
+            }
+        }
+        
+        // Option 2: Use WhatsApp Business API (if configured)
+        if (process.env.WHATSAPP_API_TOKEN && process.env.WHATSAPP_API_URL) {
+            try {
+                await axios.post(process.env.WHATSAPP_API_URL, {
+                    phone: phoneNumber,
+                    message: message
+                }, {
+                    headers: {
+                        'Authorization': `Bearer ${process.env.WHATSAPP_API_TOKEN}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                console.log('✅ Admin notification sent to WhatsApp via Business API');
+                return { success: true, method: 'business_api', phone: phoneNumber };
+            } catch (apiError) {
+                console.error('❌ WhatsApp Business API error:', apiError.message);
+                // Fall through to webhook method
+            }
+        }
+        
+        // Option 3: Use webhook URL (custom webhook service)
+        if (process.env.ADMIN_NOTIFICATION_WEBHOOK_URL || process.env.WHATSAPP_WEBHOOK_URL) {
+            try {
+                const webhookUrl = process.env.ADMIN_NOTIFICATION_WEBHOOK_URL || process.env.WHATSAPP_WEBHOOK_URL;
+                const webhookData = {
+                    phone: phoneNumber,
+                    message: message,
+                    orderId: order.orderId,
+                    type: 'admin_notification'
+                };
+                
+                await axios.post(webhookUrl, webhookData, {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                console.log('✅ Admin notification sent via Webhook');
+                return { success: true, method: 'webhook', phone: phoneNumber };
+            } catch (webhookError) {
+                console.error('❌ Webhook error:', webhookError.message);
+                // Fall through to logging method
+            }
+        }
+        
+        // Option 4: Use WhatsApp API via direct URL
+        if (process.env.WHATSAPP_DIRECT_URL) {
+            try {
+                const whatsappUrl = process.env.WHATSAPP_DIRECT_URL
+                    .replace('{phone}', phoneNumber)
+                    .replace('{message}', encodeURIComponent(message));
+                await axios.get(whatsappUrl);
+                console.log('✅ Admin notification sent via Direct URL');
+                return { success: true, method: 'direct_url', phone: phoneNumber };
+            } catch (directError) {
+                console.error('❌ Direct URL error:', directError.message);
+                // Fall through to logging method
+            }
+        }
+        
+        // Option 5: Log the notification for manual sending
+        console.log('\n========================================');
+        console.log('📱 ADMIN PHONE NOTIFICATION - ACTION REQUIRED');
+        console.log('========================================');
+        console.log('To:', phoneNumber);
+        console.log('Message:');
+        console.log(message);
+        console.log('========================================');
+        console.log('⚠️ To enable automatic admin notifications, configure one of:');
+        console.log('1. Green API: WHATSAPP_GREEN_API_ID and WHATSAPP_GREEN_API_TOKEN');
+        console.log('2. WhatsApp Business API: WHATSAPP_API_TOKEN and WHATSAPP_API_URL');
+        console.log('3. Webhook URL: ADMIN_NOTIFICATION_WEBHOOK_URL or WHATSAPP_WEBHOOK_URL');
+        console.log('4. Direct URL: WHATSAPP_DIRECT_URL (with {phone} and {message} placeholders)');
+        console.log('5. Admin Phone: ADMIN_PHONE (default: 254724904692)');
+        console.log('========================================\n');
+        
+        return { success: true, method: 'logged', phone: phoneNumber, message: message };
+        
+    } catch (error) {
+        console.error('❌ Error in sendAdminPhoneNotification:', error);
         throw error;
     }
 }
