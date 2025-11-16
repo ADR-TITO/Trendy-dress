@@ -228,8 +228,20 @@ async function migrateProductsToMongoDB(overwrite = false) {
             localStorage.setItem('preferredStorage', 'mongodb');
             console.log('\n✅ Migration complete! Reloading products from MongoDB...');
             
-            // Reload products from MongoDB
-            await loadProducts();
+            // After migration, try to reload from MongoDB, but don't fail if it times out
+            try {
+                // Wait a moment for MongoDB to process the new products
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // Try to reload from MongoDB (without images for faster loading)
+                await loadProducts();
+                console.log('✅ Successfully reloaded products from MongoDB after migration');
+            } catch (reloadError) {
+                // If reload fails (timeout, etc.), use the products we just migrated
+                console.warn('⚠️ Could not reload from MongoDB after migration (this is okay):', reloadError.message);
+                console.log('ℹ️ Using migrated products directly - they are already in MongoDB');
+            }
+            
             displayProducts('all');
             
             showNotification(
@@ -441,7 +453,25 @@ async function migrateFromIndexedDBToMongoDB() {
             }
             
             console.log('\n✅ Migration complete! Reloading products from MongoDB...');
-            await loadProducts();
+            
+            // After migration, try to reload from MongoDB, but don't fail if it times out
+            // We'll use the migrated products directly if MongoDB reload fails
+            try {
+                // Wait a moment for MongoDB to process the new products
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // Try to reload from MongoDB (without images for faster loading)
+                await loadProducts();
+                console.log('✅ Successfully reloaded products from MongoDB after migration');
+            } catch (reloadError) {
+                // If reload fails (timeout, etc.), use the products we just migrated
+                console.warn('⚠️ Could not reload from MongoDB after migration (this is okay):', reloadError.message);
+                console.log('ℹ️ Using migrated products directly - they are already in MongoDB');
+                
+                // Products are already in the products array from migration
+                // Just refresh the display
+            }
+            
             displayProducts('all');
             
             showNotification(
