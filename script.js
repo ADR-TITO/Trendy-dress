@@ -2379,6 +2379,10 @@ function updateOrderSummary() {
 
 // Open Payment Modal
 function openPaymentModal() {
+    // Initialize payment method UI when modal opens
+    setTimeout(() => {
+        updatePaymentMethod();
+    }, 100);
     const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     const deliveryCost = getDeliveryCost();
     const total = subtotal + deliveryCost;
@@ -2420,6 +2424,8 @@ function openPaymentModal() {
 // Update payment method UI based on selection
 function updatePaymentMethod() {
     const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked')?.value || 'till';
+    console.log('📱 updatePaymentMethod called - payment method:', paymentMethod);
+    
     const mpesaCodeGroup = document.getElementById('mpesaCodeGroup');
     const mpesaCodeInput = document.getElementById('mpesaCode');
     const tillPaymentSteps = document.getElementById('tillPaymentSteps');
@@ -2430,6 +2436,7 @@ function updatePaymentMethod() {
     const customerPhoneInput = document.getElementById('customerPhone');
     
     if (paymentMethod === 'stk-push') {
+        console.log('📱 STK Push selected - showing phone number field');
         // Hide M-Pesa code input for STK Push
         if (mpesaCodeGroup) {
             mpesaCodeGroup.style.display = 'none';
@@ -5881,9 +5888,19 @@ async function saveProduct(event) {
                 }
                 
                 // Force refresh display to show updated images (use current products array)
-                console.log('🔄 Refreshing product display... Product count:', products.length);
-                displayProducts(currentCategory || 'all');
-                console.log('✅ Product display refreshed');
+                // Use setTimeout to ensure DOM updates after async operations
+                setTimeout(() => {
+                    console.log('🔄 Refreshing product display... Product count:', products.length);
+                    displayProducts(currentCategory || 'all');
+                    console.log('✅ Product display refreshed');
+                    
+                    // Update admin products list (refresh from current products array)
+                    const searchInput = document.getElementById('adminProductSearch');
+                    const searchQuery = searchInput ? searchInput.value : '';
+                    console.log('🔄 Refreshing admin products list...');
+                    loadAdminProducts(searchQuery);
+                    console.log('✅ Admin products list refreshed');
+                }, 100);
             } else {
                 console.error('❌ Failed to sync to any storage location');
                 showNotification('Error: Failed to save product to any storage location', 'error');
@@ -5893,18 +5910,11 @@ async function saveProduct(event) {
             showNotification('Error syncing product: ' + error.message, 'error');
         }
         
-        // Close modal
+        // Close modal AFTER refresh operations are scheduled
         const modal = document.getElementById('productModal');
         const overlay = document.getElementById('modalOverlay');
         if (modal) modal.style.display = 'none';
         if (overlay) overlay.style.display = 'none';
-        
-        // Update admin products list (refresh from current products array)
-        const searchInput = document.getElementById('adminProductSearch');
-        const searchQuery = searchInput ? searchInput.value : '';
-        console.log('🔄 Refreshing admin products list...');
-        loadAdminProducts(searchQuery);
-        console.log('✅ Admin products list refreshed');
     } catch (error) {
         console.error('❌ Error in saveProduct:', error);
         alert('Error saving product: ' + error.message + '. Please check the browser console for details.');
@@ -6386,26 +6396,29 @@ async function confirmDelete() {
             }
             
             // Update UI with remaining products (use current products array)
-            console.log(`✅ Products array has ${products.length} products (after deletion)`);
-            console.log('🔄 Refreshing product display...');
-            currentCategory = 'all';
-            displayProducts('all');
-            console.log('✅ Product display refreshed');
-            
-            // Update active filter button
-            document.querySelectorAll('.filter-btn').forEach(btn => {
-                btn.classList.remove('active');
-                if (btn.getAttribute('data-category') === 'all') {
-                    btn.classList.add('active');
-                }
-            });
-            
-            // Preserve search query if there is one and refresh admin products list
-            const searchInput = document.getElementById('adminProductSearch');
-            const searchQuery = searchInput ? searchInput.value : '';
-            console.log('🔄 Refreshing admin products list...');
-            loadAdminProducts(searchQuery);
-            console.log('✅ Admin products list refreshed');
+            // Use setTimeout to ensure DOM updates after async operations
+            setTimeout(() => {
+                console.log(`✅ Products array has ${products.length} products (after deletion)`);
+                console.log('🔄 Refreshing product display...');
+                currentCategory = 'all';
+                displayProducts('all');
+                console.log('✅ Product display refreshed');
+                
+                // Update active filter button
+                document.querySelectorAll('.filter-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                    if (btn.getAttribute('data-category') === 'all') {
+                        btn.classList.add('active');
+                    }
+                });
+                
+                // Preserve search query if there is one and refresh admin products list
+                const searchInput = document.getElementById('adminProductSearch');
+                const searchQuery = searchInput ? searchInput.value : '';
+                console.log('🔄 Refreshing admin products list...');
+                loadAdminProducts(searchQuery);
+                console.log('✅ Admin products list refreshed');
+            }, 100);
             
             console.log('✅ Product deleted successfully from all storage locations');
             showNotification('Product deleted successfully from all storage locations!', 'success');
