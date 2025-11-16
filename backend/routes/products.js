@@ -78,7 +78,7 @@ router.get('/', async (req, res) => {
         } else {
             // Include images if explicitly requested
             console.log(`📦 Returning ${products.length} products with images`);
-            res.json(products);
+        res.json(products);
         }
     } catch (error) {
         console.error('❌ Error fetching products:', error);

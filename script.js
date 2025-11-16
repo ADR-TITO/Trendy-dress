@@ -244,7 +244,7 @@ async function migrateProductsToMongoDB(overwrite = false) {
                 await new Promise(resolve => setTimeout(resolve, 500));
                 
                 // Try to reload from MongoDB (without images for faster loading)
-                await loadProducts();
+            await loadProducts();
                 console.log('✅ Successfully reloaded products from MongoDB after migration');
             } catch (reloadError) {
                 // If reload fails (timeout, etc.), use the products we just migrated
@@ -487,7 +487,7 @@ async function migrateFromIndexedDBToMongoDB() {
                 await new Promise(resolve => setTimeout(resolve, 500));
                 
                 // Try to reload from MongoDB (without images for faster loading)
-                await loadProducts();
+            await loadProducts();
                 console.log('✅ Successfully reloaded products from MongoDB after migration');
             } catch (reloadError) {
                 // If reload fails (timeout, etc.), use the products we just migrated
@@ -579,7 +579,7 @@ async function checkAllStorageFacilities() {
                         console.log(`   ⚠️ MongoDB: Backend available but request timed out (20s)`);
                         console.log(`   ℹ️ This may be due to slow network or backend processing. Will retry automatically or use fallback storage.`);
                     } else {
-                        console.log(`   ⚠️ MongoDB: Backend available but error fetching products: ${error.message}`);
+                console.log(`   ⚠️ MongoDB: Backend available but error fetching products: ${error.message}`);
                     }
                     results.mongodb.available = false;
                 }
@@ -3897,7 +3897,7 @@ async function processPayment(event) {
             if (paymentMethod === 'stk-push') {
                 alert('Please enter your name and M-Pesa phone number. The payment prompt will be sent to this phone number.');
             } else {
-                alert('Please fill in all required fields: Name and Phone Number.');
+            alert('Please fill in all required fields: Name and Phone Number.');
             }
             if (!customerName) document.getElementById('customerName')?.focus();
             else if (!customerPhone) document.getElementById('customerPhone')?.focus();
@@ -4416,7 +4416,35 @@ async function processSTKPushPayment(customerName, customerPhone, customerEmail,
         
         if (!backendAvailable) {
             hidePaymentVerificationModal();
-            alert('STK Push payment requires the backend server to be running.\n\nPlease ensure:\n1. Backend server is running\n2. Backend is accessible from your network\n3. Check backend URL: ' + apiService.baseURL);
+            
+            // Provide helpful error message based on environment
+            const isProduction = window.location.hostname === 'trendydresses.co.ke' || 
+                                window.location.hostname === 'www.trendydresses.co.ke';
+            
+            let errorMessage = 'STK Push payment requires the backend server to be running.\n\n';
+            
+            if (isProduction) {
+                errorMessage += 'For Production Website:\n';
+                errorMessage += '1. SSH into your production server\n';
+                errorMessage += '2. Navigate to backend folder: cd /path/to/backend\n';
+                errorMessage += '3. Install dependencies: npm install\n';
+                errorMessage += '4. Start with PM2: pm2 start npm --name "trendy-dresses-api" -- start\n';
+                errorMessage += '5. Save PM2: pm2 save && pm2 startup\n';
+                errorMessage += '6. Configure Nginx/Apache reverse proxy (see PRODUCTION_BACKEND_SETUP.md)\n\n';
+                errorMessage += 'Backend URL being checked: ' + apiService.baseURL + '\n\n';
+                errorMessage += 'See PRODUCTION_BACKEND_SETUP.md for detailed instructions.';
+            } else {
+                errorMessage += 'For Local Development:\n';
+                errorMessage += '1. Navigate to backend folder\n';
+                errorMessage += '2. Run: npm start\n';
+                errorMessage += '3. Wait for "✅ Connected to MongoDB successfully"\n';
+                errorMessage += '4. Refresh this page\n\n';
+                errorMessage += 'Backend URL: ' + apiService.baseURL;
+            }
+            
+            alert(errorMessage);
+            console.error('❌ Backend not available at:', apiService.baseURL);
+            console.error('📋 See PRODUCTION_BACKEND_SETUP.md or backend/QUICK_START.md for setup instructions');
             return;
         }
         
@@ -4872,7 +4900,7 @@ async function generateReceiptPDF(order) {
                         doc.addImage(imageData, format, imgX, imgY, imgWidth, imgHeight);
                     } catch (formatError) {
                         // If format fails, try JPEG
-                        doc.addImage(imageData, 'JPEG', imgX, imgY, imgWidth, imgHeight);
+                    doc.addImage(imageData, 'JPEG', imgX, imgY, imgWidth, imgHeight);
                     }
                 } else if (imageData.startsWith('http://') || imageData.startsWith('https://')) {
                     // URL - log warning but don't skip, user can see it's an image URL
@@ -4883,7 +4911,7 @@ async function generateReceiptPDF(order) {
                     // Assume base64 without data URL prefix - try JPEG first
                     imageData = 'data:image/jpeg;base64,' + imageData;
                     try {
-                        doc.addImage(imageData, 'JPEG', imgX, imgY, imgWidth, imgHeight);
+                    doc.addImage(imageData, 'JPEG', imgX, imgY, imgWidth, imgHeight);
                     } catch (jpegError) {
                         // Try PNG
                         imageData = 'data:image/png;base64,' + itemImage;
@@ -5328,7 +5356,7 @@ function switchAdminTab(tabName) {
     document.getElementById(tabName + 'Tab').classList.add('active');
     const clickedBtn = event.target.closest('.admin-tab');
     if (clickedBtn) {
-        clickedBtn.classList.add('active');
+    clickedBtn.classList.add('active');
     }
     
     // Load orders if orders tab is selected
@@ -5890,10 +5918,10 @@ async function saveProduct(event) {
                 // Reload products from MongoDB if available (to get latest IDs and ensure sync)
                 let productsReloaded = false;
                 try {
-                    const backendAvailable = await apiService.checkBackend();
-                    if (backendAvailable) {
+                const backendAvailable = await apiService.checkBackend();
+                if (backendAvailable) {
                         console.log('🔄 Reloading products from MongoDB after save...');
-                        await loadProducts();
+                    await loadProducts();
                         productsReloaded = true;
                         console.log('✅ Products reloaded from MongoDB. Product count:', products.length);
                     }
@@ -6513,31 +6541,31 @@ async function loadProducts() {
         try {
             console.log('🔍 Checking MongoDB backend availability...');
             const backendAvailable = await apiService.checkBackend();
-            
-            if (backendAvailable) {
+        
+        if (backendAvailable) {
                 console.log('🔍 Backend is available - checking MongoDB connection...');
-                try {
-                    const dbStatus = await apiService.checkMongoDBStatus();
+            try {
+                const dbStatus = await apiService.checkMongoDBStatus();
                     mongoDBConnected = dbStatus && dbStatus.readyState === 1;
                     
-                    if (mongoDBConnected) {
-                        useMongoDB = true;
+                if (mongoDBConnected) {
+                    useMongoDB = true;
                         localStorage.setItem('useMongoDB', 'true');
                         console.log('✅ MongoDB is connected - will use MongoDB');
                         console.log(`   Database: ${dbStatus.name || 'trendy-dresses'}`);
                         console.log(`   Host: ${dbStatus.host || 'connected'}`);
-                    } else {
+                } else {
                         const statusText = dbStatus?.readyStateText || 'unknown';
                         const readyState = dbStatus?.readyState || 0;
                         console.warn(`⚠️ MongoDB backend available but database not connected`);
                         console.warn(`   Status: ${statusText} (ReadyState: ${readyState})`);
                         console.warn(`   Will use fallback storage (localStorage/IndexedDB)`);
-                        useMongoDB = false;
+                    useMongoDB = false;
                         localStorage.setItem('useMongoDB', 'false');
-                    }
+                }
                 } catch (dbError) {
                     console.warn('⚠️ Error checking MongoDB connection status:', dbError.message);
-                    useMongoDB = false;
+                useMongoDB = false;
                     localStorage.setItem('useMongoDB', 'false');
                 }
             } else {
@@ -6583,18 +6611,30 @@ async function loadProducts() {
             console.error('❌ Error checking local storage:', error);
         }
         
-        // PRIORITY: Use MongoDB ONLY when available, sync all local products to MongoDB
+        // PRIORITY: MongoDB is PERMANENT, CENTRALIZED storage - primary source of truth
         if (useMongoDB && mongoDBConnected) {
             // Update localStorage preference to MongoDB
             localStorage.setItem('useMongoDB', 'true');
             localStorage.setItem('preferredStorage', 'mongodb');
             
             try {
-                // Step 1: Load products from MongoDB (primary source) - WITHOUT images for faster loading
+                // Step 1: Load products from MongoDB (PERMANENT, CENTRALIZED storage) - WITHOUT images for faster loading
                 const mongoProducts = await apiService.getProducts('all', false);
-                console.log(`📦 Loaded ${mongoProducts.length} products from MongoDB (without images for faster loading)`);
+                console.log(`📦 Loaded ${mongoProducts.length} products from MongoDB (permanent, centralized storage)`);
                 
-                // Step 1.5: Load images for products that have them (lazy load)
+                // Step 1.5: Cache MongoDB data to IndexedDB for offline access
+                try {
+                    await storageManager.init();
+                    if (storageManager.useIndexedDB && storageManager.db) {
+                        await storageManager.syncFromMongoDB(mongoProducts);
+                        console.log(`✅ Cached MongoDB data to IndexedDB for offline access`);
+                    }
+                } catch (cacheError) {
+                    console.warn('⚠️ Could not cache to IndexedDB:', cacheError.message);
+                    // Continue - caching is optional
+                }
+                
+                // Step 1.6: Load images for products that have them (lazy load)
                 // This is done asynchronously after initial display
                 if (mongoProducts.length > 0) {
                     console.log('🖼️ Loading product images in background...');
@@ -6603,22 +6643,29 @@ async function loadProducts() {
                     });
                 }
                 
-                // Step 2: If we have local products, sync them to MongoDB (ensure all products are in MongoDB)
+                // Step 2: If we have local products, sync them to MongoDB (MongoDB is authoritative)
                 if (localProductCount > 0 && localProducts.length > 0) {
-                    console.log(`🔄 Found ${localProductCount} products in localStorage/IndexedDB - syncing to MongoDB...`);
+                    console.log(`🔄 Found ${localProductCount} products in local cache - syncing to MongoDB (authoritative)...`);
                     try {
                         await syncProductsToAllStorage(localProducts, { preserveImages: true });
-                        console.log(`✅ Synced ${localProductCount} local products to MongoDB`);
-                        
+                        console.log(`✅ Synced ${localProductCount} local products to MongoDB (permanent storage)`);
+                    
                         // Reload from MongoDB after sync to get the latest data (without images for speed)
                         const updatedMongoProducts = await apiService.getProducts('all', false);
                         loadedProducts = updatedMongoProducts.map(p => ({
-                            ...p,
+                        ...p,
                             id: p._id || p.id,
                             image: p.image || '' // Will be empty, loaded lazily
-                        }));
-                        loadSource = 'MongoDB (synced from local)';
-                        console.log(`📦 Using ${loadedProducts.length} products from MongoDB (after sync)`);
+                    }));
+                        loadSource = 'MongoDB (permanent, centralized)';
+                        console.log(`📦 Using ${loadedProducts.length} products from MongoDB (authoritative)`);
+                    
+                        // Update IndexedDB cache with latest MongoDB data
+                        try {
+                            await storageManager.syncFromMongoDB(updatedMongoProducts);
+                        } catch (cacheError) {
+                            console.warn('⚠️ Could not update IndexedDB cache:', cacheError.message);
+                        }
                         
                         // Load images in background
                         loadProductImagesLazy(loadedProducts).catch(err => {
@@ -6627,28 +6674,28 @@ async function loadProducts() {
                     } catch (syncError) {
                         console.error('❌ Error syncing to MongoDB:', syncError);
                         // If sync fails, still use MongoDB products (they're the source of truth)
-                        loadedProducts = mongoProducts.map(p => ({
-                            ...p,
-                            id: p._id || p.id,
-                            image: p.image || ''
-                        }));
-                        loadSource = 'MongoDB';
+                    loadedProducts = mongoProducts.map(p => ({
+                        ...p,
+                        id: p._id || p.id,
+                        image: p.image || ''
+                    }));
+                        loadSource = 'MongoDB (permanent, centralized)';
                     }
                 } else {
-                    // No local products - use MongoDB directly
+                    // No local products - use MongoDB directly (primary source)
                     loadedProducts = mongoProducts.map(p => ({
                         ...p,
                         id: p._id || p.id,
                         image: p.image || '' // Will be empty, loaded lazily
                     }));
-                    loadSource = 'MongoDB';
-                    console.log(`📦 Using ${loadedProducts.length} products from MongoDB`);
+                    loadSource = 'MongoDB (permanent, centralized)';
+                    console.log(`📦 Using ${loadedProducts.length} products from MongoDB (permanent, centralized storage)`);
                     
                     // Load images in background for products that have them
                     loadProductImagesLazy(loadedProducts).catch(err => {
                         console.warn('⚠️ Some product images failed to load:', err.message);
                     });
-                }
+                    }
                 
             } catch (error) {
                 // MongoDB failed - check if it's a transient error or permanent failure
@@ -6693,24 +6740,26 @@ async function loadProducts() {
             }
         }
         
-        // FALLBACK: Only use localStorage/IndexedDB if MongoDB is not available or failed to load
+        // FALLBACK: Use IndexedDB cache/localStorage only if MongoDB is not available
+        // MongoDB is permanent, centralized storage. IndexedDB is cache/fallback for offline access.
         if (loadedProducts.length === 0) {
             if (useMongoDB && mongoDBConnected) {
                 // MongoDB was available but failed to load products
-                console.warn('⚠️ MongoDB was connected but failed to load products - using fallback storage');
+                console.warn('⚠️ MongoDB was connected but failed to load products - using IndexedDB cache (fallback)');
             } else {
-                console.log('⚠️ MongoDB not available - using localStorage/IndexedDB as fallback');
+                console.log('⚠️ MongoDB not available - using IndexedDB cache/localStorage (fallback mode)');
+                console.log('   Note: MongoDB is permanent, centralized storage. IndexedDB is cache/fallback.');
             }
             
-            // Use local products if we found them earlier
+            // Use local cache (IndexedDB/localStorage) if we found them earlier
             if (localProductCount > 0 && localProducts.length > 0) {
                 loadedProducts = localProducts.map(p => ({
                     ...p,
                     id: p.id || p._id,
                     image: p.image || ''
                 }));
-                loadSource = localProductCount === localProducts.length ? 'localStorage/IndexedDB' : 'IndexedDB';
-                console.log(`📦 Using ${loadedProducts.length} products from ${loadSource} (MongoDB not available - fallback mode)`);
+                loadSource = localProductCount === localProducts.length ? 'IndexedDB cache/localStorage' : 'IndexedDB cache';
+                console.log(`📦 Using ${loadedProducts.length} products from ${loadSource} (offline/fallback - MongoDB is primary)`);
             } else {
                 // Check localStorage again if we didn't check earlier
                 const savedProducts = localStorage.getItem('products');
@@ -6724,7 +6773,7 @@ async function loadProducts() {
                     }
                 }
                 
-                // Check IndexedDB if localStorage is empty
+                // Check IndexedDB cache if localStorage is empty (IndexedDB is cache/fallback for complex local storage)
                 if (loadedProducts.length === 0) {
                     try {
                         await storageManager.init();
@@ -6732,16 +6781,17 @@ async function loadProducts() {
                             const indexedProducts = await storageManager.loadProducts();
                             if (indexedProducts && indexedProducts.length > 0) {
                                 loadedProducts = indexedProducts;
-                                loadSource = 'IndexedDB';
-                                console.log(`📦 Loaded ${loadedProducts.length} products from IndexedDB (fallback)`);
+                                loadSource = 'IndexedDB cache';
+                                console.log(`📦 Loaded ${loadedProducts.length} products from IndexedDB cache (offline/fallback)`);
+                                console.log(`   Note: This is cached data. MongoDB is permanent, centralized storage.`);
                                 
-                                // Save to localStorage as backup
+                                // Save lightweight version to localStorage as minimal backup (not source of truth)
                                 try {
                                     const productsJson = JSON.stringify(indexedProducts);
                                     const sizeInMB = new Blob([productsJson]).size / (1024 * 1024);
                                     
                                     if (sizeInMB > 4.5) {
-                                        console.warn(`⚠️ IndexedDB products are large (${sizeInMB.toFixed(2)}MB). Saving lightweight version to localStorage...`);
+                                        console.warn(`⚠️ IndexedDB cache is large (${sizeInMB.toFixed(2)}MB). Saving lightweight backup to localStorage...`);
                                         const lightweightProducts = indexedProducts.map(p => ({
                                             id: p.id,
                                             name: p.name,
@@ -6753,18 +6803,19 @@ async function loadProducts() {
                                             image: ''
                                         }));
                                         localStorage.setItem('products', JSON.stringify(lightweightProducts));
-                                        console.log(`✅ Saved lightweight version (${lightweightProducts.length} products) to localStorage`);
+                                        console.log(`✅ Saved lightweight backup (${lightweightProducts.length} products) to localStorage`);
                                     } else {
                                         localStorage.setItem('products', productsJson);
-                                        console.log(`✅ Saved ${indexedProducts.length} products from IndexedDB to localStorage`);
+                                        console.log(`✅ Saved ${indexedProducts.length} products from IndexedDB cache to localStorage (backup)`);
                                     }
                                 } catch (error) {
-                                    console.error('❌ Could not save products to localStorage:', error);
+                                    console.warn('⚠️ Could not save products to localStorage backup:', error);
+                                    // Not critical - IndexedDB has the data
                                 }
                             }
                         }
                     } catch (error) {
-                        console.error('❌ Error checking IndexedDB:', error);
+                        console.error('❌ Error checking IndexedDB cache:', error);
                     }
                 }
                 

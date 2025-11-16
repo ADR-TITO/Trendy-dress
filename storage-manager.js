@@ -1,5 +1,14 @@
-// Storage Manager - Uses IndexedDB for large storage capacity
-// IndexedDB can store much more data than localStorage (typically 50% of disk space)
+// Storage Manager - IndexedDB for complex local storage needs
+// Storage Hierarchy:
+// 1. MongoDB (PERMANENT, CENTRALIZED) - Primary source of truth, cloud-based storage
+// 2. IndexedDB (CACHE/FALLBACK) - Local cache for offline access, complex queries, large data
+// 3. localStorage (MINIMAL BACKUP) - Lightweight backup only, limited capacity
+
+// IndexedDB is used for:
+// - Caching MongoDB data for offline access
+// - Storing large datasets locally (images, complex objects)
+// - Performing complex queries locally when MongoDB is unavailable
+// - Fallback storage when MongoDB backend is down
 
 class StorageManager {
     constructor() {
@@ -8,6 +17,7 @@ class StorageManager {
         this.storeName = 'products';
         this.db = null;
         this.useIndexedDB = false;
+        this.isCacheMode = true; // IndexedDB is in cache mode - syncs with MongoDB when available
     }
 
     // Initialize IndexedDB
@@ -48,17 +58,18 @@ class StorageManager {
         });
     }
 
-    // Save products to IndexedDB
+    // Save products to IndexedDB (used as cache/fallback, not primary storage)
+    // Note: MongoDB is the permanent, centralized storage. IndexedDB caches MongoDB data.
     async saveProducts(productsArray) {
-        // ALWAYS save to localStorage FIRST as the source of truth
+        // Save lightweight version to localStorage as minimal backup (not source of truth)
         const localSaveResult = this.saveProductsLocalStorage(productsArray);
         if (!localSaveResult) {
-            console.error('Failed to save to localStorage - this is critical!');
-            return false;
+            console.warn('⚠️ Failed to save to localStorage - continuing anyway');
+            // Don't fail entirely - MongoDB is the source of truth
         }
         
         if (!this.useIndexedDB || !this.db) {
-            // Fallback to localStorage only
+            // Fallback to localStorage only (minimal backup)
             return localSaveResult;
         }
 
@@ -159,10 +170,11 @@ class StorageManager {
         });
     }
 
-    // Load products from IndexedDB
+    // Load products from IndexedDB (cache/fallback only)
+    // Note: MongoDB is the primary source. This loads from local cache when MongoDB is unavailable.
     async loadProducts() {
         if (!this.useIndexedDB || !this.db) {
-            // Fallback to localStorage
+            // Fallback to localStorage (minimal backup)
             return this.loadProductsLocalStorage();
         }
 
@@ -173,13 +185,13 @@ class StorageManager {
 
             request.onsuccess = () => {
                 const products = request.result || [];
-                console.log(`Loaded ${products.length} products from IndexedDB`);
+                console.log(`📦 Loaded ${products.length} products from IndexedDB cache (fallback - MongoDB is primary)`);
                 resolve(products);
             };
 
             request.onerror = () => {
-                console.error('Error loading products:', request.error);
-                // Fallback to localStorage
+                console.error('❌ Error loading products from IndexedDB:', request.error);
+                // Fallback to localStorage (minimal backup)
                 resolve(this.loadProductsLocalStorage());
             };
         });
@@ -311,10 +323,29 @@ class StorageManager {
         }
     }
 
-    // Migrate data from localStorage to IndexedDB
+    // Sync products from MongoDB to IndexedDB cache
+    // This caches MongoDB data locally for offline access
+    async syncFromMongoDB(mongoProducts) {
+        if (!this.useIndexedDB || !this.db) {
+            console.log('⚠️ IndexedDB not available - cannot cache MongoDB data');
+            return false;
+        }
+
+        try {
+            console.log(`🔄 Syncing ${mongoProducts.length} products from MongoDB to IndexedDB cache...`);
+            await this.saveProducts(mongoProducts);
+            console.log(`✅ Cached ${mongoProducts.length} products from MongoDB to IndexedDB`);
+            return true;
+        } catch (error) {
+            console.error('❌ Error syncing from MongoDB to IndexedDB:', error);
+            return false;
+        }
+    }
+
+    // Migrate data from localStorage to IndexedDB (legacy - for initial migration only)
     async migrateFromLocalStorage() {
         if (!this.useIndexedDB || !this.db) {
-            console.log('IndexedDB not available, cannot migrate');
+            console.log('⚠️ IndexedDB not available, cannot migrate');
             return false;
         }
 
@@ -322,16 +353,18 @@ class StorageManager {
             // Check if IndexedDB already has products
             const existingProducts = await this.loadProducts();
             if (existingProducts && existingProducts.length > 0) {
-                console.log(`⚠️ IndexedDB already has ${existingProducts.length} products. Migration skipped to prevent data loss.`);
+                console.log(`⚠️ IndexedDB cache already has ${existingProducts.length} products. Migration skipped.`);
+                console.log(`   Note: MongoDB is the primary storage. IndexedDB is cache only.`);
                 return false;
             }
             
             const localProducts = this.loadProductsLocalStorage();
-            console.log(`📦 Found ${localProducts.length} products in localStorage to migrate`);
+            console.log(`📦 Found ${localProducts.length} products in localStorage to migrate to IndexedDB cache`);
             
             if (localProducts.length > 0) {
                 await this.saveProducts(localProducts);
-                console.log(`✅ Migrated ${localProducts.length} products from localStorage to IndexedDB`);
+                console.log(`✅ Migrated ${localProducts.length} products from localStorage to IndexedDB cache`);
+                console.log(`   Note: These will sync to MongoDB when backend is available`);
                 return true;
             }
             return false;
