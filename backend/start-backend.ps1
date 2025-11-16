@@ -55,12 +55,30 @@ if (-not (Test-Path ".env")) {
 }
 Write-Host ""
 
+# Check if port 3001 is in use and optionally kill it
+Write-Host "[4/5] Checking if port 3001 is available..." -ForegroundColor Yellow
+$portCheck = netstat -ano | Select-String ":3001.*LISTENING"
+if ($portCheck) {
+    Write-Host "[WARNING] Port 3001 is already in use!" -ForegroundColor Yellow
+    $response = Read-Host "Do you want to kill the process using port 3001? (y/n)"
+    if ($response -eq "y" -or $response -eq "Y") {
+        Write-Host "Killing process on port 3001..." -ForegroundColor Yellow
+        node kill-port.js 3001
+        Start-Sleep -Seconds 2
+    } else {
+        Write-Host "[INFO] Server will attempt to find an available port automatically" -ForegroundColor Cyan
+    }
+} else {
+    Write-Host "[OK] Port 3001 is available" -ForegroundColor Green
+}
+Write-Host ""
+
 # Start the server
-Write-Host "[4/4] Starting backend server..." -ForegroundColor Yellow
+Write-Host "[5/5] Starting backend server..." -ForegroundColor Yellow
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "Server starting on http://localhost:3000" -ForegroundColor Green
-Write-Host "API endpoints: http://localhost:3000/api" -ForegroundColor Green
+Write-Host "Server starting on http://localhost:3001" -ForegroundColor Green
+Write-Host "API endpoints: http://localhost:3001/api" -ForegroundColor Green
 Write-Host "Press Ctrl+C to stop the server" -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""

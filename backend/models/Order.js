@@ -34,8 +34,7 @@ const orderSchema = new mongoose.Schema({
     orderId: {
         type: String,
         required: true,
-        unique: true,
-        index: true
+        unique: true
     },
     date: {
         type: String,
@@ -68,8 +67,7 @@ const orderSchema = new mongoose.Schema({
     mpesaCode: {
         type: String,
         required: true,
-        uppercase: true,
-        index: true // Index for faster lookups
+        uppercase: true
     },
     verified: {
         type: Boolean,

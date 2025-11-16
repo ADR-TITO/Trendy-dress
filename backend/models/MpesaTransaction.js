@@ -5,13 +5,11 @@ const mpesaTransactionSchema = new mongoose.Schema({
         type: String,
         required: true,
         uppercase: true,
-        index: true,
         unique: true
     },
     transactionDate: {
         type: Date,
-        required: true,
-        index: true
+        required: true
     },
     amount: {
         type: Number,

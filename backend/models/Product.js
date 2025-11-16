@@ -40,10 +40,8 @@ const productSchema = new mongoose.Schema({
 });
 
 // Indexes for faster queries
-productSchema.index({ category: 1 });
 productSchema.index({ name: 1 });
-productSchema.index({ createdAt: -1 }); // For sorting
-productSchema.index({ category: 1, createdAt: -1 }); // Compound index for category queries
+productSchema.index({ category: 1, createdAt: -1 }); // Compound index for category queries (covers both category and createdAt)
 
 const Product = mongoose.model('Product', productSchema);
 

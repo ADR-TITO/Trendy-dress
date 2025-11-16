@@ -8,7 +8,9 @@
     "dev": "nodemon server.js",
     "init-db": "node init-db.js",
     "check": "node check-backend.js",
-    "verify-env": "node verify-env.js"
+    "verify-env": "node verify-env.js",
+    "kill-port": "node kill-port.js",
+    "kill-port:3001": "node kill-port.js 3001"
   },
   "keywords": [
     "e-commerce",

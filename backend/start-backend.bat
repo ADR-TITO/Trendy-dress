@@ -53,11 +53,28 @@ if not exist ".env" (
 )
 echo.
 
-echo [4/4] Starting backend server...
+echo [4/5] Checking if port 3001 is available...
+netstat -ano | findstr ":3001.*LISTENING" >nul
+if %ERRORLEVEL% EQU 0 (
+    echo [WARNING] Port 3001 is already in use!
+    set /p response="Do you want to kill the process using port 3001? (y/n): "
+    if /i "%response%"=="y" (
+        echo Killing process on port 3001...
+        node kill-port.js 3001
+        timeout /t 2 /nobreak >nul
+    ) else (
+        echo [INFO] Server will attempt to find an available port automatically
+    )
+) else (
+    echo [OK] Port 3001 is available
+)
+echo.
+
+echo [5/5] Starting backend server...
 echo.
 echo ========================================
-echo Server starting on http://localhost:3000
-echo API endpoints: http://localhost:3000/api
+echo Server starting on http://localhost:3001
+echo API endpoints: http://localhost:3001/api
 echo Press Ctrl+C to stop the server
 echo ========================================
 echo.

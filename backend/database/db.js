@@ -41,22 +41,27 @@ async function initDatabase() {
 
 // Handle connection events
 mongoose.connection.on('connected', () => {
-    console.log('Mongoose connected to MongoDB');
+    console.log('✅ Mongoose connected to MongoDB');
 });
 
 mongoose.connection.on('error', (err) => {
-    console.error('Mongoose connection error:', err);
+    console.error('❌ Mongoose connection error:', err);
+    console.error('❌ Error details:', err.message);
+    // Don't crash the server - connection errors are handled gracefully
 });
 
 mongoose.connection.on('disconnected', () => {
-    console.log('Mongoose disconnected');
+    console.log('⚠️ Mongoose disconnected from MongoDB');
 });
 
-// Graceful shutdown
-process.on('SIGINT', async () => {
-    await mongoose.connection.close();
-    console.log('MongoDB connection closed through app termination');
-    process.exit(0);
+mongoose.connection.on('reconnected', () => {
+    console.log('✅ Mongoose reconnected to MongoDB');
 });
+
+mongoose.connection.on('close', () => {
+    console.log('📪 Mongoose connection closed');
+});
+
+// Note: SIGINT/SIGTERM handlers are in server.js to avoid duplicate handlers
 
 module.exports = { initDatabase, mongoose };
