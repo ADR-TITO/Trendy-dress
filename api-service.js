@@ -1,49 +1,129 @@
 // API Service for MongoDB Backend
-// Auto-detect backend URL based on current domain
-const getBackendURL = () => {
+// Auto-detect backend URL and port based on current domain and server response
+let detectedBackendURL = null;
+let isDetectingPort = false;
+
+// Auto-detect backend port by trying common ports or checking server-info endpoint
+async function detectBackendPort() {
     // Check if running on production domain
     if (window.location.hostname === 'trendydresses.co.ke' || 
         window.location.hostname === 'www.trendydresses.co.ke') {
-        // Production: Try multiple possible backend URLs
-        // Option 1: Backend on same domain with /api path (most common - recommended)
-        const sameOriginURL = window.location.origin + '/api';
-        
-        // Option 2: Backend on subdomain
-        const subdomainURL = 'https://api.trendydresses.co.ke/api';
-        
-        // Option 3: Backend on same domain with port (less common, but some setups use this)
-        const portURL = window.location.protocol + '//' + window.location.hostname + ':3000/api';
-        
-        // Use same origin by default (most common production setup)
-        // If your backend is on a subdomain, change this to subdomainURL
-        // If your backend uses a specific port, change this to portURL
-        return sameOriginURL;
-        
-        // Uncomment one of these if the default doesn't work:
-        // return subdomainURL;  // If backend is on api.trendydresses.co.ke
-        // return portURL;       // If backend exposes port 3000 directly
-    } else {
-        // Development: Use localhost
+        // Production: Backend on same domain with /api path (recommended)
+        return window.location.origin + '/api';
+    }
+    
+    // Development: Try to detect port automatically
+    // Try common ports in order: 3001, 3002, 3000, 3003, etc. (3001 is default)
+    const portsToTry = [3001, 3002, 3000, 3003, 3004, 3005];
+    
+    for (const port of portsToTry) {
+        try {
+            const testURL = `http://localhost:${port}/api/server-info`;
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 500); // Quick check (500ms)
+            
+            const response = await fetch(testURL, {
+                signal: controller.signal,
+                method: 'GET',
+                headers: { 'Accept': 'application/json' }
+            });
+            
+            clearTimeout(timeoutId);
+            
+            if (response.ok) {
+                const serverInfo = await response.json();
+                const detectedURL = serverInfo.baseURL || `http://localhost:${serverInfo.port}/api`;
+                console.log(`✅ Detected backend on port ${serverInfo.port}`);
+                return detectedURL;
+            }
+        } catch (error) {
+            // Port not available, try next one
+            continue;
+        }
+    }
+    
+    // Fallback: If detection fails, use default port 3001
+    console.warn('⚠️ Could not auto-detect backend port, using default: 3001');
+    return 'http://localhost:3001/api';
+}
+
+// Initialize backend URL
+const getBackendURL = async () => {
+    if (detectedBackendURL) {
+        return detectedBackendURL;
+    }
+    
+    if (isDetectingPort) {
+        // Wait for ongoing detection
+        while (isDetectingPort) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        return detectedBackendURL || 'http://localhost:3000/api';
+    }
+    
+    isDetectingPort = true;
+    try {
+        detectedBackendURL = await detectBackendPort();
+        console.log('🔍 API Service initialized');
+        console.log('   Current domain:', window.location.hostname);
+        console.log('   Detected backend URL:', detectedBackendURL);
+        return detectedBackendURL;
+    } catch (error) {
+        console.error('❌ Error detecting backend port:', error);
         return 'http://localhost:3000/api';
+    } finally {
+        isDetectingPort = false;
     }
 };
 
-const API_BASE_URL = getBackendURL();
-
-// Log the detected backend URL for debugging
-console.log('🔍 API Service initialized');
-console.log('   Current domain:', window.location.hostname);
-console.log('   Backend URL:', API_BASE_URL);
+// Initialize with default URL (will be updated after detection)
+let API_BASE_URL = (window.location.hostname === 'trendydresses.co.ke' || 
+                    window.location.hostname === 'www.trendydresses.co.ke')
+    ? window.location.origin + '/api'
+    : 'http://localhost:3001/api';
 
 class ApiService {
     constructor() {
         this.baseURL = API_BASE_URL;
-        // Log backend URL on initialization
-        console.log('📡 ApiService baseURL:', this.baseURL);
+        this.initialized = false;
+        
+        // Auto-detect and update port in background
+        this.initializePort().catch(err => {
+            console.warn('⚠️ Port auto-detection failed, using default:', err);
+        });
+    }
+    
+    async initializePort() {
+        try {
+            const detectedURL = await getBackendURL();
+            if (detectedURL !== this.baseURL) {
+                this.baseURL = detectedURL;
+                console.log('📡 ApiService baseURL updated:', this.baseURL);
+            }
+            this.initialized = true;
+        } catch (error) {
+            console.error('❌ Failed to initialize port:', error);
+            this.initialized = true; // Mark as initialized even if detection failed
+        }
+    }
+    
+    // Ensure port is detected before making requests
+    async ensureInitialized() {
+        if (!this.initialized && !isDetectingPort) {
+            await this.initializePort();
+        }
+        // Wait a bit if detection is in progress
+        let attempts = 0;
+        while (!this.initialized && attempts < 10) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            attempts++;
+        }
     }
 
     // Check if backend is available
     async checkBackend() {
+        await this.ensureInitialized();
+        
         try {
             // Optimized timeout - faster response
             const controller = new AbortController();
@@ -58,6 +138,26 @@ class ApiService {
             });
             clearTimeout(timeoutId);
             const isAvailable = response.ok;
+            
+            // If check succeeds and we haven't detected port yet, try to get server info
+            if (isAvailable && !this.initialized) {
+                try {
+                    const serverInfoResponse = await fetch(`${this.baseURL}/server-info`, {
+                        signal: controller.signal,
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    if (serverInfoResponse.ok) {
+                        const serverInfo = await serverInfoResponse.json();
+                        if (serverInfo.baseURL && serverInfo.baseURL !== this.baseURL) {
+                            this.baseURL = serverInfo.baseURL;
+                            console.log('📡 Updated baseURL from server-info:', this.baseURL);
+                        }
+                    }
+                } catch (e) {
+                    // Ignore server-info errors
+                }
+            }
+            
             console.log(`🔍 Backend check: ${isAvailable ? '✅ Available' : '❌ Not available'} (${response.status})`);
             return isAvailable;
         } catch (error) {
@@ -118,6 +218,7 @@ class ApiService {
 
     // Get all products (optimized - without images by default)
     async getProducts(category = 'all', includeImages = false, retryCount = 0) {
+        await this.ensureInitialized();
         const maxRetries = 2; // Retry up to 2 times (3 total attempts)
         
         try {

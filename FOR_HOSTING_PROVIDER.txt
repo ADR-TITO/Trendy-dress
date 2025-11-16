@@ -1,0 +1,54 @@
+================================================================================
+BACKEND API CONFIGURATION REQUEST
+Domain: trendydresses.co.ke
+================================================================================
+
+ISSUE:
+The API endpoint https://trendydresses.co.ke/api/health returns 404 error.
+
+REQUIRED ACTIONS:
+
+1. START BACKEND SERVER
+   Location: /var/www/trendydresses.co.ke/backend/ (or your website root/backend)
+   Command: pm2 start npm --name "trendy-dresses-api" -- start
+   Port: 3001 (or next available port)
+   Auto-start: pm2 save && pm2 startup
+
+2. CONFIGURE NGINX PROXY
+   File: /etc/nginx/sites-available/trendydresses.co.ke
+   
+   Add this location block inside the server block (for both HTTP and HTTPS):
+   
+   location /api {
+       proxy_pass http://localhost:3001;
+       proxy_http_version 1.1;
+       proxy_set_header Host $host;
+       proxy_set_header X-Real-IP $remote_addr;
+       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+       proxy_set_header X-Forwarded-Proto $scheme;
+       
+       proxy_connect_timeout 60s;
+       proxy_send_timeout 60s;
+       proxy_read_timeout 60s;
+   }
+   
+   Then: nginx -t && systemctl reload nginx
+
+3. VERIFY
+   Test: curl https://trendydresses.co.ke/api/health
+   Expected: {"status":"ok","message":"Trendy Dresses API is running"}
+
+REQUIREMENTS:
+- Node.js installed
+- PM2 installed (npm install -g pm2 if needed)
+- Backend folder contains package.json and server.js
+- .env file with MongoDB connection string
+
+FILES PROVIDED:
+- nginx-api-config.conf (full Nginx configuration)
+- package.json (shows dependencies)
+
+================================================================================
+Thank you for your assistance!
+================================================================================
+

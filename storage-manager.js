@@ -82,11 +82,16 @@ class StorageManager {
             
             getAllRequest.onsuccess = () => {
                 const existingProducts = getAllRequest.result || [];
-                const existingIds = new Set(existingProducts.map(p => p.id));
-                const newIds = new Set(productsArray.map(p => p.id));
+                const existingIds = new Set(existingProducts.map(p => p.id || p._id));
+                
+                // Normalize new product IDs (MongoDB uses _id, IndexedDB uses id)
+                const newIds = new Set(productsArray.map(p => p._id || p.id));
                 
                 // Delete products that are no longer in the array
-                const toDelete = existingProducts.filter(p => !newIds.has(p.id));
+                const toDelete = existingProducts.filter(p => {
+                    const productId = p.id || p._id;
+                    return productId && !newIds.has(productId);
+                });
                 let deleteCompleted = 0;
                 let deleteErrors = 0;
                 
@@ -125,31 +130,92 @@ class StorageManager {
                     
                     let completed = 0;
                     let errors = 0;
+                    const maxImageSize = 5 * 1024 * 1024; // 5MB limit for IndexedDB
                     
                     productsArray.forEach((product) => {
-                        // Use put instead of add - it will update if exists, add if not
-                        const request = store.put(product);
-                        
-                        request.onsuccess = () => {
-                            completed++;
-                            if (completed === productsArray.length) {
-                                console.log(`✅ Saved ${productsArray.length} products to IndexedDB`);
-                                resolve(true);
+                        try {
+                            // Normalize product data for IndexedDB
+                            const normalizedProduct = {
+                                // Convert MongoDB _id to id
+                                id: product._id || product.id || String(Date.now()) + Math.random(),
+                                
+                                // Basic product fields
+                                name: product.name || '',
+                                category: product.category || 'others',
+                                price: typeof product.price === 'number' ? product.price : 0,
+                                discount: typeof product.discount === 'number' ? product.discount : 0,
+                                quantity: typeof product.quantity === 'number' ? product.quantity : 0,
+                                size: product.size || '',
+                                
+                                // Handle image - limit size for IndexedDB
+                                image: (() => {
+                                    const img = product.image || '';
+                                    if (!img || img.length === 0) return '';
+                                    
+                                    // If image is too large, truncate or skip
+                                    if (img.length > maxImageSize) {
+                                        console.warn(`⚠️ Product "${product.name}" image too large (${(img.length / 1024 / 1024).toFixed(2)}MB), skipping image for IndexedDB`);
+                                        return ''; // Skip large images to prevent IndexedDB errors
+                                    }
+                                    return img;
+                                })(),
+                                
+                                // Convert Date objects to ISO strings
+                                createdAt: product.createdAt ? (product.createdAt instanceof Date ? product.createdAt.toISOString() : product.createdAt) : new Date().toISOString(),
+                                updatedAt: product.updatedAt ? (product.updatedAt instanceof Date ? product.updatedAt.toISOString() : product.updatedAt) : new Date().toISOString(),
+                                
+                                // Preserve hasImage flag if present
+                                hasImage: product.hasImage !== undefined ? product.hasImage : !!(product.image && product.image.length > 0)
+                            };
+                            
+                            // Validate required fields
+                            if (!normalizedProduct.name || !normalizedProduct.category || !normalizedProduct.size) {
+                                console.warn(`⚠️ Skipping invalid product:`, normalizedProduct);
+                                errors++;
+                                if (completed + errors === productsArray.length) {
+                                    resolve(true);
+                                }
+                                return;
                             }
-                        };
+                            
+                            // Use put instead of add - it will update if exists, add if not
+                            const request = store.put(normalizedProduct);
+                            
+                            request.onsuccess = () => {
+                                completed++;
+                                if (completed === productsArray.length) {
+                                    console.log(`✅ Saved ${completed} products to IndexedDB`);
+                                    resolve(true);
+                                }
+                            };
 
-                        request.onerror = () => {
+                            request.onerror = (event) => {
+                                errors++;
+                                const error = event.target.error;
+                                console.error(`❌ Error saving product "${normalizedProduct.name}" to IndexedDB:`, error?.name || error?.message || error);
+                                
+                                // Log product details for debugging (without large image)
+                                const productDebug = { ...normalizedProduct };
+                                if (productDebug.image && productDebug.image.length > 100) {
+                                    productDebug.image = `[Image data: ${(productDebug.image.length / 1024).toFixed(2)}KB]`;
+                                }
+                                console.error('   Product data:', productDebug);
+                                
+                                if (errors === productsArray.length) {
+                                    console.error('❌ All products failed to save to IndexedDB');
+                                    resolve(true); // Still resolve - MongoDB is primary
+                                } else if (completed + errors === productsArray.length) {
+                                    console.log(`⚠️ Some products failed to save to IndexedDB (${errors} errors, ${completed} succeeded)`);
+                                    resolve(true); // Some succeeded
+                                }
+                            };
+                        } catch (error) {
                             errors++;
-                            console.error('Error saving product to IndexedDB:', request.error, product);
-                            if (errors === productsArray.length) {
-                                console.error('All products failed to save to IndexedDB');
-                                // Still resolve true since localStorage backup succeeded
+                            console.error('❌ Error normalizing product for IndexedDB:', error, product);
+                            if (completed + errors === productsArray.length) {
                                 resolve(true);
-                            } else if (completed + errors === productsArray.length) {
-                                console.log(`⚠️ Some products failed to save to IndexedDB (${errors} errors, ${completed} succeeded)`);
-                                resolve(true); // Some succeeded
                             }
-                        };
+                        }
                     });
                 }
             };
