@@ -94,11 +94,14 @@ async function migrateProductsToMongoDB(overwrite = false) {
         console.log(`📦 Found ${localProducts.length} products in localStorage`);
         console.log(`🔄 Starting migration to MongoDB...`);
         
-        // Check if MongoDB already has products
+        // Check if MongoDB already has products (with timeout handling)
         let mongoProducts = [];
         try {
-            mongoProducts = await apiService.getProducts('all');
+            // Use optimized version without images for faster checking
+            console.log('🔍 Checking existing MongoDB products...');
+            mongoProducts = await apiService.getProducts('all', false); // false = without images for speed
             if (mongoProducts && mongoProducts.length > 0 && !overwrite) {
+                console.log(`✅ Found ${mongoProducts.length} existing products in MongoDB`);
                 console.log(`⚠️ MongoDB already has ${mongoProducts.length} products.`);
                 console.log('💡 To overwrite existing products, run: migrateProductsToMongoDB(true)');
                 console.log('💡 To merge products, the migration will update existing ones by name and size');
@@ -115,8 +118,15 @@ async function migrateProductsToMongoDB(overwrite = false) {
                 }
             }
         } catch (error) {
-            console.warn('⚠️ Could not check MongoDB products:', error.message);
-            console.log('🔄 Proceeding with migration...');
+            // If check fails (timeout, network issue), proceed with migration anyway
+            const errorMsg = error.message || 'Unknown error';
+            if (errorMsg.includes('timed out') || errorMsg.includes('aborted')) {
+                console.warn('⚠️ Could not check MongoDB products (timeout) - proceeding with migration anyway');
+                console.log('ℹ️ Migration will proceed. If products already exist, they will be updated.');
+            } else {
+                console.warn('⚠️ Could not check MongoDB products:', errorMsg);
+                console.log('ℹ️ Proceeding with migration - existing products will be updated if found.');
+            }
         }
         
         // Create a map of existing MongoDB products by name+size for duplicate detection
@@ -339,11 +349,15 @@ async function migrateFromIndexedDBToMongoDB() {
         console.log(`📦 Found ${indexedProducts.length} products in IndexedDB`);
         console.log(`🔄 Starting migration to MongoDB...`);
         
-        // Check if MongoDB already has products
+        // Check if MongoDB already has products (with timeout handling)
         let mongoProducts = [];
         try {
-            mongoProducts = await apiService.getProducts('all');
+            // Use optimized version without images for faster checking
+            console.log('🔍 Checking existing MongoDB products...');
+            mongoProducts = await apiService.getProducts('all', false); // false = without images for speed
+            
             if (mongoProducts && mongoProducts.length > 0) {
+                console.log(`✅ Found ${mongoProducts.length} existing products in MongoDB`);
                 const proceed = confirm(
                     `MongoDB already has ${mongoProducts.length} products.\n\n` +
                     `IndexedDB has ${indexedProducts.length} products.\n\n` +
@@ -354,9 +368,21 @@ async function migrateFromIndexedDBToMongoDB() {
                     console.log('❌ Migration cancelled by user');
                     return false;
                 }
+            } else {
+                console.log('ℹ️ No existing products found in MongoDB - will create new products');
             }
         } catch (error) {
-            console.warn('⚠️ Could not check MongoDB products:', error.message);
+            // If check fails (timeout, network issue), proceed with migration anyway
+            // The migration will handle duplicates if they exist
+            const errorMsg = error.message || 'Unknown error';
+            if (errorMsg.includes('timed out') || errorMsg.includes('aborted')) {
+                console.warn('⚠️ Could not check MongoDB products (timeout) - proceeding with migration anyway');
+                console.log('ℹ️ Migration will proceed. If products already exist, they will be updated.');
+            } else {
+                console.warn('⚠️ Could not check MongoDB products:', errorMsg);
+                console.log('ℹ️ Proceeding with migration - existing products will be updated if found.');
+            }
+            // Continue with migration - we'll handle duplicates during the migration process
         }
         
         // Create a map of existing MongoDB products

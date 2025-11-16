@@ -15,8 +15,37 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware - CORS configuration
+// Production: Allow only trendydresses.co.ke and www.trendydresses.co.ke
+// Development: Allow localhost for local testing
+const allowedOrigins = process.env.NODE_ENV === 'production' 
+    ? [
+        'https://trendydresses.co.ke',
+        'https://www.trendydresses.co.ke',
+        'http://trendydresses.co.ke', // HTTP fallback (should redirect to HTTPS)
+        'http://www.trendydresses.co.ke' // HTTP fallback
+      ]
+    : [
+        'http://localhost:3000',
+        'http://localhost:8080',
+        'http://127.0.0.1:3000',
+        'http://127.0.0.1:8080',
+        'file://', // For local file testing
+        '*' // Allow all in development
+      ];
+
 app.use(cors({
-    origin: '*', // Allow all origins (you can restrict this to specific domains in production)
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps, Postman, or same-origin requests)
+        if (!origin) return callback(null, true);
+        
+        if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            // Log blocked origin for debugging
+            console.warn(`⚠️ CORS blocked origin: ${origin}`);
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
