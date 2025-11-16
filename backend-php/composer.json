@@ -1,0 +1,16 @@
+{
+    "name": "trendy-dresses/backend",
+    "description": "PHP Backend API for Trendy Dresses e-commerce website",
+    "type": "project",
+    "require": {
+        "php": ">=7.4",
+        "mongodb/mongodb": "^1.15",
+        "vlucas/phpdotenv": "^5.5"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "src/"
+        }
+    }
+}
+

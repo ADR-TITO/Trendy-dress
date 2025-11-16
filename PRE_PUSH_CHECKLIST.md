@@ -1,89 +1,73 @@
-# Pre-Push Checklist ✅
+# Pre-Push Checklist
 
-## 🔒 Security Verification
+## ✅ Security Check
 
-- [x] ✅ `.env` file is in `.gitignore` - **VERIFIED**
-- [x] ✅ No sensitive files tracked in Git - **VERIFIED**
-- [x] ✅ No hardcoded credentials in code - **VERIFIED**
-- [x] ✅ All credentials use `process.env` - **VERIFIED**
-- [x] ✅ `ENV_TEMPLATE.txt` has placeholders only - **VERIFIED**
+- [ ] No `.env` files in repository
+- [ ] No API keys or secrets in code
+- [ ] No MongoDB connection strings hardcoded
+- [ ] No M-Pesa credentials in files
+- [ ] All sensitive files in `.gitignore`
 
-## 📋 Files Ready for GitHub
+## ✅ Code Quality
 
-### ✅ Safe to Push:
-- [x] All source code (`*.js`, `*.html`, `*.css`)
-- [x] Configuration templates (`ENV_TEMPLATE.txt`)
-- [x] Documentation (`*.md`)
-- [x] `package.json` and `package-lock.json`
-- [x] `.gitignore` files
-- [x] Backend server files
-- [x] Frontend files
+- [ ] PHP backend is complete and tested
+- [ ] Frontend uses PHP backend by default
+- [ ] All API endpoints work correctly
+- [ ] Error handling is in place
+- [ ] Documentation is updated
 
-### ❌ Excluded (Protected):
-- [x] `.env` files (contains credentials)
-- [x] `node_modules/` (dependencies)
-- [x] Database files (`*.db`, `*.sqlite`)
-- [x] Logs and cache files
-- [x] OS-specific files
+## ✅ Files to Verify
 
-## 🚀 Ready to Push!
+Run `git status` and verify:
 
-Your repository is ready for GitHub. Follow these steps:
+### ✅ Should be included:
+- ✅ `index.html`, `style.css`, `script.js`
+- ✅ `api-service.js`, `storage-manager.js`
+- ✅ `backend-php/` folder (all files except `.env`)
+- ✅ `backend/` folder (all files except `.env`)
+- ✅ `README.md` and documentation
+- ✅ `.gitignore` files
 
-### Quick Push Commands:
+### ❌ Should NOT be included:
+- ❌ `backend/.env`
+- ❌ `backend-php/.env`
+- ❌ `node_modules/`
+- ❌ `backend-php/vendor/`
+- ❌ `*.log` files
+- ❌ Database files (`*.db`, `*.sqlite`)
+- ❌ Credentials files
 
-```bash
-# 1. Navigate to project root
-cd "C:\Users\user\TRENDY DRESSES"
+## ✅ Final Steps
 
-# 2. Check current status
-git status
+1. **Review Changes:**
+   ```bash
+   git status
+   git diff
+   ```
 
-# 3. Add all files (respecting .gitignore)
-git add .
+2. **Test Locally:**
+   - Test PHP backend: `php -S localhost:8000`
+   - Test frontend: Open `index.html`
+   - Verify API endpoints work
 
-# 4. Verify no .env files are staged
-git status | grep -i ".env"
-# Should return nothing
+3. **Commit:**
+   ```bash
+   git add .
+   git commit -m "Ready for GitHub: PHP backend implementation"
+   ```
 
-# 5. Commit changes
-git commit -m "Initial commit: Trendy Dresses e-commerce website
+4. **Push:**
+   ```bash
+   git push origin main
+   ```
 
-Features:
-- Full-stack e-commerce application
-- MongoDB Atlas integration
-- M-Pesa payment integration
-- Admin panel with order management
-- Product management system
-- PDF receipt generation
-- WhatsApp notifications
-- Production-ready deployment"
+## ✅ After Pushing
 
-# 6. Create GitHub repository (on github.com)
-# 7. Add remote and push
-git remote add origin https://github.com/YOUR_USERNAME/trendy-dresses.git
-git branch -M main
-git push -u origin main
-```
+- [ ] Verify repository on GitHub
+- [ ] Check that sensitive files are not visible
+- [ ] Test that repository can be cloned
+- [ ] Update server with actual `.env` files
 
-## ✅ Final Verification
+---
 
-Run this before pushing:
-
-```bash
-# Check for any .env files
-git ls-files | grep -i "\.env"
-# Should return nothing
-
-# Check for hardcoded credentials
-git diff --cached | grep -i "password\|secret\|MONGODB_URI\|MPESA.*KEY"
-# Should only show variable names, not actual values
-
-# List all files that will be committed
-git ls-files
-```
-
-## 🎉 Everything is Ready!
-
-Your code is secure and ready to push to GitHub!
-
+**Ready to push!** 🚀

@@ -1,169 +1,195 @@
 # Trendy Dresses E-Commerce Website
 
-A modern, full-featured e-commerce website for Trendy Dresses with MongoDB backend, M-Pesa payment integration, and admin panel.
+A modern e-commerce website for Trendy Dresses featuring product catalog, shopping cart, M-Pesa payment integration, and admin panel.
 
 ## 🌟 Features
 
-- **Product Management**: Full CRUD operations for products with images, categories, sizes, and inventory tracking
-- **Shopping Cart**: Add to cart, quantity management, and order processing
+- **Product Management**: Browse products by category (Dresses, Tracksuits, Khaki Pants & Jeans, Others)
+- **Shopping Cart**: Add to cart, update quantities, and checkout
 - **Payment Integration**: 
-  - M-Pesa Till Number payment
-  - M-Pesa STK Push (Prompt) payment
-  - Transaction verification
+  - M-Pesa Till Number
+  - M-Pesa STK Push (Prompt Payment)
 - **Admin Panel**: 
-  - Product management
-  - Order management and tracking
-  - Delivery status updates
+  - Product management (CRUD operations)
+  - Order management
+  - Delivery status tracking
   - Completed orders view
-- **MongoDB Backend**: Cloud database with MongoDB Atlas integration
-- **PDF Receipts**: Automatic PDF receipt generation and WhatsApp delivery
-- **Responsive Design**: Mobile-friendly interface
-- **SEO Optimized**: Sitemap and robots.txt included
+- **Receipt Generation**: PDF receipts with product images
+- **WhatsApp Integration**: Send receipts to customers via WhatsApp
+- **MongoDB Integration**: Cloud-based database using MongoDB Atlas
+- **Offline Support**: IndexedDB cache for offline access
 
-## 🚀 Quick Start
+## 🚀 Tech Stack
 
-### Prerequisites
+### Frontend
+- HTML5, CSS3, JavaScript (Vanilla)
+- jsPDF for PDF generation
+- Font Awesome icons
+- Responsive design
 
-- Node.js (v14 or higher)
-- MongoDB Atlas account (or local MongoDB)
-- M-Pesa Daraja API credentials (for payment processing)
+### Backend
+- **PHP** (Primary) - RESTful API with MongoDB
+- **Node.js** (Alternative) - Express.js with MongoDB (optional)
 
-### Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/your-username/trendy-dresses.git
-   cd trendy-dresses
-   ```
-
-2. **Install backend dependencies**
-   ```bash
-   cd backend
-   npm install
-   ```
-
-3. **Configure environment variables**
-   ```bash
-   cd backend
-   cp ENV_TEMPLATE.txt .env
-   # Edit .env and add your MongoDB connection string and M-Pesa credentials
-   ```
-
-4. **Start the backend server**
-   ```bash
-   # Windows
-   start-backend.bat
-   
-   # Or manually
-   npm start
-   ```
-
-5. **Open the website**
-   - Open `index.html` in your browser
-   - Or serve via a web server
+### Database
+- MongoDB Atlas (Cloud)
+- IndexedDB (Browser cache)
+- localStorage (UI data only)
 
 ## 📁 Project Structure
 
 ```
 trendy-dresses/
-├── backend/              # Backend API server
-│   ├── routes/          # API routes
-│   ├── models/          # MongoDB models
-│   ├── services/        # Business logic services
-│   ├── database/        # Database configuration
-│   └── server.js        # Express server
-├── index.html            # Main frontend page
-├── script.js            # Frontend JavaScript
-├── styles.css           # Stylesheet
-├── api-service.js       # API client
-├── storage-manager.js   # Local storage manager
-└── README.md            # This file
+├── index.html              # Main HTML file
+├── style.css               # Styles
+├── script.js               # Main JavaScript
+├── api-service.js          # API service layer
+├── storage-manager.js      # IndexedDB manager
+├── backend-php/            # PHP Backend (Primary)
+│   ├── index.php          # Router
+│   ├── config/            # Configuration
+│   ├── src/               # Models & Services
+│   └── routes/            # API routes
+├── backend/                # Node.js Backend (Alternative)
+│   ├── server.js          # Express server
+│   ├── models/            # Mongoose models
+│   └── routes/            # API routes
+└── README.md               # This file
 ```
+
+## 🛠️ Setup Instructions
+
+### Prerequisites
+
+- Web server (Apache/Nginx) with PHP 7.4+ OR Node.js 14+
+- MongoDB Atlas account
+- M-Pesa API credentials (for payment processing)
+
+### Quick Start
+
+#### Option 1: PHP Backend (Recommended)
+
+1. **Install PHP Backend**
+   ```bash
+   cd backend-php
+   composer install
+   ```
+
+2. **Install MongoDB PHP Extension**
+   - Windows: Download from [pecl.php.net](https://pecl.php.net/package/mongodb)
+   - Linux: `sudo apt-get install php-mongodb`
+   - Mac: `brew install php-mongodb`
+
+3. **Configure Environment**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your MongoDB connection string
+   ```
+
+4. **Deploy**
+   - Upload `backend-php/` to your web server
+   - Configure web server to route `/api` to PHP
+   - Test: `curl https://trendydresses.co.ke/api/health`
+
+#### Option 2: Node.js Backend
+
+1. **Install Dependencies**
+   ```bash
+   cd backend
+   npm install
+   ```
+
+2. **Configure Environment**
+   ```bash
+   cp ENV_TEMPLATE.txt .env
+   # Edit .env with your MongoDB connection string
+   ```
+
+3. **Start Server**
+   ```bash
+   npm start
+   ```
+
+### Frontend Setup
+
+1. **Open `index.html`** in a web browser
+2. The frontend will automatically detect the backend (PHP or Node.js)
+3. For local development, ensure backend is running
 
 ## 🔧 Configuration
 
-### Backend Configuration
+### MongoDB Connection
 
-Create a `.env` file in the `backend/` folder:
+Add your MongoDB Atlas connection string to:
+- `backend-php/.env` (for PHP backend)
+- `backend/.env` (for Node.js backend)
 
-```env
-# MongoDB Connection
-MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/trendy-dresses
+Format:
+```
+MONGODB_URI=mongodb+srv://username:password@cluster0.xxxxx.mongodb.net/trendy-dresses?retryWrites=true&w=majority
+```
 
-# Server Port
-PORT=3000
+### M-Pesa Configuration
 
-# M-Pesa Configuration (Optional)
-MPESA_CONSUMER_KEY=your_consumer_key
-MPESA_CONSUMER_SECRET=your_consumer_secret
+Add M-Pesa credentials to `.env`:
+```
+MPESA_CONSUMER_KEY=your_key
+MPESA_CONSUMER_SECRET=your_secret
 MPESA_SHORTCODE=your_shortcode
 MPESA_PASSKEY=your_passkey
-MPESA_ENVIRONMENT=production
+MPESA_ENVIRONMENT=sandbox  # or production
 ```
 
-### Frontend Configuration
+## 📡 API Endpoints
 
-The frontend automatically detects the backend URL:
-- **Development**: `http://localhost:3000/api`
-- **Production**: `https://trendydresses.co.ke/api`
+All endpoints are available at `/api/*`:
 
-To change the production URL, edit `api-service.js`.
+- `GET /api/health` - Health check
+- `GET /api/products` - Get all products
+- `POST /api/products` - Create product
+- `PUT /api/products/:id` - Update product
+- `DELETE /api/products/:id` - Delete product
+- `GET /api/orders` - Get all orders
+- `POST /api/orders` - Create order
+- `POST /api/orders/verify` - Verify M-Pesa code
+- `POST /api/mpesa/stk-push` - Initiate STK Push
+- `POST /api/admin/login` - Admin login
 
-## 📚 Documentation
+## 🌐 Deployment
 
-- **[MONGODB_ATLAS_SETUP.md](./MONGODB_ATLAS_SETUP.md)** - MongoDB Atlas setup guide
-- **[PRODUCTION_BACKEND_SETUP.md](./PRODUCTION_BACKEND_SETUP.md)** - Production deployment guide
-- **[QUICK_SETUP.md](./QUICK_SETUP.md)** - Quick setup instructions
-- **[backend/QUICK_START.md](./backend/QUICK_START.md)** - Backend quick start
-- **[GITHUB_SETUP.md](./GITHUB_SETUP.md)** - GitHub setup guide
+### Production Deployment
 
-## 🛠️ Development
+1. **Upload Files**
+   - Upload frontend files to web root
+   - Upload `backend-php/` to server
 
-### Backend Development
+2. **Configure Web Server**
+   - Apache: Ensure `.htaccess` is enabled
+   - Nginx: Configure PHP-FPM routing
 
-```bash
-cd backend
-npm run dev  # Starts with nodemon (auto-reload)
-```
+3. **Set Environment Variables**
+   - Create `.env` file in `backend-php/`
+   - Add MongoDB connection string
+   - Add M-Pesa credentials
 
-### Check Backend Status
+4. **Test**
+   ```bash
+   curl https://trendydresses.co.ke/api/health
+   ```
 
-```bash
-cd backend
-npm run check  # Health check
-npm run verify-env  # Verify environment variables
-```
+## 📝 Documentation
 
-## 🌐 Production Deployment
-
-See **[PRODUCTION_BACKEND_SETUP.md](./PRODUCTION_BACKEND_SETUP.md)** for complete production deployment instructions.
-
-### Quick Production Steps
-
-1. Upload files to your server
-2. Install dependencies: `npm install`
-3. Configure `.env` file
-4. Start with PM2: `pm2 start npm --name "trendy-dresses-api" -- start`
-5. Configure Nginx/Apache reverse proxy
+- [PHP Backend Setup](backend-php/README.md)
+- [Node.js Backend Setup](backend/README.md)
+- [MongoDB Setup](MONGODB_ATLAS_SETUP.md)
+- [M-Pesa Integration](backend/MPESA_SETUP.md)
 
 ## 🔒 Security
 
-- All sensitive files (`.env`, credentials) are excluded from Git
-- MongoDB connection strings are stored in `.env` (not committed)
-- M-Pesa credentials are stored in `.env` (not committed)
-- CORS is configured for specific domains in production
-
-## 📝 API Endpoints
-
-- `GET /api/health` - Health check
-- `GET /api/db-status` - Database connection status
-- `GET /api/products` - Get all products
-- `POST /api/products` - Create product (Admin)
-- `PUT /api/products/:id` - Update product (Admin)
-- `DELETE /api/products/:id` - Delete product (Admin)
-- `POST /api/orders` - Create order
-- `GET /api/orders` - Get all orders (Admin)
-- `POST /api/mpesa/stk-push` - Initiate STK Push payment
+- Environment variables are excluded from Git (`.gitignore`)
+- MongoDB connection strings are stored in `.env` files
+- M-Pesa credentials are stored securely
+- CORS is configured for production domains
 
 ## 🤝 Contributing
 
@@ -174,23 +200,14 @@ See **[PRODUCTION_BACKEND_SETUP.md](./PRODUCTION_BACKEND_SETUP.md)** for complet
 
 ## 📄 License
 
-ISC License
+This project is proprietary and confidential.
 
 ## 📞 Support
 
-For issues and questions:
-- Check the documentation files
-- Review troubleshooting guides
-- Open an issue on GitHub
-
-## 🙏 Acknowledgments
-
-- MongoDB Atlas for database hosting
-- Safaricom M-Pesa Daraja API for payment processing
-- Express.js for backend framework
-- jsPDF for PDF generation
+For issues or questions, please contact:
+- Email: Trendy dresses790@gmail.com
+- Phone: 254724904692
 
 ---
 
-**Note**: Remember to configure your `.env` file with your actual credentials before running the application.
-
+**Built with ❤️ for Trendy Dresses**

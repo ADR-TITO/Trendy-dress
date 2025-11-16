@@ -1,239 +1,151 @@
-# GitHub Setup & Push Guide
+# GitHub Setup Guide
 
-## ✅ Pre-Push Checklist
+## Pre-Push Checklist
 
-### 1. Sensitive Files Protection
-- [x] `.env` files are in `.gitignore`
-- [x] `node_modules/` is in `.gitignore`
-- [x] Database files are in `.gitignore`
-- [x] API keys and secrets are in `.gitignore`
-- [x] No hardcoded credentials in code (all use `process.env`)
+✅ **All sensitive files are excluded:**
+- `.env` files (both `backend/` and `backend-php/`)
+- `node_modules/` and `vendor/`
+- Database files
+- Log files
+- Credentials and API keys
 
-### 2. Files Ready for GitHub
+✅ **Code is ready:**
+- PHP backend is complete
+- Frontend uses PHP backend by default
+- All documentation is updated
 
-**✅ Safe to Push:**
-- All source code (`*.js`, `*.html`, `*.css`)
-- Configuration templates (`ENV_TEMPLATE.txt`)
-- Documentation (`*.md`)
-- `package.json` and `package-lock.json`
-- `.gitignore` files
+## Steps to Push to GitHub
 
-**❌ Excluded from Git:**
-- `.env` files (contains MongoDB Atlas credentials)
-- `node_modules/` (dependencies, can be reinstalled)
-- Database files (`*.db`, `*.sqlite`)
-- Logs and cache files
-- OS-specific files
-
-### 3. Current Git Status
-
-Files ready to commit:
-- Modified: `backend/server.js`, `script.js`
-- New: Documentation files (MONGODB_ATLAS_SETUP.md, etc.)
-- New: Configuration templates
-- New: Verification scripts
-
-## 🚀 How to Push to GitHub
-
-### Step 1: Initialize Git Repository (if not done)
+### 1. Initialize Git Repository (if not already done)
 
 ```bash
-cd "C:\Users\user\TRENDY DRESSES"
 git init
 ```
 
-### Step 2: Verify .gitignore is Working
+### 2. Add All Files
 
 ```bash
-# Check that .env is ignored
-git check-ignore backend/.env
-# Should return: backend/.env
-
-# Check what files will be tracked
-git status
-```
-
-### Step 3: Add Files to Staging
-
-```bash
-# Add all files (respecting .gitignore)
 git add .
-
-# Or add specific files
-git add *.md
-git add backend/
-git add *.js
-git add *.html
-git add *.css
 ```
 
-### Step 4: Verify What Will Be Committed
+### 3. Verify What Will Be Committed
 
 ```bash
-# Check staged files (should NOT include .env)
 git status
-
-# Review changes
-git diff --cached
 ```
 
-### Step 5: Create Initial Commit
+**Important:** Check that these files are NOT included:
+- ❌ `backend/.env`
+- ❌ `backend-php/.env`
+- ❌ `node_modules/`
+- ❌ `backend-php/vendor/`
+- ❌ Any `.log` files
+- ❌ Any credentials files
+
+### 4. Create Initial Commit
 
 ```bash
-git commit -m "Initial commit: Trendy Dresses e-commerce website
-
-- Full-stack e-commerce application
-- MongoDB Atlas integration
-- M-Pesa payment integration
-- Admin panel with order management
-- Product management system
-- PDF receipt generation
-- WhatsApp notifications"
+git commit -m "Initial commit: Trendy Dresses e-commerce website with PHP backend"
 ```
 
-### Step 6: Create GitHub Repository
+### 5. Create GitHub Repository
 
-1. Go to https://github.com/new
-2. Create a new repository (e.g., `trendy-dresses`)
-3. **Do NOT** initialize with README, .gitignore, or license
-4. Copy the repository URL
+1. Go to [GitHub](https://github.com)
+2. Click "New repository"
+3. Name: `trendy-dresses`
+4. Description: "E-commerce website for Trendy Dresses"
+5. Choose: Private (recommended) or Public
+6. **DO NOT** initialize with README (we already have one)
+7. Click "Create repository"
 
-### Step 7: Add Remote and Push
+### 6. Add Remote and Push
 
 ```bash
-# Add remote repository
 git remote add origin https://github.com/YOUR_USERNAME/trendy-dresses.git
-
-# Or using SSH
-git remote add origin git@github.com:YOUR_USERNAME/trendy-dresses.git
-
-# Push to GitHub
 git branch -M main
 git push -u origin main
 ```
 
-## 🔒 Security Checklist
+## Repository Structure
 
-Before pushing, ensure:
+Your GitHub repository will contain:
 
-- [x] `.env` file is **NOT** in repository
-- [x] No hardcoded passwords in code
-- [x] All credentials use `process.env`
-- [x] MongoDB connection string is in `.env` (excluded)
-- [x] M-Pesa API keys are in `.env` (excluded)
-- [x] `ENV_TEMPLATE.txt` contains placeholders, not real values
-
-## 📋 Files Included in Repository
-
-### Frontend
-- `index.html` - Main website
-- `script.js` - Frontend JavaScript
-- `styles.css` - Stylesheet
-- `api-service.js` - API client
-- `storage-manager.js` - Local storage manager
-
-### Backend
-- `backend/server.js` - Express server
-- `backend/database/db.js` - MongoDB connection
-- `backend/models/` - Mongoose models
-- `backend/routes/` - API routes
-- `backend/services/` - Business logic
-- `backend/package.json` - Dependencies
-- `backend/ENV_TEMPLATE.txt` - Environment template
-
-### Documentation
-- `README.md` - Main documentation
-- `MONGODB_ATLAS_SETUP.md` - MongoDB setup guide
-- `PRODUCTION_SETUP.md` - Production deployment guide
-- `MONGODB_EXPORT_IMPORT.md` - Data migration guide
-- All other `.md` files
-
-### Configuration
-- `.gitignore` - Git ignore rules
-- `backend/.gitignore` - Backend-specific ignore rules
-
-## ⚠️ Important Reminders
-
-1. **Never commit `.env` files** - They contain sensitive credentials
-2. **Use `ENV_TEMPLATE.txt`** - Shows structure without real values
-3. **Review before push** - Always check `git status` before committing
-4. **Test locally first** - Ensure everything works before pushing
-
-## 🔍 Verify Before Pushing
-
-Run these commands to verify:
-
-```bash
-# Check for any .env files in staging
-git status | grep -i ".env"
-
-# Should return nothing (no .env files)
-
-# Check for any hardcoded credentials
-git diff --cached | grep -i "password\|secret\|key.*="
-
-# Should only show environment variable names, not values
-
-# List all files that will be committed
-git ls-files --cached | grep -v node_modules
+```
+trendy-dresses/
+├── index.html
+├── style.css
+├── script.js
+├── api-service.js
+├── storage-manager.js
+├── README.md
+├── .gitignore
+├── backend-php/          # PHP Backend (Primary)
+│   ├── index.php
+│   ├── composer.json
+│   ├── .htaccess
+│   ├── .env.example
+│   ├── config/
+│   ├── src/
+│   └── routes/
+├── backend/              # Node.js Backend (Alternative)
+│   ├── server.js
+│   ├── package.json
+│   ├── ENV_TEMPLATE.txt
+│   ├── models/
+│   └── routes/
+└── Documentation files
 ```
 
-## 📝 Recommended .gitignore Additions
+## Important Notes
 
-If you want to add more files to ignore:
+### Environment Files
 
-```gitignore
-# Personal notes
-NOTES.md
-TODO.md
-scratch.md
+- ✅ `.env.example` files are included (templates)
+- ❌ `.env` files are excluded (actual credentials)
 
-# Local development
-.local
-.local.*
-```
+### Backend Choice
 
-## 🎯 Next Steps After Push
+- **PHP Backend** is the primary backend (used in production)
+- **Node.js Backend** is included as an alternative
+- Frontend automatically detects and uses PHP backend
 
-1. **Add README.md** with setup instructions
-2. **Add LICENSE** file (if open source)
-3. **Create branches** for features (if collaborating)
-4. **Set up GitHub Actions** for CI/CD (optional)
-5. **Configure secrets** in GitHub (for deployment)
+### Security
 
-## 🔐 GitHub Secrets (For CI/CD)
+- Never commit:
+  - `.env` files
+  - API keys
+  - MongoDB connection strings
+  - M-Pesa credentials
+  - Any files with passwords
 
-If using GitHub Actions, add these as secrets (not in code):
-- `MONGODB_URI`
-- `MPESA_CONSUMER_KEY`
-- `MPESA_CONSUMER_SECRET`
-- `MPESA_PASSKEY`
-- `WHATSAPP_API_TOKEN`
+## After Pushing
 
-## ✅ Final Check
+1. **Update Repository Settings:**
+   - Add description
+   - Add topics: `e-commerce`, `php`, `mongodb`, `mpesa`, `fashion`
+   - Set visibility (Private recommended)
 
-Before pushing, run:
+2. **Create `.env` Files on Server:**
+   - Copy `.env.example` to `.env`
+   - Fill in actual credentials
+   - Never commit `.env` files
 
-```bash
-# 1. Verify .gitignore is working
-git check-ignore backend/.env
-# Should return: backend/.env
+3. **Documentation:**
+   - README.md is included
+   - All setup guides are included
+   - Installation instructions are clear
 
-# 2. Check what will be committed
-git status
+## Troubleshooting
 
-# 3. Review changes
-git diff --cached
+### "Files too large" error
+- Check `.gitignore` includes large files
+- Remove large files from Git history if needed
 
-# 4. Everything looks good? Push!
-git push -u origin main
-```
+### "Sensitive data" warning
+- Review all files before committing
+- Use `git status` to verify exclusions
+- Check `.gitignore` is working correctly
 
-## 🎉 Success!
+---
 
-After pushing, your code will be on GitHub and ready for:
-- Collaboration
-- Version control
-- Deployment
-- Backup and recovery
-
+**Your code is ready for GitHub!** 🚀
