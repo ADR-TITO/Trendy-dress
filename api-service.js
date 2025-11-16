@@ -4,12 +4,24 @@ const getBackendURL = () => {
     // Check if running on production domain
     if (window.location.hostname === 'trendydresses.co.ke' || 
         window.location.hostname === 'www.trendydresses.co.ke') {
-        // Production: Use production backend API
-        // Update this to your actual production backend URL
-        // For now, assuming backend is on the same domain or subdomain
-        return window.location.protocol + '//' + window.location.hostname + ':3000/api';
-        // Or if backend is on a subdomain: 'https://api.trendydresses.co.ke/api'
-        // Or if backend is on same server: window.location.origin + '/api'
+        // Production: Try multiple possible backend URLs
+        // Option 1: Backend on same domain with /api path (most common - recommended)
+        const sameOriginURL = window.location.origin + '/api';
+        
+        // Option 2: Backend on subdomain
+        const subdomainURL = 'https://api.trendydresses.co.ke/api';
+        
+        // Option 3: Backend on same domain with port (less common, but some setups use this)
+        const portURL = window.location.protocol + '//' + window.location.hostname + ':3000/api';
+        
+        // Use same origin by default (most common production setup)
+        // If your backend is on a subdomain, change this to subdomainURL
+        // If your backend uses a specific port, change this to portURL
+        return sameOriginURL;
+        
+        // Uncomment one of these if the default doesn't work:
+        // return subdomainURL;  // If backend is on api.trendydresses.co.ke
+        // return portURL;       // If backend exposes port 3000 directly
     } else {
         // Development: Use localhost
         return 'http://localhost:3000/api';
@@ -18,9 +30,16 @@ const getBackendURL = () => {
 
 const API_BASE_URL = getBackendURL();
 
+// Log the detected backend URL for debugging
+console.log('🔍 API Service initialized');
+console.log('   Current domain:', window.location.hostname);
+console.log('   Backend URL:', API_BASE_URL);
+
 class ApiService {
     constructor() {
         this.baseURL = API_BASE_URL;
+        // Log backend URL on initialization
+        console.log('📡 ApiService baseURL:', this.baseURL);
     }
 
     // Check if backend is available
