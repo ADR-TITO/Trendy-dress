@@ -42,7 +42,11 @@ router.get('/', async (req, res) => {
         }
         
         console.log('Fetching products from MongoDB...');
-        const products = await Product.find(query).sort({ createdAt: -1 });
+        // Optimized query - only select needed fields, limit results if needed
+        const products = await Product.find(query)
+            .select(includeImages === 'true' ? '' : 'name category price discount quantity size createdAt updatedAt') // Exclude image field if not needed
+            .sort({ createdAt: -1 })
+            .lean(); // Use lean() for faster queries (returns plain JS objects)
         console.log(`✅ Found ${products.length} products`);
         
         // OPTIMIZATION: Exclude images from list endpoint by default (dramatically reduces response size)
@@ -63,10 +67,12 @@ router.get('/', async (req, res) => {
             }));
             
             console.log(`📦 Returning ${productsWithoutImages.length} products without images (optimized)`);
-            // Add caching headers for better performance
+            // Add aggressive caching headers for better performance
             res.set({
-                'Cache-Control': 'public, max-age=300', // Cache for 5 minutes
-                'ETag': `"${productsWithoutImages.length}-${Date.now()}"`
+                'Cache-Control': 'public, max-age=600', // Cache for 10 minutes
+                'ETag': `"${productsWithoutImages.length}-${Date.now()}"`,
+                'X-Content-Type-Options': 'nosniff',
+                'X-Response-Time': Date.now().toString()
             });
             res.json(productsWithoutImages);
         } else {

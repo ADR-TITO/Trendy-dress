@@ -35,6 +35,12 @@ backend/START_MONGODB.ps1
 *secrets*.bat
 *secrets*.ps1
 
+# PM2 logs and process files
+backend/logs/
+backend/.pm2/
+*.pid
+*.pid.lock
+
 # API Keys and Secrets
 *api*key*.txt
 *secret*.txt

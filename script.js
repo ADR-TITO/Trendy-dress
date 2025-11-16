@@ -1690,6 +1690,7 @@ function getCategoryDisplayName(category) {
 }
 
 // Lazy load product images in background (optimization for faster initial page load)
+// Optimized lazy image loading with batching and caching
 async function loadProductImagesLazy(products) {
     try {
         const useMongoDB = localStorage.getItem('useMongoDB') === 'true';
@@ -1711,8 +1712,10 @@ async function loadProductImagesLazy(products) {
         
         console.log(`🖼️ Loading images for ${productsNeedingImages.length} products in background...`);
         
-        // Load images in batches to avoid overwhelming the server
-        const batchSize = 5;
+        // Load images in larger batches for faster loading
+        const batchSize = 10; // Increased batch size for faster loading
+        let lastUpdateTime = Date.now();
+        
         for (let i = 0; i < productsNeedingImages.length; i += batchSize) {
             const batch = productsNeedingImages.slice(i, i + batchSize);
             
@@ -1731,8 +1734,6 @@ async function loadProductImagesLazy(products) {
                         );
                         if (productIndex !== -1) {
                             products[productIndex].image = fullProduct.image;
-                            // Update display if this product is visible
-                            displayProducts(currentCategory);
                         }
                     }
                 } catch (imgError) {
@@ -1741,11 +1742,16 @@ async function loadProductImagesLazy(products) {
                 }
             }));
             
-            // Small delay between batches to avoid overwhelming server
-            if (i + batchSize < productsNeedingImages.length) {
-                await new Promise(resolve => setTimeout(resolve, 100));
+            // Throttle display updates - only update every 500ms to avoid excessive re-renders
+            const now = Date.now();
+            if (now - lastUpdateTime > 500) {
+                displayProducts(currentCategory);
+                lastUpdateTime = now;
             }
         }
+        
+        // Final display update
+        displayProducts(currentCategory);
         
         console.log(`✅ Finished loading product images in background`);
     } catch (error) {
@@ -2379,10 +2385,8 @@ function updateOrderSummary() {
 
 // Open Payment Modal
 function openPaymentModal() {
-    // Initialize payment method UI when modal opens
-    setTimeout(() => {
-        updatePaymentMethod();
-    }, 100);
+    // Initialize payment method UI immediately (no delay needed)
+    updatePaymentMethod();
     const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     const deliveryCost = getDeliveryCost();
     const total = subtotal + deliveryCost;
@@ -5898,20 +5902,17 @@ async function saveProduct(event) {
                     // Continue with local products
                 }
                 
-                // Force refresh display to show updated images (use current products array)
-                // Use setTimeout to ensure DOM updates after async operations
-                setTimeout(() => {
-                    console.log('🔄 Refreshing product display... Product count:', products.length);
-                    displayProducts(currentCategory || 'all');
-                    console.log('✅ Product display refreshed');
-                    
-                    // Update admin products list (refresh from current products array)
-                    const searchInput = document.getElementById('adminProductSearch');
-                    const searchQuery = searchInput ? searchInput.value : '';
-                    console.log('🔄 Refreshing admin products list...');
-                    loadAdminProducts(searchQuery);
-                    console.log('✅ Admin products list refreshed');
-                }, 100);
+                // Force refresh display immediately (no delay needed)
+                console.log('🔄 Refreshing product display... Product count:', products.length);
+                displayProducts(currentCategory || 'all');
+                console.log('✅ Product display refreshed');
+                
+                // Update admin products list (refresh from current products array)
+                const searchInput = document.getElementById('adminProductSearch');
+                const searchQuery = searchInput ? searchInput.value : '';
+                console.log('🔄 Refreshing admin products list...');
+                loadAdminProducts(searchQuery);
+                console.log('✅ Admin products list refreshed');
             } else {
                 console.error('❌ Failed to sync to any storage location');
                 showNotification('Error: Failed to save product to any storage location', 'error');
@@ -6406,30 +6407,27 @@ async function confirmDelete() {
                 // Continue with local products
             }
             
-            // Update UI with remaining products (use current products array)
-            // Use setTimeout to ensure DOM updates after async operations
-            setTimeout(() => {
-                console.log(`✅ Products array has ${products.length} products (after deletion)`);
-                console.log('🔄 Refreshing product display...');
-                currentCategory = 'all';
-                displayProducts('all');
-                console.log('✅ Product display refreshed');
-                
-                // Update active filter button
-                document.querySelectorAll('.filter-btn').forEach(btn => {
-                    btn.classList.remove('active');
-                    if (btn.getAttribute('data-category') === 'all') {
-                        btn.classList.add('active');
-                    }
-                });
-                
-                // Preserve search query if there is one and refresh admin products list
-                const searchInput = document.getElementById('adminProductSearch');
-                const searchQuery = searchInput ? searchInput.value : '';
-                console.log('🔄 Refreshing admin products list...');
-                loadAdminProducts(searchQuery);
-                console.log('✅ Admin products list refreshed');
-            }, 100);
+            // Update UI with remaining products immediately (no delay needed)
+            console.log(`✅ Products array has ${products.length} products (after deletion)`);
+            console.log('🔄 Refreshing product display...');
+            currentCategory = 'all';
+            displayProducts('all');
+            console.log('✅ Product display refreshed');
+            
+            // Update active filter button
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.getAttribute('data-category') === 'all') {
+                    btn.classList.add('active');
+                }
+            });
+            
+            // Preserve search query if there is one and refresh admin products list
+            const searchInput = document.getElementById('adminProductSearch');
+            const searchQuery = searchInput ? searchInput.value : '';
+            console.log('🔄 Refreshing admin products list...');
+            loadAdminProducts(searchQuery);
+            console.log('✅ Admin products list refreshed');
             
             console.log('✅ Product deleted successfully from all storage locations');
             showNotification('Product deleted successfully from all storage locations!', 'success');

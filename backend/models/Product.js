@@ -39,9 +39,11 @@ const productSchema = new mongoose.Schema({
     timestamps: true // Adds createdAt and updatedAt automatically
 });
 
-// Index for faster queries
+// Indexes for faster queries
 productSchema.index({ category: 1 });
 productSchema.index({ name: 1 });
+productSchema.index({ createdAt: -1 }); // For sorting
+productSchema.index({ category: 1, createdAt: -1 }); // Compound index for category queries
 
 const Product = mongoose.model('Product', productSchema);
 

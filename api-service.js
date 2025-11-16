@@ -45,9 +45,9 @@ class ApiService {
     // Check if backend is available
     async checkBackend() {
         try {
-            // Use a longer timeout to avoid false negatives
+            // Optimized timeout - faster response
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+            const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout
             
             const response = await fetch(`${this.baseURL}/health`, {
                 signal: controller.signal,
@@ -81,7 +81,7 @@ class ApiService {
     async checkMongoDBStatus() {
         try {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000); // Increased timeout to 5 seconds
+            const timeoutId = setTimeout(() => controller.abort(), 2000); // Optimized timeout to 2 seconds
             
             const response = await fetch(`${this.baseURL}/db-status`, {
                 signal: controller.signal,
@@ -126,9 +126,9 @@ class ApiService {
                 ? `${this.baseURL}/products?category=${category}${includeImages ? '&includeImages=true' : ''}`
                 : `${this.baseURL}/products${includeImages ? '?includeImages=true' : ''}`;
             
-            // Use longer timeout for production (20 seconds for slow networks)
-            // Even without images, large product lists or slow MongoDB queries might take time
-            const timeoutDuration = includeImages ? 30000 : 20000; // 30s with images, 20s without
+            // Optimized timeouts - reduced for faster failure detection
+            // Products without images should load quickly (< 5s)
+            const timeoutDuration = includeImages ? 15000 : 5000; // 15s with images, 5s without
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), timeoutDuration);
             

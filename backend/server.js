@@ -50,6 +50,11 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
 }));
+
+// Compression middleware for faster responses
+const compression = require('compression');
+app.use(compression({ level: 6 })); // Level 6 provides good balance between speed and compression
+
 app.use(bodyParser.json({ limit: '50mb' })); // Increased limit for base64 images
 app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
 
