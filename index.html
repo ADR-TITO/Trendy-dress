@@ -176,13 +176,13 @@
                     <div class="payment-instructions" style="margin-top: 20px; padding-top: 20px; border-top: 2px solid #eee;">
                         <h3>Payment Method *</h3>
                         <div class="payment-method-selection" style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
-                            <label class="payment-option" id="stkPushOption" style="width: 100%; padding: 15px; border: 2px solid var(--primary-color); border-radius: 5px; cursor: pointer; background: #f0f7ff; transition: all 0.3s;" onchange="updatePaymentMethod()">
-                                <input type="radio" name="paymentMethod" value="stk-push" style="margin-right: 10px; cursor: pointer;">
+                            <label class="payment-option" id="stkPushOption" style="width: 100%; padding: 15px; border: 2px solid var(--primary-color); border-radius: 5px; cursor: pointer; background: #f0f7ff; transition: all 0.3s;" onclick="updatePaymentMethod()">
+                                <input type="radio" name="paymentMethod" value="stk-push" style="margin-right: 10px; cursor: pointer;" onchange="updatePaymentMethod()">
                                 <div style="display: flex; align-items: center; gap: 10px;">
                                     <i class="fas fa-mobile-alt" style="font-size: 1.5rem; color: var(--primary-color);"></i>
                                     <div style="flex: 1;">
                                         <strong style="color: var(--dark-color);">M-Pesa Prompt (STK Push)</strong>
-                                        <p style="margin: 5px 0 0 0; color: #666; font-size: 0.9rem;">Get payment prompt on your phone automatically</p>
+                                        <p style="margin: 5px 0 0 0; color: #666; font-size: 0.9rem;">Enter your phone number and get payment prompt on your device</p>
                                     </div>
                                 </div>
                             </label>
@@ -215,20 +215,25 @@
                         <div id="stkPushPaymentSteps" class="payment-steps" style="margin-top: 15px; display: none;">
                             <p><strong>How it works:</strong></p>
                             <ol>
-                                <li>Click "Complete Payment" button below</li>
+                                <li><strong>Enter your phone number</strong> below (the number registered with M-Pesa)</li>
+                                <li>Click "Complete Payment" button</li>
                                 <li>A payment prompt will appear on your phone</li>
                                 <li>Enter your M-Pesa PIN to authorize payment</li>
                                 <li>Payment will be processed automatically</li>
                             </ol>
+                            <p style="margin-top: 10px; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 5px; color: #856404; font-size: 0.9rem;">
+                                <strong>📱 Important:</strong> Make sure you enter the correct phone number registered with your M-Pesa account. The payment prompt will be sent to this number.
+                            </p>
                         </div>
                     </div>
                     <div class="form-group">
                         <label for="customerName">Your Name *</label>
                         <input type="text" id="customerName" required placeholder="Enter your full name">
                     </div>
-                    <div class="form-group">
-                        <label for="customerPhone">Your Phone Number *</label>
-                        <input type="tel" id="customerPhone" required placeholder="07XX XXX XXX" pattern="[0-9]{10}">
+                    <div class="form-group" id="customerPhoneGroup">
+                        <label for="customerPhone" id="customerPhoneLabel">Your Phone Number *</label>
+                        <input type="tel" id="customerPhone" required placeholder="07XX XXX XXX or 2547XX XXX XXX" pattern="[0-9]{10,12}">
+                        <small id="phoneNumberHint" style="color: #666; display: none; font-size: 0.85rem; margin-top: 5px;">Enter the phone number registered with your M-Pesa account (e.g., 0724904692 or 254724904692)</small>
                     </div>
                     <div class="form-group" id="mpesaCodeGroup">
                         <label for="mpesaCode">M-Pesa Transaction Code *</label>

@@ -2424,6 +2424,10 @@ function updatePaymentMethod() {
     const mpesaCodeInput = document.getElementById('mpesaCode');
     const tillPaymentSteps = document.getElementById('tillPaymentSteps');
     const stkPushPaymentSteps = document.getElementById('stkPushPaymentSteps');
+    const customerPhoneGroup = document.getElementById('customerPhoneGroup');
+    const customerPhoneLabel = document.getElementById('customerPhoneLabel');
+    const phoneNumberHint = document.getElementById('phoneNumberHint');
+    const customerPhoneInput = document.getElementById('customerPhone');
     
     if (paymentMethod === 'stk-push') {
         // Hide M-Pesa code input for STK Push
@@ -2432,6 +2436,7 @@ function updatePaymentMethod() {
         }
         if (mpesaCodeInput) {
             mpesaCodeInput.removeAttribute('required');
+            mpesaCodeInput.value = ''; // Clear the value
         }
         // Show STK Push steps, hide Till steps
         if (tillPaymentSteps) {
@@ -2439,6 +2444,32 @@ function updatePaymentMethod() {
         }
         if (stkPushPaymentSteps) {
             stkPushPaymentSteps.style.display = 'block';
+        }
+        // Make phone number field more prominent for STK Push
+        if (customerPhoneGroup) {
+            customerPhoneGroup.style.display = 'block';
+            customerPhoneGroup.style.marginTop = '20px';
+            customerPhoneGroup.style.padding = '15px';
+            customerPhoneGroup.style.background = '#f0f7ff';
+            customerPhoneGroup.style.border = '2px solid var(--primary-color)';
+            customerPhoneGroup.style.borderRadius = '8px';
+        }
+        if (customerPhoneLabel) {
+            customerPhoneLabel.innerHTML = '<i class="fas fa-mobile-alt"></i> Your M-Pesa Phone Number *';
+            customerPhoneLabel.style.color = 'var(--primary-color)';
+            customerPhoneLabel.style.fontWeight = 'bold';
+            customerPhoneLabel.style.fontSize = '1.1rem';
+        }
+        if (phoneNumberHint) {
+            phoneNumberHint.style.display = 'block';
+        }
+        if (customerPhoneInput) {
+            customerPhoneInput.setAttribute('required', 'required');
+            customerPhoneInput.style.fontSize = '1.1rem';
+            customerPhoneInput.style.padding = '12px';
+            customerPhoneInput.style.borderWidth = '2px';
+            customerPhoneInput.placeholder = 'Enter M-Pesa phone number (0724904692 or 254724904692)';
+            customerPhoneInput.focus(); // Focus on phone number input
         }
     } else {
         // Show M-Pesa code input for Till payment
@@ -2454,6 +2485,31 @@ function updatePaymentMethod() {
         }
         if (stkPushPaymentSteps) {
             stkPushPaymentSteps.style.display = 'none';
+        }
+        // Reset phone number field styling for Till payment
+        if (customerPhoneGroup) {
+            customerPhoneGroup.style.display = 'block';
+            customerPhoneGroup.style.marginTop = '';
+            customerPhoneGroup.style.padding = '';
+            customerPhoneGroup.style.background = '';
+            customerPhoneGroup.style.border = '';
+            customerPhoneGroup.style.borderRadius = '';
+        }
+        if (customerPhoneLabel) {
+            customerPhoneLabel.innerHTML = 'Your Phone Number *';
+            customerPhoneLabel.style.color = '';
+            customerPhoneLabel.style.fontWeight = '';
+            customerPhoneLabel.style.fontSize = '';
+        }
+        if (phoneNumberHint) {
+            phoneNumberHint.style.display = 'none';
+        }
+        if (customerPhoneInput) {
+            customerPhoneInput.setAttribute('required', 'required');
+            customerPhoneInput.style.fontSize = '';
+            customerPhoneInput.style.padding = '';
+            customerPhoneInput.style.borderWidth = '';
+            customerPhoneInput.placeholder = '07XX XXX XXX or 2547XX XXX XXX';
         }
     }
 }
@@ -3794,20 +3850,48 @@ async function processPayment(event) {
             return;
         }
         
-        const customerName = document.getElementById('customerName')?.value;
-        const customerPhone = document.getElementById('customerPhone')?.value;
-        const customerEmail = document.getElementById('customerEmail')?.value || '';
+        const customerName = document.getElementById('customerName')?.value?.trim();
+        let customerPhone = document.getElementById('customerPhone')?.value?.trim() || '';
+        const customerEmail = document.getElementById('customerEmail')?.value?.trim() || '';
+        
+        // Get selected payment method
+        const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked')?.value || 'till';
+        
+        // Format phone number for STK Push (convert 07XX to 2547XX if needed)
+        if (customerPhone && paymentMethod === 'stk-push') {
+            // Remove any spaces, dashes, or other characters
+            customerPhone = customerPhone.replace(/[\s\-\(\)]/g, '');
+            
+            // Convert 07XX format to 2547XX for STK Push
+            if (customerPhone.startsWith('0') && customerPhone.length === 10) {
+                customerPhone = '254' + customerPhone.substring(1);
+            } else if (customerPhone.startsWith('254') && customerPhone.length === 12) {
+                // Already in correct format
+                customerPhone = customerPhone;
+            } else if (customerPhone.length === 9) {
+                // 7XX format - add 254 prefix
+                customerPhone = '254' + customerPhone;
+            }
+            
+            // Validate phone number format for STK Push
+            if (!/^2547\d{8}$/.test(customerPhone)) {
+                alert('Please enter a valid M-Pesa phone number.\n\nFormat: 0724904692 or 254724904692\n\nThe number must start with 07XX or 2547XX and be registered with M-Pesa.');
+                document.getElementById('customerPhone')?.focus();
+                return;
+            }
+        }
         
         // Validate required fields
         if (!customerName || !customerPhone) {
-            alert('Please fill in all required fields: Name and Phone Number.');
+            if (paymentMethod === 'stk-push') {
+                alert('Please enter your name and M-Pesa phone number. The payment prompt will be sent to this phone number.');
+            } else {
+                alert('Please fill in all required fields: Name and Phone Number.');
+            }
             if (!customerName) document.getElementById('customerName')?.focus();
             else if (!customerPhone) document.getElementById('customerPhone')?.focus();
             return;
         }
-        
-        // Get selected payment method
-        const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked')?.value || 'till';
         const deliveryOption = document.querySelector('input[name="deliveryOption"]:checked');
         const deliveryAddress = document.getElementById('deliveryAddress')?.value || '';
         
@@ -4336,10 +4420,34 @@ async function processSTKPushPayment(customerName, customerPhone, customerEmail,
             }
         }
         
+        // Format phone number for STK Push API (ensure it's in 254 format)
+        let formattedPhone = customerPhone.trim();
+        if (!formattedPhone.startsWith('254')) {
+            // Remove leading 0 and add 254
+            if (formattedPhone.startsWith('0')) {
+                formattedPhone = '254' + formattedPhone.substring(1);
+            } else if (formattedPhone.length === 9) {
+                // 7XX format - add 254 prefix
+                formattedPhone = '254' + formattedPhone;
+            }
+        }
+        
+        // Validate phone number format
+        if (!/^2547\d{8}$/.test(formattedPhone)) {
+            hidePaymentVerificationModal();
+            alert('Please enter a valid M-Pesa phone number.\n\nFormat: 0724904692 or 254724904692\n\nThe number must be registered with M-Pesa.');
+            document.getElementById('customerPhone')?.focus();
+            return;
+        }
+        
         // Initiate STK Push
         console.log('📱 Initiating STK Push payment...');
+        console.log('📞 Phone number:', formattedPhone.replace(/(\d{3})(\d{3})(\d{3})/, '$1***$3')); // Mask middle digits for privacy
+        console.log('💰 Amount: KSh', total.toLocaleString('en-KE'));
+        console.log('📦 Order ID:', orderId);
+        
         const stkResult = await apiService.initiateSTKPush(
-            customerPhone,
+            formattedPhone, // Use formatted phone number
             total,
             orderId,
             `Payment for order ${orderId}`
@@ -4347,15 +4455,16 @@ async function processSTKPushPayment(customerName, customerPhone, customerEmail,
         
         if (!stkResult.success) {
             hidePaymentVerificationModal();
-            alert(`Failed to initiate M-Pesa payment prompt:\n\n${stkResult.responseDescription || 'Unknown error'}`);
+            alert(`Failed to initiate M-Pesa payment prompt:\n\n${stkResult.responseDescription || 'Unknown error'}\n\nPlease ensure your phone number is correct and registered with M-Pesa.`);
             return;
         }
         
-        // Show waiting message
+        // Show waiting message with phone number
         const verificationModal = document.getElementById('paymentVerificationModal');
         const verificationText = verificationModal?.querySelector('p');
         if (verificationText) {
-            verificationText.textContent = 'A payment prompt has been sent to your phone. Please enter your M-Pesa PIN to complete the payment...';
+            const displayPhone = formattedPhone.replace(/(\d{3})(\d{3})(\d{3})/, '$1***$3'); // Mask for display
+            verificationText.innerHTML = `A payment prompt has been sent to <strong>${displayPhone}</strong>.<br><br>Please check your phone and enter your M-Pesa PIN to complete the payment...`;
         }
         
         console.log('✅ STK Push initiated:', stkResult.checkoutRequestID);
@@ -5757,13 +5866,24 @@ async function saveProduct(event) {
                 }
                 
                 // Reload products from MongoDB if available (to get latest IDs and ensure sync)
-                const backendAvailable = await apiService.checkBackend();
-                if (backendAvailable) {
-                    await loadProducts();
+                let productsReloaded = false;
+                try {
+                    const backendAvailable = await apiService.checkBackend();
+                    if (backendAvailable) {
+                        console.log('🔄 Reloading products from MongoDB after save...');
+                        await loadProducts();
+                        productsReloaded = true;
+                        console.log('✅ Products reloaded from MongoDB. Product count:', products.length);
+                    }
+                } catch (reloadError) {
+                    console.warn('⚠️ Could not reload from MongoDB (using local data):', reloadError.message);
+                    // Continue with local products
                 }
                 
-                // Force refresh display to show updated images
+                // Force refresh display to show updated images (use current products array)
+                console.log('🔄 Refreshing product display... Product count:', products.length);
                 displayProducts(currentCategory || 'all');
+                console.log('✅ Product display refreshed');
             } else {
                 console.error('❌ Failed to sync to any storage location');
                 showNotification('Error: Failed to save product to any storage location', 'error');
@@ -5779,12 +5899,12 @@ async function saveProduct(event) {
         if (modal) modal.style.display = 'none';
         if (overlay) overlay.style.display = 'none';
         
-        // Update admin products list if in admin view
+        // Update admin products list (refresh from current products array)
         const searchInput = document.getElementById('adminProductSearch');
-        if (searchInput) {
-            const searchQuery = searchInput.value || '';
-            loadAdminProducts(searchQuery);
-        }
+        const searchQuery = searchInput ? searchInput.value : '';
+        console.log('🔄 Refreshing admin products list...');
+        loadAdminProducts(searchQuery);
+        console.log('✅ Admin products list refreshed');
     } catch (error) {
         console.error('❌ Error in saveProduct:', error);
         alert('Error saving product: ' + error.message + '. Please check the browser console for details.');
@@ -6248,14 +6368,29 @@ async function confirmDelete() {
                 }
             }
             
-            // DON'T reload from MongoDB after deletion - MongoDB still has deleted products (if not connected)
-            // Products array already has the correct remaining products
-            // Just update the UI with the current products array
-            console.log(`✅ Products array has ${products.length} products (after deletion)`);
+            // Reload products from MongoDB if available (to get latest state and ensure sync)
+            let productsReloaded = false;
+            try {
+                const backendAvailable = await apiService.checkBackend();
+                if (backendAvailable) {
+                    console.log('🔄 Reloading products from MongoDB after deletion...');
+                    await loadProducts();
+                    productsReloaded = true;
+                    console.log('✅ Products reloaded from MongoDB. Product count:', products.length);
+                } else {
+                    console.log('ℹ️ Backend not available - using local products array');
+                }
+            } catch (reloadError) {
+                console.warn('⚠️ Could not reload from MongoDB (using local data):', reloadError.message);
+                // Continue with local products
+            }
             
-            // Update UI with remaining products
+            // Update UI with remaining products (use current products array)
+            console.log(`✅ Products array has ${products.length} products (after deletion)`);
+            console.log('🔄 Refreshing product display...');
             currentCategory = 'all';
             displayProducts('all');
+            console.log('✅ Product display refreshed');
             
             // Update active filter button
             document.querySelectorAll('.filter-btn').forEach(btn => {
@@ -6265,10 +6400,12 @@ async function confirmDelete() {
                 }
             });
             
-            // Preserve search query if there is one
+            // Preserve search query if there is one and refresh admin products list
             const searchInput = document.getElementById('adminProductSearch');
             const searchQuery = searchInput ? searchInput.value : '';
+            console.log('🔄 Refreshing admin products list...');
             loadAdminProducts(searchQuery);
+            console.log('✅ Admin products list refreshed');
             
             console.log('✅ Product deleted successfully from all storage locations');
             showNotification('Product deleted successfully from all storage locations!', 'success');
