@@ -518,8 +518,13 @@ async function checkAllStorageFacilities() {
                     // Only log unexpected errors
                     console.log(`   ⚠️ MongoDB: Backend available but error fetching products: ${error.message}`);
                 } else {
-                    // Silently handle expected errors (backend might be slow or not responding)
-                    // Don't log this - it's expected when backend is not fully available
+                    // Handle expected errors (timeout, network issues)
+                    if (errorMsg.includes('timed out') || errorMsg.includes('aborted')) {
+                        console.log(`   ⚠️ MongoDB: Backend available but request timed out (20s)`);
+                        console.log(`   ℹ️ This may be due to slow network or backend processing. Will retry automatically or use fallback storage.`);
+                    } else {
+                        console.log(`   ⚠️ MongoDB: Backend available but error fetching products: ${error.message}`);
+                    }
                     results.mongodb.available = false;
                 }
             }

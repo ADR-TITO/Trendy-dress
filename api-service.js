@@ -117,20 +117,27 @@ class ApiService {
     }
 
     // Get all products (optimized - without images by default)
-    async getProducts(category = 'all', includeImages = false) {
+    async getProducts(category = 'all', includeImages = false, retryCount = 0) {
+        const maxRetries = 2; // Retry up to 2 times (3 total attempts)
+        
         try {
             // OPTIMIZATION: Don't include images in list request (reduces response from 28MB to ~100KB)
             const url = category && category !== 'all' 
                 ? `${this.baseURL}/products?category=${category}${includeImages ? '&includeImages=true' : ''}`
                 : `${this.baseURL}/products${includeImages ? '?includeImages=true' : ''}`;
             
-            // Use longer timeout for slow connections (15 seconds should be enough even on slow networks)
+            // Use longer timeout for production (20 seconds for slow networks)
             // Even without images, large product lists or slow MongoDB queries might take time
-            const timeoutDuration = includeImages ? 30000 : 15000; // 30s with images, 15s without
+            const timeoutDuration = includeImages ? 30000 : 20000; // 30s with images, 20s without
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), timeoutDuration);
             
-            console.log(`📡 Fetching products from MongoDB API (${includeImages ? 'with' : 'without'} images, timeout: ${timeoutDuration/1000}s)...`);
+            if (retryCount > 0) {
+                console.log(`📡 Retrying product fetch (attempt ${retryCount + 1}/${maxRetries + 1})...`);
+            } else {
+                console.log(`📡 Fetching products from MongoDB API (${includeImages ? 'with' : 'without'} images, timeout: ${timeoutDuration/1000}s)...`);
+            }
+            
             let response;
             try {
                 response = await fetch(url, {
@@ -144,7 +151,13 @@ class ApiService {
                 clearTimeout(timeoutId);
                 // Check if it was aborted due to timeout
                 if (fetchError.name === 'AbortError' || fetchError.message.includes('aborted')) {
-                    throw new Error(`Request timed out after ${timeoutDuration/1000} seconds`);
+                    // Retry on timeout if we haven't exceeded max retries
+                    if (retryCount < maxRetries) {
+                        console.warn(`⚠️ Request timed out, retrying in 1 second... (attempt ${retryCount + 1}/${maxRetries + 1})`);
+                        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+                        return this.getProducts(category, includeImages, retryCount + 1);
+                    }
+                    throw new Error(`Request timed out after ${timeoutDuration/1000} seconds (${retryCount + 1} attempts)`);
                 }
                 throw fetchError;
             }
@@ -177,13 +190,16 @@ class ApiService {
             const errorMsg = error.message || '';
             
             if (errorName === 'AbortError' || errorMsg.includes('timed out') || errorMsg.includes('aborted')) {
-                const timeoutMsg = errorMsg.includes('timed out') ? errorMsg.match(/\d+ seconds?/)?.[0] || '15 seconds' : '15 seconds';
-                console.warn(`⚠️ Product fetch timed out (${timeoutMsg}) - backend may be slow or network connection is slow`);
-                console.warn(`   Tip: ${includeImages ? 'Products with images can be large. ' : ''}Try refreshing or check your network connection.`);
+                const timeoutMsg = errorMsg.includes('timed out') ? errorMsg.match(/\d+ seconds?/)?.[0] || '20 seconds' : '20 seconds';
+                const attemptsMsg = errorMsg.includes('attempts') ? errorMsg.match(/\(\d+ attempts\)/)?.[0] || '' : '';
+                console.warn(`⚠️ Product fetch timed out (${timeoutMsg})${attemptsMsg ? ' ' + attemptsMsg : ''} - backend may be slow or network connection is slow`);
+                console.warn(`   Tip: ${includeImages ? 'Products with images can be large. ' : ''}The request will automatically retry or fall back to local storage.`);
                 console.warn(`   Backend URL: ${this.baseURL}`);
+                console.warn(`   You can check backend status at: ${this.baseURL.replace('/products', '/health')}`);
             } else if (errorName === 'TypeError' || errorMsg.includes('fetch') || errorMsg.includes('network')) {
                 console.warn(`⚠️ Product fetch failed - network error or CORS issue`);
                 console.warn(`   Check if backend is running on ${this.baseURL}`);
+                console.warn(`   Test backend health: ${this.baseURL.replace('/products', '/health')}`);
             } else {
                 console.error('❌ Error fetching products from API:', errorMsg);
             }
