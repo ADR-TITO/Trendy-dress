@@ -4399,14 +4399,24 @@ async function processSTKPushPayment(customerName, customerPhone, customerEmail,
         // Show loading modal
         showPaymentVerificationModal();
         
-        // Check if MongoDB is available
-        const useMongoDB = localStorage.getItem('useMongoDB') === 'true';
+        // Check if backend is available (STK Push needs backend API, not necessarily MongoDB)
+        console.log('🔍 Checking backend availability for STK Push...');
+        let backendAvailable = false;
+        try {
+            backendAvailable = await apiService.checkBackend();
+            console.log('📊 Backend available:', backendAvailable);
+        } catch (backendError) {
+            console.error('❌ Error checking backend:', backendError);
+            backendAvailable = false;
+        }
         
-        if (!useMongoDB) {
+        if (!backendAvailable) {
             hidePaymentVerificationModal();
-            alert('STK Push payment requires MongoDB backend. Please ensure the backend server is running.');
+            alert('STK Push payment requires the backend server to be running.\n\nPlease ensure:\n1. Backend server is running\n2. Backend is accessible from your network\n3. Check backend URL: ' + apiService.baseURL);
             return;
         }
+        
+        console.log('✅ Backend is available - proceeding with STK Push');
         
         // Generate order ID first
         const orderId = 'ORD-' + Date.now();
@@ -4534,6 +4544,7 @@ async function processSTKPushPayment(customerName, customerPhone, customerEmail,
                     }
                     
                     // If we couldn't find transaction, still create order (transaction will be linked via webhook)
+                    // Note: createOrderFromSTKPush will save to localStorage even if MongoDB fails
                     await createOrderFromSTKPush(
                         orderId,
                         customerName,
