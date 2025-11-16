@@ -220,6 +220,52 @@ body {
     justify-content: center;
     gap: 1rem;
     flex-wrap: wrap;
+    align-items: center;
+}
+
+/* Wrapper for category buttons (excluding "All Products") */
+.filter-buttons-wrapper {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    width: 100%;
+}
+
+/* Mobile: "All Products" on top, others in row below */
+@media (max-width: 768px) {
+    .filter-buttons {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    /* "All Products" button - full width on top */
+    .filter-btn[data-category="all"] {
+        width: 100%;
+        max-width: 300px;
+        padding: 12px 25px;
+        font-size: 1rem;
+        margin-bottom: 5px;
+    }
+
+    /* Wrapper for other category buttons - in one row */
+    .filter-buttons-wrapper {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 10px;
+        width: 100%;
+    }
+
+    /* Other category buttons - in one row below "All Products" */
+    .filter-buttons-wrapper .filter-btn {
+        flex: 1;
+        min-width: calc(50% - 5px);
+        max-width: calc(50% - 5px);
+        padding: 10px 15px;
+        font-size: 0.9rem;
+    }
 }
 
 .filter-btn {
@@ -259,6 +305,22 @@ body {
     gap: 30px;
     /* No limits - displays all products regardless of quantity */
     grid-auto-rows: auto;
+}
+
+/* Mobile: 2 columns (2 products visible per scroll) */
+@media (max-width: 768px) {
+    .products-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 15px;
+    }
+}
+
+/* Very small screens: Keep 2 columns but smaller gap */
+@media (max-width: 480px) {
+    .products-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
 }
 
 .product-card {
@@ -1497,9 +1559,73 @@ body {
         font-size: 1rem;
     }
 
-    .products-grid {
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-        gap: 20px;
+    /* Category Filter - Mobile Layout */
+    .category-filter {
+        padding: 20px 0;
+    }
+
+    .filter-buttons {
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+    }
+
+    /* "All Products" button on top row - full width */
+    .filter-btn[data-category="all"] {
+        width: 100%;
+        max-width: 300px;
+        padding: 12px 25px;
+        font-size: 1rem;
+        margin-bottom: 5px;
+    }
+
+    /* Wrapper for other category buttons - in one row */
+    .filter-buttons-wrapper {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 10px;
+        width: 100%;
+    }
+
+    /* Other category buttons - in one row below "All Products" */
+    .filter-buttons-wrapper .filter-btn {
+        flex: 1;
+        min-width: calc(50% - 5px);
+        max-width: calc(50% - 5px);
+        padding: 10px 15px;
+        font-size: 0.9rem;
+    }
+
+    /* Smaller product images on mobile */
+    .product-image {
+        height: 180px; /* Reduced from 300px */
+    }
+
+    .product-image img.product-img {
+        height: 180px;
+    }
+
+    .no-image-placeholder i {
+        font-size: 2rem; /* Reduced from 3rem */
+    }
+
+    .product-info {
+        padding: 15px;
+    }
+
+    .product-name {
+        font-size: 1rem; /* Slightly smaller */
+    }
+
+    .product-price {
+        font-size: 1.2rem; /* Slightly smaller */
+    }
+
+    .add-to-cart {
+        padding: 10px;
+        font-size: 0.9rem;
     }
 
     .cart-sidebar {
@@ -1533,6 +1659,50 @@ body {
     .payment-card {
         min-width: auto;
         width: 100%;
+    }
+}
+
+/* Extra small screens (phones in portrait) */
+@media (max-width: 480px) {
+    /* Even smaller product images */
+    .product-image {
+        height: 150px; /* Further reduced for very small screens */
+    }
+
+    .product-image img.product-img {
+        height: 150px;
+    }
+
+    .no-image-placeholder i {
+        font-size: 1.5rem;
+    }
+
+    /* Ensure 2 products per row even on very small screens */
+    .products-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+
+    .product-info {
+        padding: 12px;
+    }
+
+    .product-name {
+        font-size: 0.9rem;
+    }
+
+    .product-price {
+        font-size: 1.1rem;
+    }
+
+    /* Category filter adjustments for very small screens */
+    .filter-btn {
+        padding: 10px 15px;
+        font-size: 0.9rem;
+    }
+
+    .filter-btn[data-category="all"] {
+        max-width: 100%;
     }
 }
 

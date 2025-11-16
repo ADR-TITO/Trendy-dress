@@ -781,20 +781,22 @@ async function checkAllStorageFacilities() {
     return results;
 }
 
-// Unified function to sync products to ALL storage locations (MongoDB, localStorage, IndexedDB)
-// PRIORITY: MongoDB first, then localStorage/IndexedDB as backup
+// Unified function to sync products to storage locations (MongoDB, IndexedDB cache)
+// PRIORITY: MongoDB is PRIMARY storage (permanent, centralized)
+// IndexedDB is CACHE only (for offline access)
+// localStorage is NOT used for products - only for UI data (cart, preferences)
 async function syncProductsToAllStorage(productsToSync, options = {}) {
     const {
         skipMongoDB = false,
-        skipLocalStorage = false,
+        skipLocalStorage = true, // ALWAYS skip localStorage - only for UI data
         skipIndexedDB = false,
         preserveImages = true
     } = options;
     
     console.log(`🔄 [syncProductsToAllStorage] Syncing ${productsToSync.length} products...`);
-    console.log(`   MongoDB: ${skipMongoDB ? '⏭️ Skipped' : '✅ Enabled'}`);
-    console.log(`   localStorage: ${skipLocalStorage ? '⏭️ Skipped' : '✅ Enabled (backup)'}`);
-    console.log(`   IndexedDB: ${skipIndexedDB ? '⏭️ Skipped' : '✅ Enabled (backup)'}`);
+    console.log(`   MongoDB: ${skipMongoDB ? '⏭️ Skipped' : '✅ Enabled (PRIMARY - permanent storage)'}`);
+    console.log(`   localStorage: ⏭️ Skipped (ONLY for UI data: cart, preferences)`);
+    console.log(`   IndexedDB: ${skipIndexedDB ? '⏭️ Skipped' : '✅ Enabled (CACHE - offline access)'}`);
     
     console.log('🔄 [syncProductsToAllStorage] Starting sync to all storage locations...');
     console.log('🔄 Products to sync:', productsToSync.length);
@@ -1005,116 +1007,57 @@ async function syncProductsToAllStorage(productsToSync, options = {}) {
         }
     }
     
-    // 2. Sync to IndexedDB first (it also saves to localStorage, so we get both)
+    // 2. Cache to IndexedDB (for offline access only - MongoDB is PRIMARY)
+    // NOTE: localStorage is NOT used for products - only for UI data (cart, preferences)
     if (!skipIndexedDB) {
         try {
-            console.log('🔄 Syncing to IndexedDB (which also syncs to localStorage)...');
+            console.log('🔄 Caching to IndexedDB (for offline access only)...');
             // Initialize IndexedDB
             await storageManager.init();
             
             if (storageManager.useIndexedDB && storageManager.db) {
-                // Save to IndexedDB (this also saves to localStorage as backup automatically)
+                // Cache to IndexedDB (MongoDB is primary, this is just for offline access)
                 const indexedResult = await storageManager.saveProducts(productsToSave);
                 if (indexedResult) {
                     results.indexedDB.success = true;
                     results.indexedDB.count = productsToSave.length;
-                    console.log(`✅ Synced ${productsToSave.length} products to IndexedDB`);
-                    
-                    // Since IndexedDB save also saved to localStorage, mark localStorage as success
-                    // (storageManager.saveProducts() saves to localStorage first)
-                    results.localStorage.success = true;
-                    results.localStorage.count = productsToSave.length;
-                    console.log(`✅ Also synced to localStorage via IndexedDB`);
+                    console.log(`✅ Cached ${productsToSave.length} products to IndexedDB (for offline access)`);
                 } else {
                     results.indexedDB.error = 'Save operation returned false';
-                    console.error('❌ IndexedDB save returned false');
+                    console.error('❌ IndexedDB cache save returned false');
                 }
             } else {
-                console.log('ℹ️ IndexedDB not available - will sync to localStorage separately');
+                console.log('ℹ️ IndexedDB not available - skipping cache');
                 results.indexedDB.error = 'IndexedDB not available';
             }
         } catch (error) {
-            console.error('❌ IndexedDB sync error:', error);
+            console.error('❌ IndexedDB cache error:', error);
             results.indexedDB.error = error.message;
         }
     }
     
-    // 3. Sync to localStorage separately (only if IndexedDB didn't sync or if explicitly requested)
-    if (!skipLocalStorage && (!results.indexedDB.success || skipIndexedDB)) {
-        try {
-            console.log('🔄 Syncing to localStorage...');
-            const productsJson = JSON.stringify(productsToSave);
-            const sizeInMB = new Blob([productsJson]).size / (1024 * 1024);
-            
-            if (sizeInMB > 4.5) {
-                console.warn(`⚠️ Products are large (${sizeInMB.toFixed(2)}MB). Saving lightweight version to localStorage...`);
-                // Save lightweight version (without images) to localStorage
-                const lightweightProducts = productsToSave.map(p => ({
-                    id: p.id,
-                    name: p.name,
-                    category: p.category,
-                    price: p.price,
-                    discount: p.discount,
-                    quantity: p.quantity,
-                    size: p.size,
-                    image: '' // Remove images for localStorage
-                }));
-                localStorage.setItem('products', JSON.stringify(lightweightProducts));
-                results.localStorage.success = true;
-                results.localStorage.count = lightweightProducts.length;
-                console.log(`✅ Synced ${lightweightProducts.length} products to localStorage (lightweight)`);
-            } else {
-                // Save full version to localStorage
-                localStorage.setItem('products', productsJson);
-                results.localStorage.success = true;
-                results.localStorage.count = productsToSave.length;
-                console.log(`✅ Synced ${productsToSave.length} products to localStorage (full)`);
-            }
-        } catch (error) {
-            if (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
-                console.error('❌ localStorage quota exceeded!');
-                results.localStorage.error = 'Quota exceeded';
-                // Try lightweight version as fallback
-                try {
-                    const lightweightProducts = productsToSave.map(p => ({
-                        id: p.id,
-                        name: p.name,
-                        category: p.category,
-                        price: p.price,
-                        discount: p.discount,
-                        quantity: p.quantity,
-                        size: p.size,
-                        image: ''
-                    }));
-                    localStorage.setItem('products', JSON.stringify(lightweightProducts));
-                    results.localStorage.success = true;
-                    results.localStorage.count = lightweightProducts.length;
-                    console.log(`✅ Synced ${lightweightProducts.length} products to localStorage (lightweight fallback)`);
-                } catch (lightweightError) {
-                    console.error('❌ Even lightweight save failed!', lightweightError);
-                    results.localStorage.error = lightweightError.message;
-                }
-            } else {
-                console.error('❌ localStorage sync error:', error);
-                results.localStorage.error = error.message;
-            }
-        }
+    // 3. DO NOT sync to localStorage for products
+    // localStorage is ONLY for UI-related data (cart, preferences, admin credentials)
+    // Products are stored in MongoDB (permanent storage) and cached in IndexedDB (offline access)
+    if (!skipLocalStorage && false) { // Disabled - localStorage not used for products
+        console.log('ℹ️ localStorage sync skipped - localStorage is ONLY for UI data (cart, preferences)');
+        results.localStorage.error = 'Not used for products - only for UI data';
     }
     
     // Summary
     const totalSuccess = (results.mongodb.success ? 1 : 0) + 
-                        (results.localStorage.success ? 1 : 0) + 
-                        (results.indexedDB.success ? 1 : 0);
+                        (results.indexedDB.success ? 1 : 0); // localStorage not counted - not used for products
     
     console.log('\n📊 Sync Summary:');
-    console.log(`   MongoDB:      ${results.mongodb.success ? '✅' : '❌'} ${results.mongodb.count} products ${results.mongodb.error ? '(' + results.mongodb.error + ')' : ''}`);
-    console.log(`   localStorage: ${results.localStorage.success ? '✅' : '❌'} ${results.localStorage.count} products ${results.localStorage.error ? '(' + results.localStorage.error + ')' : ''}`);
-    console.log(`   IndexedDB:    ${results.indexedDB.success ? '✅' : '❌'} ${results.indexedDB.count} products ${results.indexedDB.error ? '(' + results.indexedDB.error + ')' : ''}`);
-    console.log(`   Total: ${totalSuccess}/3 storage locations synced successfully`);
+    console.log(`   MongoDB:      ${results.mongodb.success ? '✅' : '❌'} ${results.mongodb.count} products ${results.mongodb.error ? '(' + results.mongodb.error + ')' : ''} (PRIMARY - permanent storage)`);
+    console.log(`   IndexedDB:    ${results.indexedDB.success ? '✅' : '❌'} ${results.indexedDB.count} products ${results.indexedDB.error ? '(' + results.indexedDB.error + ')' : ''} (CACHE - offline access)`);
+    console.log(`   localStorage: ⏭️ Not used for products (ONLY for UI data: cart, preferences)`);
+    console.log(`   Total: ${totalSuccess}/2 storage locations synced successfully`);
     
-    // Return success if at least one storage location succeeded
+    // Return success if MongoDB succeeded (primary requirement)
+    // IndexedDB cache is optional (for offline access)
     return {
-        success: totalSuccess > 0,
+        success: results.mongodb.success, // MongoDB is required for success
         results: results,
         products: productsToSave // Return updated products (with MongoDB IDs if applicable)
     };
@@ -1372,8 +1315,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.log('ℹ️ Currently using localStorage/IndexedDB as fallback (temporary)');
     }
     
-    loadAdminCredentials(); // Load admin credentials
-    await loadProducts(); // Load products from MongoDB API or localStorage
+    loadAdminCredentials(); // Load admin credentials (UI data - localStorage OK)
+    loadCart(); // Load cart (UI data - localStorage OK)
+    await loadProducts(); // Load products from MongoDB API using fetch() - NOT localStorage
     
     // Automatically check all storage facilities for products
     console.log('\n💡 ========================================');
@@ -5135,17 +5079,34 @@ function toggleMobileMenu() {
     navMenu.classList.toggle('active');
 }
 
-// Save Cart to LocalStorage
+// ============================================
+// localStorage Usage:
+// ONLY for UI-related temporary data:
+// - Cart (temporary shopping cart)
+// - Admin credentials (session data)
+// - UI preferences (filters, theme, etc.)
+// 
+// NOT for core app data:
+// - Products → MongoDB API (permanent storage)
+// - Orders → MongoDB API (permanent storage)
+// ============================================
+
+// Save Cart to LocalStorage (UI-related data only)
 function saveCart() {
     localStorage.setItem('cart', JSON.stringify(cart));
 }
 
-// Load Cart from LocalStorage
+// Load Cart from LocalStorage (UI-related data only)
 function loadCart() {
     const savedCart = localStorage.getItem('cart');
     if (savedCart) {
-        cart = JSON.parse(savedCart);
-        updateCartUI();
+        try {
+            cart = JSON.parse(savedCart);
+            updateCartUI();
+        } catch (error) {
+            console.error('❌ Error parsing cart from localStorage:', error);
+            cart = [];
+        }
     }
 }
 
@@ -6740,87 +6701,45 @@ async function loadProducts() {
             }
         }
         
-        // FALLBACK: Use IndexedDB cache/localStorage only if MongoDB is not available
-        // MongoDB is permanent, centralized storage. IndexedDB is cache/fallback for offline access.
+        // FALLBACK: Use IndexedDB cache ONLY if MongoDB is not available (OFFLINE mode)
+        // NOTE: localStorage is NOT used for products - only for UI data (cart, preferences)
+        // MongoDB is the ONLY source of truth for core app data
         if (loadedProducts.length === 0) {
             if (useMongoDB && mongoDBConnected) {
-                // MongoDB was available but failed to load products
-                console.warn('⚠️ MongoDB was connected but failed to load products - using IndexedDB cache (fallback)');
+                // MongoDB was available but failed to load products - show error
+                console.error('❌ MongoDB was connected but failed to load products');
+                console.error('   This is an error - products should load from MongoDB');
+                console.error('   Check backend logs and MongoDB connection');
             } else {
-                console.log('⚠️ MongoDB not available - using IndexedDB cache/localStorage (fallback mode)');
-                console.log('   Note: MongoDB is permanent, centralized storage. IndexedDB is cache/fallback.');
-            }
-            
-            // Use local cache (IndexedDB/localStorage) if we found them earlier
-            if (localProductCount > 0 && localProducts.length > 0) {
-                loadedProducts = localProducts.map(p => ({
-                    ...p,
-                    id: p.id || p._id,
-                    image: p.image || ''
-                }));
-                loadSource = localProductCount === localProducts.length ? 'IndexedDB cache/localStorage' : 'IndexedDB cache';
-                console.log(`📦 Using ${loadedProducts.length} products from ${loadSource} (offline/fallback - MongoDB is primary)`);
-            } else {
-                // Check localStorage again if we didn't check earlier
-                const savedProducts = localStorage.getItem('products');
-                if (savedProducts) {
-                    try {
-                        loadedProducts = JSON.parse(savedProducts);
-                        loadSource = 'localStorage';
-                        console.log(`📦 Loaded ${loadedProducts.length} products from localStorage (fallback)`);
-                    } catch (error) {
-                        console.error('❌ Error parsing localStorage products:', error);
-                    }
-                }
+                // MongoDB not available - use IndexedDB cache for offline mode ONLY
+                console.warn('⚠️ MongoDB not available - using IndexedDB cache (OFFLINE MODE)');
+                console.warn('   Note: MongoDB is permanent, centralized storage.');
+                console.warn('   localStorage is NOT used for products - only for UI data (cart, preferences)');
                 
-                // Check IndexedDB cache if localStorage is empty (IndexedDB is cache/fallback for complex local storage)
-                if (loadedProducts.length === 0) {
-                    try {
-                        await storageManager.init();
-                        if (storageManager.useIndexedDB && storageManager.db) {
-                            const indexedProducts = await storageManager.loadProducts();
-                            if (indexedProducts && indexedProducts.length > 0) {
-                                loadedProducts = indexedProducts;
-                                loadSource = 'IndexedDB cache';
-                                console.log(`📦 Loaded ${loadedProducts.length} products from IndexedDB cache (offline/fallback)`);
-                                console.log(`   Note: This is cached data. MongoDB is permanent, centralized storage.`);
-                                
-                                // Save lightweight version to localStorage as minimal backup (not source of truth)
-                                try {
-                                    const productsJson = JSON.stringify(indexedProducts);
-                                    const sizeInMB = new Blob([productsJson]).size / (1024 * 1024);
-                                    
-                                    if (sizeInMB > 4.5) {
-                                        console.warn(`⚠️ IndexedDB cache is large (${sizeInMB.toFixed(2)}MB). Saving lightweight backup to localStorage...`);
-                                        const lightweightProducts = indexedProducts.map(p => ({
-                                            id: p.id,
-                                            name: p.name,
-                                            category: p.category,
-                                            price: p.price,
-                                            discount: p.discount || 0,
-                                            quantity: p.quantity || 0,
-                                            size: p.size || 'M',
-                                            image: ''
-                                        }));
-                                        localStorage.setItem('products', JSON.stringify(lightweightProducts));
-                                        console.log(`✅ Saved lightweight backup (${lightweightProducts.length} products) to localStorage`);
-                                    } else {
-                                        localStorage.setItem('products', productsJson);
-                                        console.log(`✅ Saved ${indexedProducts.length} products from IndexedDB cache to localStorage (backup)`);
-                                    }
-                                } catch (error) {
-                                    console.warn('⚠️ Could not save products to localStorage backup:', error);
-                                    // Not critical - IndexedDB has the data
-                                }
-                            }
+                // Use IndexedDB cache if available (offline mode)
+                try {
+                    await storageManager.init();
+                    if (storageManager.useIndexedDB && storageManager.db) {
+                        const indexedProducts = await storageManager.loadProducts();
+                        if (indexedProducts && indexedProducts.length > 0) {
+                            loadedProducts = indexedProducts.map(p => ({
+                                ...p,
+                                id: p.id || p._id,
+                                image: p.image || ''
+                            }));
+                            loadSource = 'IndexedDB cache (offline mode)';
+                            console.log(`📦 Using ${loadedProducts.length} products from IndexedDB cache (offline mode)`);
+                            console.log(`   ⚠️ This is cached data. Reconnect to MongoDB for latest data.`);
                         }
-                    } catch (error) {
-                        console.error('❌ Error checking IndexedDB cache:', error);
                     }
+                } catch (error) {
+                    console.error('❌ Error loading from IndexedDB cache:', error);
                 }
                 
+                // DO NOT use localStorage for products - it's only for UI data
                 if (loadedProducts.length === 0) {
-                    console.log('⚠️ No products found in localStorage or IndexedDB');
+                    console.error('❌ No products available - MongoDB is not connected and no cache found');
+                    console.error('   Please ensure backend server is running and MongoDB is connected');
                 }
             }
         }

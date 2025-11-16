@@ -58,19 +58,18 @@ class StorageManager {
         });
     }
 
-    // Save products to IndexedDB (used as cache/fallback, not primary storage)
+    // Save products to IndexedDB (used as cache for offline access, not primary storage)
     // Note: MongoDB is the permanent, centralized storage. IndexedDB caches MongoDB data.
+    // NOTE: localStorage is NOT used for products - only for UI data (cart, preferences)
     async saveProducts(productsArray) {
-        // Save lightweight version to localStorage as minimal backup (not source of truth)
-        const localSaveResult = this.saveProductsLocalStorage(productsArray);
-        if (!localSaveResult) {
-            console.warn('⚠️ Failed to save to localStorage - continuing anyway');
-            // Don't fail entirely - MongoDB is the source of truth
-        }
+        // DO NOT save to localStorage - it's only for UI data
+        // localStorage is reserved for: cart, admin credentials, UI preferences
+        // Products are stored in MongoDB (primary) and cached in IndexedDB (offline)
         
         if (!this.useIndexedDB || !this.db) {
-            // Fallback to localStorage only (minimal backup)
-            return localSaveResult;
+            // IndexedDB not available - return false (can't cache)
+            console.warn('⚠️ IndexedDB not available - cannot cache products');
+            return false;
         }
 
         return new Promise((resolve, reject) => {
