@@ -6453,15 +6453,17 @@ async function loadProducts() {
                     console.error('❌ Error details:', error);
                 } else {
                     // Expected error (timeout, network issue) - don't log as error
-                    console.warn(`⚠️ MongoDB request ${errorName === 'AbortError' ? 'timed out' : 'failed'}: ${errorMsg}`);
+                    if (errorName === 'AbortError' || errorMsg.includes('timed out') || errorMsg.includes('aborted')) {
+                        console.warn(`⚠️ MongoDB request timed out (15s) - this may be due to slow network or backend response`);
+                        console.warn(`   The request will fall back to localStorage/IndexedDB for now`);
+                        console.warn(`   If this persists, check: 1) Backend is running, 2) Network connection, 3) MongoDB Atlas connection`);
+                    } else {
+                        console.warn(`⚠️ MongoDB request failed: ${errorMsg}`);
+                    }
                 }
                 
-                // Only fall back if it's a real failure, not just a timeout
-                if (errorName === 'AbortError') {
-                    console.warn('⚠️ MongoDB request timed out - using fallback storage');
-                } else {
-                    console.warn('⚠️ MongoDB not available - falling back to localStorage/IndexedDB');
-                }
+                // Log fallback message
+                console.log('ℹ️ Failed to load from MongoDB - will load from localStorage/IndexedDB');
                 
                 // Mark MongoDB as unavailable for this session
                 useMongoDB = false;

@@ -105,18 +105,30 @@ class ApiService {
                 ? `${this.baseURL}/products?category=${category}${includeImages ? '&includeImages=true' : ''}`
                 : `${this.baseURL}/products${includeImages ? '?includeImages=true' : ''}`;
             
+            // Use longer timeout for slow connections (15 seconds should be enough even on slow networks)
+            // Even without images, large product lists or slow MongoDB queries might take time
+            const timeoutDuration = includeImages ? 30000 : 15000; // 30s with images, 15s without
             const controller = new AbortController();
-            // Reduced timeout to 10 seconds since we're not loading images
-            const timeoutId = setTimeout(() => controller.abort(), 10000);
+            const timeoutId = setTimeout(() => controller.abort(), timeoutDuration);
             
-            console.log(`📡 Fetching products from MongoDB API (${includeImages ? 'with' : 'without'} images)...`);
-            const response = await fetch(url, {
-                signal: controller.signal,
-                headers: {
-                    'Accept': 'application/json',
-                },
-            });
-            clearTimeout(timeoutId);
+            console.log(`📡 Fetching products from MongoDB API (${includeImages ? 'with' : 'without'} images, timeout: ${timeoutDuration/1000}s)...`);
+            let response;
+            try {
+                response = await fetch(url, {
+                    signal: controller.signal,
+                    headers: {
+                        'Accept': 'application/json',
+                    },
+                });
+                clearTimeout(timeoutId);
+            } catch (fetchError) {
+                clearTimeout(timeoutId);
+                // Check if it was aborted due to timeout
+                if (fetchError.name === 'AbortError' || fetchError.message.includes('aborted')) {
+                    throw new Error(`Request timed out after ${timeoutDuration/1000} seconds`);
+                }
+                throw fetchError;
+            }
             
             console.log(`📡 Response received: ${response.status} ${response.statusText}`);
             const contentLength = response.headers.get('content-length');
@@ -145,10 +157,12 @@ class ApiService {
             const errorName = error.name || '';
             const errorMsg = error.message || '';
             
-            if (errorName === 'AbortError') {
-                console.warn(`⚠️ Product fetch timed out (30s) - response may be too large or backend is slow`);
-                console.warn(`   Tip: Products with images can be large (20-30MB). Try refreshing or check network speed.`);
-            } else if (errorName === 'TypeError' || errorMsg.includes('fetch')) {
+            if (errorName === 'AbortError' || errorMsg.includes('timed out') || errorMsg.includes('aborted')) {
+                const timeoutMsg = errorMsg.includes('timed out') ? errorMsg.match(/\d+ seconds?/)?.[0] || '15 seconds' : '15 seconds';
+                console.warn(`⚠️ Product fetch timed out (${timeoutMsg}) - backend may be slow or network connection is slow`);
+                console.warn(`   Tip: ${includeImages ? 'Products with images can be large. ' : ''}Try refreshing or check your network connection.`);
+                console.warn(`   Backend URL: ${this.baseURL}`);
+            } else if (errorName === 'TypeError' || errorMsg.includes('fetch') || errorMsg.includes('network')) {
                 console.warn(`⚠️ Product fetch failed - network error or CORS issue`);
                 console.warn(`   Check if backend is running on ${this.baseURL}`);
             } else {
