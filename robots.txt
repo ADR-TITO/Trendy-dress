@@ -1,0 +1,20 @@
+# robots.txt for trendydresses.co.ke
+
+User-agent: *
+Allow: /
+Allow: /#home
+Allow: /#products
+Allow: /#about
+Allow: /#contact
+Allow: /#payment
+
+# Disallow admin and API endpoints
+Disallow: /api/
+Disallow: /admin/
+
+# Sitemap location
+Sitemap: https://trendydresses.co.ke/sitemap.xml
+
+# Crawl-delay (optional - adjust if needed)
+Crawl-delay: 1
+
