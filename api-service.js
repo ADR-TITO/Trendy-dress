@@ -3,15 +3,15 @@
 let detectedBackendURL = null;
 let isDetectingPort = false;
 
-// Auto-detect PHP backend
-async function detectBackendPort() {
-    // Check if running on production domain
-    if (window.location.hostname === 'trendydresses.co.ke' || 
-        window.location.hostname === 'www.trendydresses.co.ke') {
-        // Production: Try different possible paths
-        // Option 1: /api (if configured in root)
-        // Option 2: /backend-php/api (if backend-php folder is in root)
-        const possiblePaths = ['/api', '/backend-php/api'];
+       // Auto-detect PHP backend
+       async function detectBackendPort() {
+           // Check if running on production domain
+           if (window.location.hostname === 'trendydresses.co.ke' ||
+               window.location.hostname === 'www.trendydresses.co.ke') {
+               // Production: Try different possible paths
+               // Option 1: /backend-php/api (most common for cPanel)
+               // Option 2: /api (if configured in root)
+               const possiblePaths = ['/backend-php/api', '/api'];
         
         for (const path of possiblePaths) {
             try {

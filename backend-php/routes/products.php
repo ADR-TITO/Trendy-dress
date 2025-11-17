@@ -51,25 +51,46 @@ try {
         case 'GET':
             if ($id) {
                 // Get single product
-                $product = $productModel->findById($id);
-                if (!$product) {
-                    http_response_code(404);
-                    echo json_encode(['error' => 'Product not found']);
+                try {
+                    $product = $productModel->findById($id);
+                    if (!$product) {
+                        http_response_code(404);
+                        echo json_encode(['error' => 'Product not found']);
+                        exit;
+                    }
+                    echo json_encode($product);
+                } catch (Exception $e) {
+                    error_log('Error fetching product: ' . $e->getMessage());
+                    http_response_code(500);
+                    echo json_encode([
+                        'error' => 'Failed to fetch product',
+                        'message' => $e->getMessage()
+                    ]);
                     exit;
                 }
-                echo json_encode($product);
             } else {
                 // Get all products
-                $category = $_GET['category'] ?? 'all';
-                $includeImages = isset($_GET['includeImages']) && $_GET['includeImages'] === 'true';
-                
-                $products = $productModel->findAll($category === 'all' ? null : $category, $includeImages);
-                
-                // Add caching headers
-                header('Cache-Control: public, max-age=600');
-                header('ETag: "' . count($products) . '-' . time() . '"');
-                
-                echo json_encode($products);
+                try {
+                    $category = $_GET['category'] ?? 'all';
+                    $includeImages = isset($_GET['includeImages']) && $_GET['includeImages'] === 'true';
+
+                    $products = $productModel->findAll($category === 'all' ? null : $category, $includeImages);
+
+                    // Add caching headers
+                    header('Cache-Control: public, max-age=600');
+                    header('ETag: "' . count($products) . '-' . time() . '"');
+
+                    echo json_encode($products);
+                } catch (Exception $e) {
+                    error_log('Error fetching products: ' . $e->getMessage());
+                    error_log('Stack trace: ' . $e->getTraceAsString());
+                    http_response_code(500);
+                    echo json_encode([
+                        'error' => 'Failed to fetch products',
+                        'message' => $e->getMessage()
+                    ]);
+                    exit;
+                }
             }
             break;
             
