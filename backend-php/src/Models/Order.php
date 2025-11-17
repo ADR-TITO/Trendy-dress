@@ -55,12 +55,22 @@ class Order {
      */
     public function findAll($completedOnly = false) {
         try {
+            if (!Database::isConnected()) {
+                throw new \Exception('Database not connected');
+            }
             $pdo = Database::getConnection();
+            
+            // Check if table exists first
+            $tableCheck = $pdo->query("SHOW TABLES LIKE 'orders'");
+            if ($tableCheck->rowCount() === 0) {
+                error_log("⚠️ Orders table does not exist - returning empty array");
+                return [];
+            }
             
             if ($completedOnly) {
                 $stmt = $pdo->prepare("SELECT * FROM orders WHERE deliveryStatus = 'delivered' ORDER BY createdAt DESC");
             } else {
-                $stmt = $pdo->prepare("SELECT * FROM orders WHERE deliveryStatus != 'delivered' OR deliveryStatus IS NULL ORDER BY createdAt DESC");
+                $stmt = $pdo->prepare("SELECT * FROM orders WHERE (deliveryStatus != 'delivered' OR deliveryStatus IS NULL) ORDER BY createdAt DESC");
             }
             
             $stmt->execute();
@@ -83,6 +93,9 @@ class Order {
      */
     public function create($data) {
         try {
+            if (!Database::isConnected()) {
+                throw new \Exception('Database not connected');
+            }
             $pdo = Database::getConnection();
             
             // Generate ID if not provided

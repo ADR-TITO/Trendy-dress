@@ -39,13 +39,22 @@ class Database {
             ];
             
             self::$connection = new PDO($dsn, $username, $password, $options);
+            
+            // Test connection with a simple query
+            self::$connection->query("SELECT 1");
+            
             self::$connected = true;
             
             error_log("✅ Connected to MariaDB successfully");
             error_log("📊 Database: $dbname");
             
             // Create tables if they don't exist
-            self::createTables();
+            try {
+                self::createTables();
+            } catch (Exception $e) {
+                error_log("⚠️ Warning: Could not create tables: " . $e->getMessage());
+                // Don't fail connection if tables already exist
+            }
             
             return true;
         } catch (PDOException $e) {
@@ -100,6 +109,9 @@ class Database {
      */
     private static function createTables() {
         try {
+            if (!self::$connected) {
+                return; // Don't try to create tables if not connected
+            }
             $pdo = self::getConnection();
             
             // Products table
@@ -140,7 +152,7 @@ class Database {
             
             // M-Pesa transactions table
             $pdo->exec("CREATE TABLE IF NOT EXISTS mpesa_transactions (
-                id VARCHAR(255) PRIMARY KEY,
+                id INT AUTO_INCREMENT PRIMARY KEY,
                 receiptNumber VARCHAR(100) UNIQUE NOT NULL,
                 transactionDate DATETIME NOT NULL,
                 phoneNumber VARCHAR(50),
@@ -157,7 +169,19 @@ class Database {
             
             error_log("✅ Database tables created/verified");
         } catch (PDOException $e) {
-            error_log("⚠️ Error creating tables: " . $e->getMessage());
+            $errorMsg = $e->getMessage();
+            error_log("⚠️ Error creating tables: " . $errorMsg);
+            
+            // If table already exists, that's okay
+            if (strpos($errorMsg, 'already exists') !== false || 
+                strpos($errorMsg, 'Duplicate') !== false) {
+                error_log("ℹ️ Tables may already exist - this is okay");
+            } else {
+                // Log the full error for debugging
+                error_log("Full error: " . $e->getTraceAsString());
+            }
+        } catch (Exception $e) {
+            error_log("⚠️ Unexpected error creating tables: " . $e->getMessage());
         }
     }
     

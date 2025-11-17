@@ -11,7 +11,17 @@ class Product {
      */
     public function findAll($category = null, $includeImages = false) {
         try {
+            if (!Database::isConnected()) {
+                throw new \Exception('Database not connected');
+            }
             $pdo = Database::getConnection();
+            
+            // Check if table exists first
+            $tableCheck = $pdo->query("SHOW TABLES LIKE 'products'");
+            if ($tableCheck->rowCount() === 0) {
+                error_log("⚠️ Products table does not exist - returning empty array");
+                return [];
+            }
             
             $sql = "SELECT * FROM products";
             $params = [];
@@ -65,6 +75,9 @@ class Product {
      */
     public function findById($id) {
         try {
+            if (!Database::isConnected()) {
+                throw new \Exception('Database not connected');
+            }
             $pdo = Database::getConnection();
             
             $stmt = $pdo->prepare("SELECT * FROM products WHERE id = :id");
@@ -99,6 +112,9 @@ class Product {
      */
     public function create($data) {
         try {
+            if (!Database::isConnected()) {
+                throw new \Exception('Database not connected');
+            }
             $pdo = Database::getConnection();
             
             // Generate ID if not provided
@@ -131,6 +147,9 @@ class Product {
      */
     public function update($id, $data) {
         try {
+            if (!Database::isConnected()) {
+                throw new \Exception('Database not connected');
+            }
             $pdo = Database::getConnection();
             
             $fields = [];
@@ -185,6 +204,9 @@ class Product {
      */
     public function delete($id) {
         try {
+            if (!Database::isConnected()) {
+                throw new \Exception('Database not connected');
+            }
             $pdo = Database::getConnection();
             
             $stmt = $pdo->prepare("DELETE FROM products WHERE id = :id");

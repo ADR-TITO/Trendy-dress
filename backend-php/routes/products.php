@@ -33,6 +33,20 @@ try {
         exit;
     }
     
+    // Test database connection with a simple query
+    try {
+        $pdo = Database::getConnection();
+        $pdo->query("SELECT 1");
+    } catch (Exception $e) {
+        http_response_code(503);
+        echo json_encode([
+            'error' => 'Database connection error',
+            'message' => 'Failed to connect to database: ' . $e->getMessage()
+        ]);
+        error_log('Database connection error: ' . $e->getMessage());
+        exit;
+    }
+    
     switch ($method) {
         case 'GET':
             if ($id) {
