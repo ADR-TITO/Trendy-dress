@@ -1,55 +1,57 @@
 <?php
 /**
- * Quick Test Script for PHP Backend
- * Visit: https://trendydresses.co.ke/backend-php/test-backend.php
+ * Backend Test Script
+ * Tests PHP backend configuration and database connection
  */
 
 header('Content-Type: application/json');
 
 $result = [
-    'status' => 'ok',
-    'message' => 'PHP backend is working',
-    'php_version' => phpversion(),
-    'mongodb_extension' => extension_loaded('mongodb') ? 'installed' : 'not installed',
-    'composer_autoload' => file_exists(__DIR__ . '/vendor/autoload.php') ? 'exists' : 'missing',
-    'env_file' => file_exists(__DIR__ . '/.env') ? 'exists' : 'missing',
-    'htaccess' => file_exists(__DIR__ . '/.htaccess') ? 'exists' : 'missing',
-    'index_php' => file_exists(__DIR__ . '/index.php') ? 'exists' : 'missing',
-    'current_directory' => __DIR__,
-    'server_software' => $_SERVER['SERVER_SOFTWARE'] ?? 'unknown'
+    'php_version' => PHP_VERSION,
+    'pdo_mysql' => extension_loaded('pdo_mysql') ? 'installed' : 'not installed',
+    'pdo' => extension_loaded('pdo') ? 'installed' : 'not installed',
+    'dotenv_available' => class_exists('Dotenv\Dotenv'),
+    'timestamp' => date('Y-m-d H:i:s')
 ];
 
-// Test MongoDB connection if extension is loaded
-if (extension_loaded('mongodb') && file_exists(__DIR__ . '/vendor/autoload.php')) {
-    try {
-        require_once __DIR__ . '/vendor/autoload.php';
-        
-        if (file_exists(__DIR__ . '/.env')) {
-            $dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
-            $dotenv->load();
-            $mongodbUri = $_ENV['MONGODB_URI'] ?? '';
-            
-            if ($mongodbUri) {
-                $result['mongodb_uri_configured'] = true;
-                $result['mongodb_uri_preview'] = preg_replace('/\/\/[^:]+:[^@]+@/', '//***:***@', $mongodbUri);
-                
-                // Try to connect
-                try {
-                    $client = new MongoDB\Client($mongodbUri);
-                    $client->selectDatabase('admin')->command(['ping' => 1]);
-                    $result['mongodb_connection'] = 'success';
-                } catch (Exception $e) {
-                    $result['mongodb_connection'] = 'failed';
-                    $result['mongodb_error'] = $e->getMessage();
-                }
-            } else {
-                $result['mongodb_uri_configured'] = false;
-            }
+// Load environment variables
+if (file_exists(__DIR__ . '/.env')) {
+    // Try to use dotenv if available
+    if (class_exists('Dotenv\Dotenv')) {
+        $dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
+        $dotenv->load();
+    } else {
+        // Simple .env parser
+        $lines = file(__DIR__ . '/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if (strpos($line, '#') === 0 || strpos($line, '=') === false) continue;
+            list($key, $value) = explode('=', $line, 2);
+            $_ENV[trim($key)] = trim(trim($value), '"\'');
         }
-    } catch (Exception $e) {
-        $result['error'] = $e->getMessage();
     }
+    $result['env_file'] = 'found';
+    $result['db_host'] = $_ENV['DB_HOST'] ?? 'not set';
+    $result['db_name'] = $_ENV['DB_NAME'] ?? 'not set';
+    $result['db_user'] = $_ENV['DB_USER'] ?? 'not set';
+    $result['db_pass'] = isset($_ENV['DB_PASS']) ? '***' : 'not set';
+} else {
+    $result['env_file'] = 'not found';
+}
+
+// Test MariaDB connection
+if (extension_loaded('pdo_mysql')) {
+    try {
+        require_once __DIR__ . '/config/database.php';
+        $status = Database::getStatus();
+        $result['database_connection'] = $status['connected'] ? 'success' : 'failed';
+        $result['database_status'] = $status;
+    } catch (Exception $e) {
+        $result['database_connection'] = 'failed';
+        $result['database_error'] = $e->getMessage();
+    }
+} else {
+    $result['database_connection'] = 'pdo_mysql extension not available';
 }
 
 echo json_encode($result, JSON_PRETTY_PRINT);
-

@@ -23,12 +23,12 @@ $id = $routeParts[1] ?? null;
 $productModel = new Product();
 
 try {
-    // Check MongoDB connection
+    // Check MariaDB connection
     if (!Database::isConnected()) {
         http_response_code(503);
         echo json_encode([
-            'error' => 'MongoDB not connected',
-            'message' => 'Database connection failed. Please check MongoDB connection string.'
+            'error' => 'MariaDB not connected',
+            'message' => 'Database connection failed. Please check database credentials in .env file.'
         ]);
         exit;
     }
