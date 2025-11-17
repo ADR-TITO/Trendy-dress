@@ -6717,7 +6717,7 @@ async function loadProducts() {
             } else {
                 // MongoDB not available - use IndexedDB cache for offline mode ONLY
                 console.warn('⚠️ MongoDB not available - using IndexedDB cache (OFFLINE MODE)');
-                console.warn('   Note: MongoDB is permanent, centralized storage.');
+                console.warn('   Note: Database (MariaDB) is permanent, centralized storage.');
                 console.warn('   localStorage is NOT used for products - only for UI data (cart, preferences)');
                 
                 // Use IndexedDB cache if available (offline mode)

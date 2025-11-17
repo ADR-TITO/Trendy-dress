@@ -4,17 +4,11 @@
  * Main entry point for all API requests
  */
 
-// Load composer autoloader
+// Load composer autoloader (optional - not required)
 if (file_exists(__DIR__ . '/vendor/autoload.php')) {
     require_once __DIR__ . '/vendor/autoload.php';
-} else {
-    http_response_code(500);
-    echo json_encode([
-        'error' => 'Composer dependencies not installed',
-        'message' => 'Run: composer install in backend-php/ directory'
-    ]);
-    exit;
 }
+// Note: Backend works without Composer - uses built-in PHP features
 
 // Load environment variables
 if (file_exists(__DIR__ . '/.env')) {
@@ -54,6 +48,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
 ini_set('log_errors', 1);
+ini_set('error_log', __DIR__ . '/logs/php-errors.log');
+
+// Create logs directory if it doesn't exist
+if (!is_dir(__DIR__ . '/logs')) {
+    @mkdir(__DIR__ . '/logs', 0755, true);
+}
 
 // Get route from query string or PATH_INFO
 $route = $_GET['route'] ?? '';

@@ -250,7 +250,7 @@ class StorageManager {
 
             request.onsuccess = () => {
                 const products = request.result || [];
-                console.log(`📦 Loaded ${products.length} products from IndexedDB cache (fallback - MongoDB is primary)`);
+                console.log(`📦 Loaded ${products.length} products from IndexedDB cache (fallback - Database is primary)`);
                 resolve(products);
             };
 
