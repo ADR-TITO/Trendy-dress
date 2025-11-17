@@ -1,4 +1,4 @@
-// API Service for MongoDB Backend
+// API Service for MariaDB Backend
 // Auto-detect backend URL and port based on current domain and server response
 let detectedBackendURL = null;
 let isDetectingPort = false;
@@ -234,8 +234,8 @@ class ApiService {
         }
     }
 
-    // Check MongoDB connection status
-    async checkMongoDBStatus() {
+    // Check Database connection status
+    async checkDatabaseStatus() {
         try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 2000); // Optimized timeout to 2 seconds
@@ -253,7 +253,7 @@ class ApiService {
             }
             
             const status = await response.json();
-            console.log(`🔍 MongoDB status check: ${status.readyStateText || 'unknown'} (ReadyState: ${status.readyState || 0})`);
+            console.log(`🔍 Database status check: ${status.readyStateText || 'unknown'} (ReadyState: ${status.readyState || 0})`);
             return status;
         } catch (error) {
             // Handle errors gracefully
@@ -261,15 +261,15 @@ class ApiService {
             const errorMsg = error.message || '';
             
             if (errorName === 'AbortError' || errorMsg.includes('aborted')) {
-                console.warn('⚠️ MongoDB status check timed out (5s)');
-                return { readyState: 0, readyStateText: 'timeout', error: 'Status check timed out' };
-            } else if (errorName === 'TypeError' || errorMsg.includes('fetch')) {
-                console.warn('⚠️ MongoDB status check failed - network error');
-                return { readyState: 0, readyStateText: 'network error', error: 'Network error or CORS issue' };
-            } else {
-                console.warn('⚠️ MongoDB status check failed:', errorMsg);
-                return { readyState: 0, readyStateText: 'error', error: errorMsg };
-            }
+                       console.warn('⚠️ Database status check timed out (5s)');
+                       return { readyState: 0, readyStateText: 'timeout', error: 'Status check timed out' };
+                   } else if (errorName === 'TypeError' || errorMsg.includes('fetch')) {
+                       console.warn('⚠️ Database status check failed - network error');
+                       return { readyState: 0, readyStateText: 'network error', error: 'Network error or CORS issue' };
+                   } else {
+                       console.warn('⚠️ Database status check failed:', errorMsg);
+                       return { readyState: 0, readyStateText: 'error', error: errorMsg };
+                   }
         }
     }
 
@@ -293,7 +293,7 @@ class ApiService {
             if (retryCount > 0) {
                 console.log(`📡 Retrying product fetch (attempt ${retryCount + 1}/${maxRetries + 1})...`);
             } else {
-                console.log(`📡 Fetching products from MongoDB API (${includeImages ? 'with' : 'without'} images, timeout: ${timeoutDuration/1000}s)...`);
+                console.log(`📡 Fetching products from Database API (${includeImages ? 'with' : 'without'} images, timeout: ${timeoutDuration/1000}s)...`);
             }
             
             let response;
@@ -335,12 +335,12 @@ class ApiService {
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
                 if (response.status === 503) {
-                    throw new Error(errorData.message || 'MongoDB database is not connected. Please check MongoDB Atlas IP whitelist.');
+                    throw new Error(errorData.message || 'Database database is not connected. Please check Database Atlas IP whitelist.');
                 }
                 throw new Error(errorData.error || 'Failed to fetch products');
             }
             const products = await response.json();
-            console.log(`✅ Successfully loaded ${products.length} products from MongoDB API`);
+            console.log(`✅ Successfully loaded ${products.length} products from Database API`);
             return products;
         } catch (error) {
             // Log error details for debugging
@@ -533,7 +533,7 @@ class ApiService {
         }
     }
 
-    // Get all orders from MongoDB
+    // Get all orders from Database
     async getOrders() {
         try {
             const response = await fetch(`${this.baseURL}/orders`, {

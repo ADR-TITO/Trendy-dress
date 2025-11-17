@@ -57,9 +57,9 @@ let websiteContent = {
 };
 
 // Initialize
-// Function to migrate ALL products from localStorage to MongoDB (preserves all data)
-async function migrateProductsToMongoDB(overwrite = false) {
-    console.log('🚀 Starting migration to MongoDB...');
+// Function to migrate ALL products from localStorage to MariaDB (preserves all data)
+async function migrateProductsToDatabase(overwrite = false) {
+    console.log('🚀 Starting migration to MariaDB...');
     
     // Check if backend is available
     const backendAvailable = await apiService.checkBackend();
@@ -70,7 +70,7 @@ async function migrateProductsToMongoDB(overwrite = false) {
         console.warn('⚠️ To deploy PHP backend:');
         console.warn('   1. Upload backend-php/ folder to your server');
         console.warn('   2. Run: composer install in backend-php/');
-        console.warn('   3. Configure .env file with MongoDB connection');
+        console.warn('   3. Configure .env file with Database connection');
         console.warn('   4. Configure web server to route /api to PHP');
         console.warn('   5. Test: curl https://trendydresses.co.ke/api/health');
         console.warn('   6. Refresh this page and try again');
@@ -94,23 +94,23 @@ async function migrateProductsToMongoDB(overwrite = false) {
         }
         
         console.log(`📦 Found ${localProducts.length} products in localStorage`);
-        console.log(`🔄 Starting migration to MongoDB...`);
+        console.log(`🔄 Starting migration to Database...`);
         
-        // Check if MongoDB already has products (with timeout handling)
-        let mongoProducts = [];
+        // Check if Database already has products (with timeout handling)
+        let dbProducts = [];
         try {
             // Use optimized version without images for faster checking
-            console.log('🔍 Checking existing MongoDB products...');
-            mongoProducts = await apiService.getProducts('all', false); // false = without images for speed
-            if (mongoProducts && mongoProducts.length > 0 && !overwrite) {
-                console.log(`✅ Found ${mongoProducts.length} existing products in MongoDB`);
-                console.log(`⚠️ MongoDB already has ${mongoProducts.length} products.`);
-                console.log('💡 To overwrite existing products, run: migrateProductsToMongoDB(true)');
+            console.log('🔍 Checking existing Database products...');
+            dbProducts = await apiService.getProducts('all', false); // false = without images for speed
+            if (dbProducts && dbProducts.length > 0 && !overwrite) {
+                console.log(`✅ Found ${dbProducts.length} existing products in database`);
+                console.log(`⚠️ Database already has ${dbProducts.length} products.`);
+                console.log('💡 To overwrite existing products, run: migrateProductsToDatabase(true)');
                 console.log('💡 To merge products, the migration will update existing ones by name and size');
                 
                 // Ask user if they want to proceed with merge (update existing, add new)
                 const proceed = confirm(
-                    `MongoDB already has ${mongoProducts.length} products.\n\n` +
+                    `Database already has ${dbProducts.length} products.\n\n` +
                     `Click OK to merge (update existing products, add new ones).\n` +
                     `Click Cancel to skip migration.`
                 );
@@ -123,24 +123,24 @@ async function migrateProductsToMongoDB(overwrite = false) {
             // If check fails (timeout, network issue), proceed with migration anyway
             const errorMsg = error.message || 'Unknown error';
             if (errorMsg.includes('timed out') || errorMsg.includes('aborted')) {
-                console.warn('⚠️ Could not check MongoDB products (timeout) - proceeding with migration anyway');
+                console.warn('⚠️ Could not check Database products (timeout) - proceeding with migration anyway');
                 console.log('ℹ️ Migration will proceed. If products already exist, they will be updated.');
             } else {
-                console.warn('⚠️ Could not check MongoDB products:', errorMsg);
+                console.warn('⚠️ Could not check Database products:', errorMsg);
                 console.log('ℹ️ Proceeding with migration - existing products will be updated if found.');
             }
         }
         
-        // Create a map of existing MongoDB products by name+size for duplicate detection
+        // Create a map of existing Database products by name+size for duplicate detection
         const existingProductsMap = new Map();
-        if (mongoProducts && mongoProducts.length > 0) {
-            mongoProducts.forEach(p => {
+        if (dbProducts && dbProducts.length > 0) {
+            dbProducts.forEach(p => {
                 const key = `${p.name.toLowerCase().trim()}_${(p.size || 'M').toUpperCase().trim()}`;
                 existingProductsMap.set(key, p);
             });
         }
         
-        // Upload each product to MongoDB (preserve ALL data including images)
+        // Upload each product to Database (preserve ALL data including images)
         let successCount = 0;
         let updateCount = 0;
         let createCount = 0;
@@ -164,7 +164,7 @@ async function migrateProductsToMongoDB(overwrite = false) {
                     image: product.image || '' // Preserve images
                 };
                 
-                // Check if product already exists in MongoDB (by name + size)
+                // Check if product already exists in Database (by name + size)
                 const key = `${productData.name.toLowerCase().trim()}_${productData.size.toUpperCase().trim()}`;
                 const existingProduct = existingProductsMap.get(key);
                 
@@ -198,11 +198,11 @@ async function migrateProductsToMongoDB(overwrite = false) {
                     error: errorMsg 
                 });
                 
-                // If we get a 503 error, MongoDB is not connected - stop migration
+                // If we get a 503 error, Database is not connected - stop migration
                 if (error.message && (error.message.includes('Database not connected') || error.message.includes('503'))) {
-                    console.error('❌ CRITICAL: MongoDB is not connected. Stopping migration.');
-                    console.error('❌ Please check your backend server console for MongoDB connection errors.');
-                    console.error('❌ Make sure MongoDB Atlas IP whitelist is updated and server is restarted.');
+                    console.error('❌ CRITICAL: Database is not connected. Stopping migration.');
+                    console.error('❌ Please check your backend server console for Database connection errors.');
+                    console.error('❌ Make sure Database Atlas IP whitelist is updated and server is restarted.');
                     break;
                 }
                 
@@ -236,35 +236,35 @@ async function migrateProductsToMongoDB(overwrite = false) {
         
         // Update localStorage preference
         if (successCount > 0) {
-            localStorage.setItem('useMongoDB', 'true');
-            localStorage.setItem('preferredStorage', 'mongodb');
-            console.log('\n✅ Migration complete! Reloading products from MongoDB...');
+            localStorage.setItem('useDatabase', 'true');
+            localStorage.setItem('preferredStorage', 'database');
+            console.log('\n✅ Migration complete! Reloading products from Database...');
             
-            // After migration, try to reload from MongoDB, but don't fail if it times out
+            // After migration, try to reload from Database, but don't fail if it times out
             try {
-                // Wait a moment for MongoDB to process the new products
+                // Wait a moment for Database to process the new products
                 await new Promise(resolve => setTimeout(resolve, 500));
                 
-                // Try to reload from MongoDB (without images for faster loading)
+                // Try to reload from Database (without images for faster loading)
             await loadProducts();
-                console.log('✅ Successfully reloaded products from MongoDB after migration');
+                console.log('✅ Successfully reloaded products from Database after migration');
             } catch (reloadError) {
                 // If reload fails (timeout, etc.), use the products we just migrated
-                console.warn('⚠️ Could not reload from MongoDB after migration (this is okay):', reloadError.message);
-                console.log('ℹ️ Using migrated products directly - they are already in MongoDB');
+                console.warn('⚠️ Could not reload from Database after migration (this is okay):', reloadError.message);
+                console.log('ℹ️ Using migrated products directly - they are already in Database');
             }
             
             displayProducts('all');
             
             showNotification(
-                `Successfully migrated ${successCount} products to MongoDB! (${createCount} created, ${updateCount} updated)`, 
+                `Successfully migrated ${successCount} products to Database! (${createCount} created, ${updateCount} updated)`, 
                 'success'
             );
             return true;
         } else if (failCount > 0) {
             const errorMsg = failedProducts.length > 0 ? failedProducts[0].error : 'Unknown error';
             showNotification(`Migration failed: ${errorMsg}. Check console for details.`, 'error');
-            console.error('❌ Migration failed completely. Check backend server console for MongoDB connection status.');
+            console.error('❌ Migration failed completely. Check backend server console for Database connection status.');
         }
         
         return successCount > 0;
@@ -320,9 +320,9 @@ async function recoverFromIndexedDB() {
     }
 }
 
-// Function to migrate from IndexedDB to MongoDB
-async function migrateFromIndexedDBToMongoDB() {
-    console.log('🚀 Starting migration from IndexedDB to MongoDB...');
+// Function to migrate from IndexedDB to Database
+async function migrateFromIndexedDBToDatabase() {
+    console.log('🚀 Starting migration from IndexedDB to Database...');
     
     // Check if backend is available
     const backendAvailable = await apiService.checkBackend();
@@ -333,7 +333,7 @@ async function migrateFromIndexedDBToMongoDB() {
         console.warn('⚠️ To deploy PHP backend:');
         console.warn('   1. Upload backend-php/ folder to your server');
         console.warn('   2. Run: composer install in backend-php/');
-        console.warn('   3. Configure .env file with MongoDB connection');
+        console.warn('   3. Configure .env file with Database connection');
         console.warn('   4. Configure web server to route /api to PHP');
         console.warn('   5. Test: curl https://trendydresses.co.ke/api/health');
         console.warn('   6. Refresh this page and try again');
@@ -351,19 +351,19 @@ async function migrateFromIndexedDBToMongoDB() {
         }
         
         console.log(`📦 Found ${indexedProducts.length} products in IndexedDB`);
-        console.log(`🔄 Starting migration to MongoDB...`);
+        console.log(`🔄 Starting migration to Database...`);
         
-        // Check if MongoDB already has products (with timeout handling)
-        let mongoProducts = [];
+        // Check if Database already has products (with timeout handling)
+        let dbProducts = [];
         try {
             // Use optimized version without images for faster checking
-            console.log('🔍 Checking existing MongoDB products...');
-            mongoProducts = await apiService.getProducts('all', false); // false = without images for speed
+            console.log('🔍 Checking existing Database products...');
+            dbProducts = await apiService.getProducts('all', false); // false = without images for speed
             
-            if (mongoProducts && mongoProducts.length > 0) {
-                console.log(`✅ Found ${mongoProducts.length} existing products in MongoDB`);
+            if (dbProducts && dbProducts.length > 0) {
+                console.log(`✅ Found ${dbProducts.length} existing products in Database`);
                 const proceed = confirm(
-                    `MongoDB already has ${mongoProducts.length} products.\n\n` +
+                    `Database already has ${dbProducts.length} products.\n\n` +
                     `IndexedDB has ${indexedProducts.length} products.\n\n` +
                     `Click OK to merge (update existing products, add new ones).\n` +
                     `Click Cancel to skip migration.`
@@ -373,26 +373,26 @@ async function migrateFromIndexedDBToMongoDB() {
                     return false;
                 }
             } else {
-                console.log('ℹ️ No existing products found in MongoDB - will create new products');
+                console.log('ℹ️ No existing products found in Database - will create new products');
             }
         } catch (error) {
             // If check fails (timeout, network issue), proceed with migration anyway
             // The migration will handle duplicates if they exist
             const errorMsg = error.message || 'Unknown error';
             if (errorMsg.includes('timed out') || errorMsg.includes('aborted')) {
-                console.warn('⚠️ Could not check MongoDB products (timeout) - proceeding with migration anyway');
+                console.warn('⚠️ Could not check Database products (timeout) - proceeding with migration anyway');
                 console.log('ℹ️ Migration will proceed. If products already exist, they will be updated.');
             } else {
-                console.warn('⚠️ Could not check MongoDB products:', errorMsg);
+                console.warn('⚠️ Could not check Database products:', errorMsg);
                 console.log('ℹ️ Proceeding with migration - existing products will be updated if found.');
             }
             // Continue with migration - we'll handle duplicates during the migration process
         }
         
-        // Create a map of existing MongoDB products
+        // Create a map of existing Database products
         const existingProductsMap = new Map();
-        if (mongoProducts && mongoProducts.length > 0) {
-            mongoProducts.forEach(p => {
+        if (dbProducts && dbProducts.length > 0) {
+            dbProducts.forEach(p => {
                 const key = `${p.name.toLowerCase().trim()}_${normalizeSize(p.size || 'M').toUpperCase().trim()}`;
                 existingProductsMap.set(key, p);
             });
@@ -406,7 +406,7 @@ async function migrateFromIndexedDBToMongoDB() {
         const failedProducts = [];
         const migratedProducts = [];
         
-        console.log(`\n📤 Migrating ${indexedProducts.length} products from IndexedDB to MongoDB...\n`);
+        console.log(`\n📤 Migrating ${indexedProducts.length} products from IndexedDB to Database...\n`);
         
         for (let i = 0; i < indexedProducts.length; i++) {
             const product = indexedProducts[i];
@@ -471,8 +471,8 @@ async function migrateFromIndexedDBToMongoDB() {
         console.log(`   📷 Products with images: ${productsWithImages}`);
         
         if (successCount > 0) {
-            localStorage.setItem('useMongoDB', 'true');
-            localStorage.setItem('preferredStorage', 'mongodb');
+            localStorage.setItem('useDatabase', 'true');
+            localStorage.setItem('preferredStorage', 'database');
             
             // Also save to localStorage as backup
             try {
@@ -482,21 +482,21 @@ async function migrateFromIndexedDBToMongoDB() {
                 console.error('❌ Could not save to localStorage:', error);
             }
             
-            console.log('\n✅ Migration complete! Reloading products from MongoDB...');
+            console.log('\n✅ Migration complete! Reloading products from Database...');
             
-            // After migration, try to reload from MongoDB, but don't fail if it times out
-            // We'll use the migrated products directly if MongoDB reload fails
+            // After migration, try to reload from Database, but don't fail if it times out
+            // We'll use the migrated products directly if Database reload fails
             try {
-                // Wait a moment for MongoDB to process the new products
+                // Wait a moment for Database to process the new products
                 await new Promise(resolve => setTimeout(resolve, 500));
                 
-                // Try to reload from MongoDB (without images for faster loading)
+                // Try to reload from Database (without images for faster loading)
             await loadProducts();
-                console.log('✅ Successfully reloaded products from MongoDB after migration');
+                console.log('✅ Successfully reloaded products from Database after migration');
             } catch (reloadError) {
                 // If reload fails (timeout, etc.), use the products we just migrated
-                console.warn('⚠️ Could not reload from MongoDB after migration (this is okay):', reloadError.message);
-                console.log('ℹ️ Using migrated products directly - they are already in MongoDB');
+                console.warn('⚠️ Could not reload from Database after migration (this is okay):', reloadError.message);
+                console.log('ℹ️ Using migrated products directly - they are already in Database');
                 
                 // Products are already in the products array from migration
                 // Just refresh the display
@@ -505,7 +505,7 @@ async function migrateFromIndexedDBToMongoDB() {
             displayProducts('all');
             
             showNotification(
-                `Successfully migrated ${successCount} products from IndexedDB to MongoDB! (${createCount} created, ${updateCount} updated, ${productsWithImages} with images)`, 
+                `Successfully migrated ${successCount} products from IndexedDB to Database! (${createCount} created, ${updateCount} updated, ${productsWithImages} with images)`, 
                 'success'
             );
             return true;
@@ -525,33 +525,33 @@ async function checkAllStorageFacilities() {
     console.log('═'.repeat(60));
     
     const results = {
-        mongodb: { available: false, count: 0, withImages: 0, products: [] },
+        database: { available: false, count: 0, withImages: 0, products: [] },
         localStorage: { available: false, count: 0, withImages: 0, products: [] },
         indexedDB: { available: false, count: 0, withImages: 0, products: [] }
     };
     
-    // Check MongoDB
-    console.log('\n📊 Checking MongoDB...');
+    // Check Database
+    console.log('\n📊 Checking Database (MariaDB)...');
     try {
         const backendAvailable = await apiService.checkBackend();
         if (backendAvailable) {
             try {
-                const mongoProducts = await apiService.getProducts('all');
-                results.mongodb.available = true;
-                results.mongodb.count = mongoProducts ? mongoProducts.length : 0;
-                results.mongodb.products = mongoProducts || [];
+                const dbProducts = await apiService.getProducts('all');
+                results.database.available = true;
+                results.database.count = dbProducts ? dbProducts.length : 0;
+                results.database.products = dbProducts || [];
                 
                 // Count products with images
-                results.mongodb.withImages = (mongoProducts || []).filter(p => {
+                results.database.withImages = (dbProducts || []).filter(p => {
                     const img = p.image || '';
                     return img && img.trim().length > 0 && 
                            (img.startsWith('data:image/') || img.startsWith('http://') || img.startsWith('https://'));
                 }).length;
                 
-                console.log(`   ✅ MongoDB: ${results.mongodb.count} products (${results.mongodb.withImages} with images)`);
+                console.log(`   ✅ Database: ${results.database.count} products (${results.database.withImages} with images)`);
                 
-                if (results.mongodb.count > 0) {
-                    console.log(`   📦 Products:`, mongoProducts.map(p => ({
+                if (results.database.count > 0) {
+                    console.log(`   📦 Products:`, dbProducts.map(p => ({
                         id: p._id || p.id,
                         name: p.name,
                         size: p.size,
@@ -576,23 +576,23 @@ async function checkAllStorageFacilities() {
                 
                 if (!isExpectedError) {
                     // Only log unexpected errors
-                    console.log(`   ⚠️ MongoDB: Backend available but error fetching products: ${error.message}`);
+                    console.log(`   ⚠️ Database: Backend available but error fetching products: ${error.message}`);
                 } else {
                     // Handle expected errors (timeout, network issues)
                     if (errorMsg.includes('timed out') || errorMsg.includes('aborted')) {
-                        console.log(`   ⚠️ MongoDB: Backend available but request timed out (20s)`);
+                        console.log(`   ⚠️ Database: Backend available but request timed out (20s)`);
                         console.log(`   ℹ️ This may be due to slow network or backend processing. Will retry automatically or use fallback storage.`);
                     } else {
-                console.log(`   ⚠️ MongoDB: Backend available but error fetching products: ${error.message}`);
+                console.log(`   ⚠️ Database: Backend available but error fetching products: ${error.message}`);
                     }
-                    results.mongodb.available = false;
+                    results.database.available = false;
                 }
             }
         } else {
-            console.log('   ❌ MongoDB: Backend not available');
+            console.log('   ❌ Database: Backend not available');
         }
     } catch (error) {
-        console.log(`   ❌ MongoDB: Error checking backend: ${error.message}`);
+        console.log(`   ❌ Database: Error checking backend: ${error.message}`);
     }
     
     // Check localStorage
@@ -673,17 +673,17 @@ async function checkAllStorageFacilities() {
     console.log('\n' + '═'.repeat(60));
     console.log('📊 STORAGE SUMMARY:');
     console.log('═'.repeat(60));
-    console.log(`\n📦 MongoDB:      ${results.mongodb.count} products (${results.mongodb.withImages} with images) ${results.mongodb.available ? '✅' : '❌'}`);
+    console.log(`\n📦 Database:      ${results.database.count} products (${results.database.withImages} with images) ${results.database.available ? '✅' : '❌'}`);
     console.log(`📦 localStorage: ${results.localStorage.count} products (${results.localStorage.withImages} with images) ${results.localStorage.available ? '✅' : '❌'}`);
     console.log(`📦 IndexedDB:    ${results.indexedDB.count} products (${results.indexedDB.withImages} with images) ${results.indexedDB.available ? '✅' : '❌'}`);
     
     const totalProducts = Math.max(
-        results.mongodb.count,
+        results.database.count,
         results.localStorage.count,
         results.indexedDB.count
     );
     const totalWithImages = Math.max(
-        results.mongodb.withImages,
+        results.database.withImages,
         results.localStorage.withImages,
         results.indexedDB.withImages
     );
@@ -724,9 +724,9 @@ async function checkAllStorageFacilities() {
         }
     };
     
-    // Collect from MongoDB
-    results.mongodb.products.forEach(p => {
-        addProduct(p, 'MongoDB');
+    // Collect from Database
+    results.database.products.forEach(p => {
+        addProduct(p, 'Database');
     });
     
     // Collect from localStorage
@@ -764,20 +764,20 @@ async function checkAllStorageFacilities() {
     
     // Recommendations
     console.log('\n💡 RECOMMENDATIONS:');
-    if (results.indexedDB.count > 0 && results.mongodb.count === 0) {
-        console.log('   🔄 IndexedDB has products but MongoDB is empty.');
-        console.log('   💡 Run: migrateFromIndexedDBToMongoDB() to migrate to MongoDB');
+    if (results.indexedDB.count > 0 && results.database.count === 0) {
+        console.log('   🔄 IndexedDB has products but Database is empty.');
+        console.log('   💡 Run: migrateFromIndexedDBToDatabase() to migrate to Database');
     }
-    if (results.localStorage.count > 0 && results.mongodb.count === 0) {
-        console.log('   🔄 localStorage has products but MongoDB is empty.');
-        console.log('   💡 Run: migrateProductsToMongoDB() to migrate to MongoDB');
+    if (results.localStorage.count > 0 && results.database.count === 0) {
+        console.log('   🔄 localStorage has products but Database is empty.');
+        console.log('   💡 Run: migrateProductsToDatabase() to migrate to Database');
     }
     if (results.indexedDB.count > results.localStorage.count) {
         console.log('   ⚠️ IndexedDB has more products than localStorage.');
-        console.log('   💡 Consider migrating IndexedDB products to MongoDB');
+        console.log('   💡 Consider migrating IndexedDB products to database');
     }
-    if (results.mongodb.count > 0) {
-        console.log('   ✅ MongoDB is active and has products - this is the preferred storage.');
+    if (results.database.count > 0) {
+        console.log('   ✅ Database is active and has products - this is the preferred storage.');
     }
     
     console.log('\n' + '═'.repeat(60));
@@ -785,20 +785,20 @@ async function checkAllStorageFacilities() {
     return results;
 }
 
-// Unified function to sync products to storage locations (MongoDB, IndexedDB cache)
-// PRIORITY: MongoDB is PRIMARY storage (permanent, centralized)
+// Unified function to sync products to storage locations (Database, IndexedDB cache)
+// PRIORITY: Database is PRIMARY storage (permanent, centralized)
 // IndexedDB is CACHE only (for offline access)
 // localStorage is NOT used for products - only for UI data (cart, preferences)
 async function syncProductsToAllStorage(productsToSync, options = {}) {
     const {
-        skipMongoDB = false,
+        skipDatabase = false,
         skipLocalStorage = true, // ALWAYS skip localStorage - only for UI data
         skipIndexedDB = false,
         preserveImages = true
     } = options;
     
     console.log(`🔄 [syncProductsToAllStorage] Syncing ${productsToSync.length} products...`);
-    console.log(`   MongoDB: ${skipMongoDB ? '⏭️ Skipped' : '✅ Enabled (PRIMARY - permanent storage)'}`);
+    console.log(`   Database: ${skipDatabase ? '⏭️ Skipped' : '✅ Enabled (PRIMARY - permanent storage)'}`);
     console.log(`   localStorage: ⏭️ Skipped (ONLY for UI data: cart, preferences)`);
     console.log(`   IndexedDB: ${skipIndexedDB ? '⏭️ Skipped' : '✅ Enabled (CACHE - offline access)'}`);
     
@@ -806,7 +806,7 @@ async function syncProductsToAllStorage(productsToSync, options = {}) {
     console.log('🔄 Products to sync:', productsToSync.length);
     
     const results = {
-        mongodb: { success: false, count: 0, error: null },
+        database: { success: false, count: 0, error: null },
         localStorage: { success: false, count: 0, error: null },
         indexedDB: { success: false, count: 0, error: null }
     };
@@ -823,28 +823,28 @@ async function syncProductsToAllStorage(productsToSync, options = {}) {
         image: preserveImages ? (p.image || '') : ''
     }));
     
-    // 1. Sync to MongoDB (if backend is available and database is connected)
-    if (!skipMongoDB) {
+    // 1. Sync to Database (if backend is available and database is connected)
+    if (!skipDatabase) {
         try {
             const backendAvailable = await apiService.checkBackend();
             if (backendAvailable) {
-                // Check if MongoDB is actually connected (not just backend available)
+                // Check if Database is actually connected (not just backend available)
                 try {
-                    const dbStatus = await apiService.checkMongoDBStatus();
+                    const dbStatus = await apiService.checkDatabaseStatus();
                     if (dbStatus.readyState !== 1) {
-                        console.log('ℹ️ MongoDB backend available but database not connected - skipping MongoDB sync');
-                        results.mongodb.error = `Database not connected (ReadyState: ${dbStatus.readyState})`;
-                        // Skip MongoDB sync if database is not connected
+                        console.log('ℹ️ Database backend available but database not connected - skipping Database sync');
+                        results.database.error = `Database not connected (ReadyState: ${dbStatus.readyState})`;
+                        // Skip Database sync if database is not connected
                     } else {
-                        console.log('🔄 Syncing to MongoDB...');
+                        console.log('🔄 Syncing to Database...');
                         
-                        // Load existing products from MongoDB first
+                        // Load existing products from Database first
                         let existingProducts = [];
                         try {
                             existingProducts = await apiService.getProducts('all');
-                            console.log(`📦 Found ${existingProducts.length} existing products in MongoDB`);
+                            console.log(`📦 Found ${existingProducts.length} existing products in Database`);
                         } catch (error) {
-                            console.warn('⚠️ Could not load existing products from MongoDB:', error.message);
+                            console.warn('⚠️ Could not load existing products from Database:', error.message);
                             // Continue anyway - might be a network issue
                         }
                         
@@ -877,27 +877,27 @@ async function syncProductsToAllStorage(productsToSync, options = {}) {
                                 const existingProduct = existingProductsMap.get(productKey);
                                 
                                 if (existingProduct && existingProduct._id) {
-                                    // Product exists in MongoDB - update it
+                                    // Product exists in Database - update it
                                     await apiService.updateProduct(existingProduct._id, productData);
-                                    // Update product ID with MongoDB _id
+                                    // Update product ID with Database _id
                                     product.id = existingProduct._id;
                                     product._id = existingProduct._id;
                                     updateCount++;
-                                    console.log(`✅ Updated product in MongoDB: ${product.name} (${product.size})`);
+                                    console.log(`✅ Updated product in Database: ${product.name} (${product.size})`);
                                 } else if (product.id && typeof product.id === 'string' && product.id.length === 24 && /^[0-9a-fA-F]{24}$/.test(product.id)) {
-                                    // Product has MongoDB ObjectId - update existing
+                                    // Product has Database ObjectId - update existing
                                     await apiService.updateProduct(product.id, productData);
                                     updateCount++;
-                                    console.log(`✅ Updated product in MongoDB by ID: ${product.name}`);
+                                    console.log(`✅ Updated product in Database by ID: ${product.name}`);
                                 } else {
                                     // New product or numeric ID - try to create new
                                     try {
                                         const created = await apiService.createProduct(productData);
-                                        // Update product ID with MongoDB _id
+                                        // Update product ID with Database _id
                                         product.id = created._id || created.id || product.id;
                                         product._id = created._id || created.id;
                                         createCount++;
-                                        console.log(`✅ Created product in MongoDB: ${product.name} (${product.size})`);
+                                        console.log(`✅ Created product in Database: ${product.name} (${product.size})`);
                                     } catch (createError) {
                                         // If create fails (e.g., duplicate), try to find and update
                                         if (createError.message && createError.message.includes('duplicate')) {
@@ -912,7 +912,7 @@ async function syncProductsToAllStorage(productsToSync, options = {}) {
                                                 product.id = found._id;
                                                 product._id = found._id;
                                                 updateCount++;
-                                                console.log(`✅ Updated duplicate product in MongoDB: ${product.name}`);
+                                                console.log(`✅ Updated duplicate product in Database: ${product.name}`);
                                             } else {
                                                 throw createError;
                                             }
@@ -925,27 +925,27 @@ async function syncProductsToAllStorage(productsToSync, options = {}) {
                             } catch (error) {
                                 // Only log if it's not a database connection error (we already handled that)
                                 const errorMsg = error.message || error.toString() || '';
-                                if (!errorMsg.includes('Database not connected') && !errorMsg.includes('MongoDB connection')) {
-                                    console.error('❌ Error syncing product to MongoDB:', product.id, product.name, errorMsg);
+                                if (!errorMsg.includes('Database not connected') && !errorMsg.includes('Database connection')) {
+                                    console.error('❌ Error syncing product to Database:', product.id, product.name, errorMsg);
                                 } else {
-                                    // Database connection error - stop trying to sync to MongoDB
-                                    console.log('⚠️ MongoDB database not connected - stopping sync to MongoDB');
+                                    // Database connection error - stop trying to sync to Database
+                                    console.log('⚠️ Database database not connected - stopping sync to Database');
                                     break; // Stop trying to sync remaining products
                                 }
                                 failCount++;
                             }
                         }
                         
-                        // Delete products from MongoDB that are not in the remaining products list
-                        // This ensures deleted products are removed from MongoDB
+                        // Delete products from Database that are not in the remaining products list
+                        // This ensures deleted products are removed from Database
                         let deletedCount = 0;
                         try {
-                            // Find products in MongoDB that are not in the remaining products list
+                            // Find products in Database that are not in the remaining products list
                             const remainingProductKeys = new Set();
                             productsToSave.forEach(p => {
                                 const key = `${(p.name || '').toLowerCase().trim()}_${normalizeSize(p.size || 'M').toUpperCase().trim()}`;
                                 remainingProductKeys.add(key);
-                                // Also add by ID if it's a MongoDB ObjectId
+                                // Also add by ID if it's a Database ObjectId
                                 if (p.id && typeof p.id === 'string' && p.id.length === 24 && /^[0-9a-fA-F]{24}$/.test(p.id)) {
                                     remainingProductKeys.add(p.id);
                                 }
@@ -954,7 +954,7 @@ async function syncProductsToAllStorage(productsToSync, options = {}) {
                                 }
                             });
                             
-                            // Delete products from MongoDB that are not in remaining list
+                            // Delete products from Database that are not in remaining list
                             const productsToDelete = existingProducts.filter(p => {
                                 const key = `${(p.name || '').toLowerCase().trim()}_${normalizeSize(p.size || 'M').toUpperCase().trim()}`;
                                 const hasKey = remainingProductKeys.has(key);
@@ -963,55 +963,55 @@ async function syncProductsToAllStorage(productsToSync, options = {}) {
                             });
                             
                             if (productsToDelete.length > 0) {
-                                console.log(`🗑️ Deleting ${productsToDelete.length} products from MongoDB that are not in remaining list...`);
+                                console.log(`🗑️ Deleting ${productsToDelete.length} products from Database that are not in remaining list...`);
                                 for (const productToDelete of productsToDelete) {
                                     try {
                                         if (productToDelete._id) {
                                             await apiService.deleteProduct(productToDelete._id);
                                             deletedCount++;
-                                            console.log(`✅ Deleted product from MongoDB: ${productToDelete.name} (${productToDelete.size})`);
+                                            console.log(`✅ Deleted product from Database: ${productToDelete.name} (${productToDelete.size})`);
                                         }
                                     } catch (deleteError) {
-                                        console.error(`❌ Error deleting product from MongoDB: ${productToDelete.name}`, deleteError.message);
+                                        console.error(`❌ Error deleting product from Database: ${productToDelete.name}`, deleteError.message);
                                     }
                                 }
                             }
                         } catch (deleteError) {
-                            console.warn('⚠️ Error deleting products from MongoDB:', deleteError.message);
+                            console.warn('⚠️ Error deleting products from Database:', deleteError.message);
                         }
                         
                         if (successCount > 0) {
-                            results.mongodb.success = true;
-                            results.mongodb.count = successCount;
-                            console.log(`✅ Synced ${successCount} products to MongoDB (${updateCount} updated, ${createCount} created, ${deletedCount} deleted)`);
+                            results.database.success = true;
+                            results.database.count = successCount;
+                            console.log(`✅ Synced ${successCount} products to Database (${updateCount} updated, ${createCount} created, ${deletedCount} deleted)`);
                             if (failCount > 0) {
-                                console.warn(`⚠️ ${failCount} products failed to sync to MongoDB`);
+                                console.warn(`⚠️ ${failCount} products failed to sync to Database`);
                             }
                         } else if (deletedCount > 0) {
                             // Even if no products were synced, deletion was successful
-                            results.mongodb.success = true;
-                            results.mongodb.count = deletedCount;
-                            console.log(`✅ Deleted ${deletedCount} products from MongoDB`);
+                            results.database.success = true;
+                            results.database.count = deletedCount;
+                            console.log(`✅ Deleted ${deletedCount} products from Database`);
                         } else {
-                            results.mongodb.error = `All ${productsToSave.length} products failed to sync`;
-                            console.error('❌ Failed to sync any products to MongoDB');
+                            results.database.error = `All ${productsToSave.length} products failed to sync`;
+                            console.error('❌ Failed to sync any products to Database');
                         }
                     }
                 } catch (dbStatusError) {
-                    console.log('ℹ️ Could not check MongoDB connection status - skipping MongoDB sync');
-                    results.mongodb.error = 'Could not verify database connection';
+                    console.log('ℹ️ Could not check Database connection status - skipping Database sync');
+                    results.database.error = 'Could not verify database connection';
                 }
             } else {
-                console.log('ℹ️ MongoDB backend not available - skipping MongoDB sync');
-                results.mongodb.error = 'Backend not available';
+                console.log('ℹ️ Database backend not available - skipping Database sync');
+                results.database.error = 'Backend not available';
             }
         } catch (error) {
-            console.error('❌ MongoDB sync error:', error);
-            results.mongodb.error = error.message;
+            console.error('❌ Database sync error:', error);
+            results.database.error = error.message;
         }
     }
     
-    // 2. Cache to IndexedDB (for offline access only - MongoDB is PRIMARY)
+    // 2. Cache to IndexedDB (for offline access only - Database is PRIMARY)
     // NOTE: localStorage is NOT used for products - only for UI data (cart, preferences)
     if (!skipIndexedDB) {
         try {
@@ -1020,7 +1020,7 @@ async function syncProductsToAllStorage(productsToSync, options = {}) {
             await storageManager.init();
             
             if (storageManager.useIndexedDB && storageManager.db) {
-                // Cache to IndexedDB (MongoDB is primary, this is just for offline access)
+                // Cache to IndexedDB (Database is primary, this is just for offline access)
                 const indexedResult = await storageManager.saveProducts(productsToSave);
                 if (indexedResult) {
                     results.indexedDB.success = true;
@@ -1042,45 +1042,45 @@ async function syncProductsToAllStorage(productsToSync, options = {}) {
     
     // 3. DO NOT sync to localStorage for products
     // localStorage is ONLY for UI-related data (cart, preferences, admin credentials)
-    // Products are stored in MongoDB (permanent storage) and cached in IndexedDB (offline access)
+    // Products are stored in Database (permanent storage) and cached in IndexedDB (offline access)
     if (!skipLocalStorage && false) { // Disabled - localStorage not used for products
         console.log('ℹ️ localStorage sync skipped - localStorage is ONLY for UI data (cart, preferences)');
         results.localStorage.error = 'Not used for products - only for UI data';
     }
     
     // Summary
-    const totalSuccess = (results.mongodb.success ? 1 : 0) + 
+    const totalSuccess = (results.database.success ? 1 : 0) + 
                         (results.indexedDB.success ? 1 : 0); // localStorage not counted - not used for products
     
     console.log('\n📊 Sync Summary:');
-    console.log(`   MongoDB:      ${results.mongodb.success ? '✅' : '❌'} ${results.mongodb.count} products ${results.mongodb.error ? '(' + results.mongodb.error + ')' : ''} (PRIMARY - permanent storage)`);
+    console.log(`   Database:      ${results.database.success ? '✅' : '❌'} ${results.database.count} products ${results.database.error ? '(' + results.database.error + ')' : ''} (PRIMARY - permanent storage)`);
     console.log(`   IndexedDB:    ${results.indexedDB.success ? '✅' : '❌'} ${results.indexedDB.count} products ${results.indexedDB.error ? '(' + results.indexedDB.error + ')' : ''} (CACHE - offline access)`);
     console.log(`   localStorage: ⏭️ Not used for products (ONLY for UI data: cart, preferences)`);
     console.log(`   Total: ${totalSuccess}/2 storage locations synced successfully`);
     
-    // Return success if MongoDB succeeded (primary requirement)
+    // Return success if Database succeeded (primary requirement)
     // IndexedDB cache is optional (for offline access)
     return {
-        success: results.mongodb.success, // MongoDB is required for success
+        success: results.database.success, // Database is required for success
         results: results,
-        products: productsToSave // Return updated products (with MongoDB IDs if applicable)
+        products: productsToSave // Return updated products (with Database IDs if applicable)
     };
 }
 
-// Unified function to delete product from ALL storage locations (MongoDB, localStorage, IndexedDB)
+// Unified function to delete product from ALL storage locations (Database, localStorage, IndexedDB)
 async function deleteProductFromAllStorage(productId) {
     console.log('🗑️ [deleteProductFromAllStorage] Starting deletion from all storage locations...');
     console.log('🗑️ Product ID:', productId);
     
     const results = {
-        mongodb: { success: false, error: null },
+        database: { success: false, error: null },
         localStorage: { success: false, error: null },
         indexedDB: { success: false, error: null }
     };
     
-    // Helper function to compare IDs (handles both MongoDB ObjectId and numeric IDs)
+    // Helper function to compare IDs (handles both Database ObjectId and numeric IDs)
     const compareIds = (id1, id2) => {
-        // Handle MongoDB ObjectId (24 char hex string)
+        // Handle Database ObjectId (24 char hex string)
         if (typeof id1 === 'string' && id1.length === 24 && /^[0-9a-fA-F]{24}$/.test(id1)) {
             return (id1 === id2) || (id1 === id2.toString());
         }
@@ -1093,51 +1093,51 @@ async function deleteProductFromAllStorage(productId) {
         return id1Num === id2Num;
     };
     
-    // 1. Delete from MongoDB (if backend is available and database is connected)
+    // 1. Delete from Database (if backend is available and database is connected)
     try {
         const backendAvailable = await apiService.checkBackend();
         if (backendAvailable) {
-            // Check if MongoDB is actually connected
+            // Check if Database is actually connected
             try {
-                const dbStatus = await apiService.checkMongoDBStatus();
+                const dbStatus = await apiService.checkDatabaseStatus();
                 if (dbStatus.readyState !== 1) {
-                    console.log('ℹ️ MongoDB backend available but database not connected - skipping MongoDB deletion');
-                    results.mongodb.error = `Database not connected (ReadyState: ${dbStatus.readyState})`;
+                    console.log('ℹ️ Database backend available but database not connected - skipping Database deletion');
+                    results.database.error = `Database not connected (ReadyState: ${dbStatus.readyState})`;
                 } else {
-                    console.log('🗑️ Deleting from MongoDB...');
+                    console.log('🗑️ Deleting from Database...');
                     
-                    // Check if productId is a MongoDB ObjectId (24 char hex string)
+                    // Check if productId is a Database ObjectId (24 char hex string)
                     if (typeof productId === 'string' && productId.length === 24 && /^[0-9a-fA-F]{24}$/.test(productId)) {
-                        // MongoDB ObjectId - try to delete directly
+                        // Database ObjectId - try to delete directly
                         try {
                             await apiService.deleteProduct(productId);
-                            results.mongodb.success = true;
-                            console.log('✅ Product deleted from MongoDB');
+                            results.database.success = true;
+                            console.log('✅ Product deleted from Database');
                         } catch (error) {
-                            console.error('❌ Error deleting from MongoDB:', error.message);
-                            results.mongodb.error = error.message;
+                            console.error('❌ Error deleting from Database:', error.message);
+                            results.database.error = error.message;
                         }
                     } else {
                         // Numeric ID or other format - try to find product by name+size and delete
-                        // Note: We need the product name and size to find it in MongoDB
-                        // For now, we'll skip MongoDB deletion if ID is not a MongoDB ObjectId
+                        // Note: We need the product name and size to find it in Database
+                        // For now, we'll skip Database deletion if ID is not a Database ObjectId
                         // The product will be removed when we sync remaining products
-                        console.log('ℹ️ Product ID is not a MongoDB ObjectId - will remove during sync of remaining products');
-                        results.mongodb.error = 'Invalid product ID format (not MongoDB ObjectId)';
+                        console.log('ℹ️ Product ID is not a Database ObjectId - will remove during sync of remaining products');
+                        results.database.error = 'Invalid product ID format (not Database ObjectId)';
                         // This is okay - the product will be removed when we sync remaining products
                     }
                 }
             } catch (dbStatusError) {
-                console.log('ℹ️ Could not check MongoDB connection status - skipping MongoDB deletion');
-                results.mongodb.error = 'Could not verify database connection';
+                console.log('ℹ️ Could not check Database connection status - skipping Database deletion');
+                results.database.error = 'Could not verify database connection';
             }
         } else {
-            console.log('ℹ️ MongoDB backend not available - skipping MongoDB deletion');
-            results.mongodb.error = 'Backend not available';
+            console.log('ℹ️ Database backend not available - skipping Database deletion');
+            results.database.error = 'Backend not available';
         }
     } catch (error) {
-        console.error('❌ MongoDB delete error:', error);
-        results.mongodb.error = error.message;
+        console.error('❌ Database delete error:', error);
+        results.database.error = error.message;
     }
     
     // 2. Delete from localStorage
@@ -1183,7 +1183,7 @@ async function deleteProductFromAllStorage(productId) {
                 // Load all products from IndexedDB to find the correct product to delete
                 const indexedProducts = await storageManager.loadProducts();
                 if (indexedProducts && indexedProducts.length > 0) {
-                    // Find the product to delete (handle both MongoDB ObjectId and numeric IDs)
+                    // Find the product to delete (handle both Database ObjectId and numeric IDs)
                     const productToDelete = indexedProducts.find(p => {
                         return compareIds(p.id, productId) || compareIds(p._id, productId);
                     });
@@ -1216,12 +1216,12 @@ async function deleteProductFromAllStorage(productId) {
     }
     
     // Summary
-    const totalSuccess = (results.mongodb.success ? 1 : 0) + 
+    const totalSuccess = (results.database.success ? 1 : 0) + 
                         (results.localStorage.success ? 1 : 0) + 
                         (results.indexedDB.success ? 1 : 0);
     
     console.log('\n📊 Delete Summary:');
-    console.log(`   MongoDB:      ${results.mongodb.success ? '✅' : '❌'} ${results.mongodb.error ? '(' + results.mongodb.error + ')' : ''}`);
+    console.log(`   Database:      ${results.database.success ? '✅' : '❌'} ${results.database.error ? '(' + results.database.error + ')' : ''}`);
     console.log(`   localStorage: ${results.localStorage.success ? '✅' : '❌'} ${results.localStorage.error ? '(' + results.localStorage.error + ')' : ''}`);
     console.log(`   IndexedDB:    ${results.indexedDB.success ? '✅' : '❌'} ${results.indexedDB.error ? '(' + results.indexedDB.error + ')' : ''}`);
     console.log(`   Total: ${totalSuccess}/3 storage locations deleted successfully`);
@@ -1235,51 +1235,51 @@ async function deleteProductFromAllStorage(productId) {
 
 // Make migration functions available globally
 if (typeof window !== 'undefined') {
-    window.migrateProductsToMongoDB = migrateProductsToMongoDB;
+    window.migrateProductsToDatabase = migrateProductsToDatabase;
     window.recoverFromIndexedDB = recoverFromIndexedDB;
-    window.migrateFromIndexedDBToMongoDB = migrateFromIndexedDBToMongoDB;
+    window.migrateFromIndexedDBToDatabase = migrateFromIndexedDBToDatabase;
     window.checkAllStorageFacilities = checkAllStorageFacilities;
     window.syncProductsToAllStorage = syncProductsToAllStorage;
     window.deleteProductFromAllStorage = deleteProductFromAllStorage;
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // Check if MongoDB backend is available
+    // Check if Database backend is available
     const backendAvailable = await apiService.checkBackend();
-    let useMongoDB = false;
+    let useDatabase = false;
     
     if (backendAvailable) {
-        console.log('✅ MongoDB backend is available - using API');
-        localStorage.setItem('useMongoDB', 'true');
-        useMongoDB = true;
+        console.log('✅ Database backend is available - using API');
+        localStorage.setItem('useDatabase', 'true');
+        useDatabase = true;
         
-        // Check MongoDB connection status
+        // Check Database connection status
         try {
-            const dbStatus = await apiService.checkMongoDBStatus();
+            const dbStatus = await apiService.checkDatabaseStatus();
             if (dbStatus.readyState === 1) {
-                console.log('✅ MongoDB is connected and ready');
+                console.log('✅ Database is connected and ready');
                 console.log(`📊 Database: ${dbStatus.name || 'trendy-dresses'}`);
                 console.log(`🔗 Host: ${dbStatus.host || 'connected'}`);
                 
-                // Sync orders from MongoDB to localStorage (to prevent duplicate M-Pesa codes)
+                // Sync orders from Database to localStorage (to prevent duplicate M-Pesa codes)
                 try {
-                    await syncOrdersFromMongoDB();
+                    await syncOrdersFromDatabase();
                 } catch (syncError) {
                     console.error('❌ Error syncing orders:', syncError);
                     // Continue even if sync fails
                 }
             } else {
-                console.warn(`⚠️ MongoDB connection status: ${dbStatus.readyStateText} (ReadyState: ${dbStatus.readyState})`);
-                console.warn('⚠️ Server may still be connecting or MongoDB is not connected');
-                console.warn('⚠️ Website will use localStorage until MongoDB connects');
+                console.warn(`⚠️ Database connection status: ${dbStatus.readyStateText} (ReadyState: ${dbStatus.readyState})`);
+                console.warn('⚠️ Server may still be connecting or Database is not connected');
+                console.warn('⚠️ Website will use localStorage until Database connects');
             }
         } catch (error) {
             // Silently handle - backend check already failed
         }
     } else {
         // Backend not available - show warning and instructions
-        localStorage.setItem('useMongoDB', 'false');
-        localStorage.setItem('preferredStorage', 'mongodb'); // Keep preference as MongoDB
+        localStorage.setItem('useDatabase', 'false');
+        localStorage.setItem('preferredStorage', 'database'); // Keep preference as Database
         
         // Initialize IndexedDB to check for products
         await storageManager.init();
@@ -1301,8 +1301,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     console.log(`💡 Found ${indexedProducts.length} products in IndexedDB`);
                     console.log(`💡 ${productsWithImages} products have images`);
                     console.log(`💡 These products will be loaded automatically`);
-                    console.log(`💡 To migrate to MongoDB, start backend server and run:`);
-                    console.log(`💡    migrateFromIndexedDBToMongoDB()`);
+                    console.log(`💡 To migrate to Database, start backend server and run:`);
+                    console.log(`💡    migrateFromIndexedDBToDatabase()`);
                     console.log(`💡 ========================================\n`);
                 }
             } catch (error) {
@@ -1310,18 +1310,18 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
         
-        console.warn('⚠️ MongoDB backend not available');
-        console.warn('⚠️ To use MongoDB:');
+        console.warn('⚠️ Database backend not available');
+        console.warn('⚠️ To use Database:');
         console.warn('   1. Navigate to the "backend" folder');
         console.warn('   2. Run: npm start');
-        console.warn('   3. Wait for "✅ Connected to MongoDB successfully"');
+        console.warn('   3. Wait for "✅ Connected to Database successfully"');
         console.warn('   4. Refresh this page');
         console.log('ℹ️ Currently using localStorage/IndexedDB as fallback (temporary)');
     }
     
     loadAdminCredentials(); // Load admin credentials (UI data - localStorage OK)
     loadCart(); // Load cart (UI data - localStorage OK)
-    await loadProducts(); // Load products from MongoDB API using fetch() - NOT localStorage
+    await loadProducts(); // Load products from Database API using fetch() - NOT localStorage
     
     // Automatically check all storage facilities for products
     console.log('\n💡 ========================================');
@@ -1371,8 +1371,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         if (maxCount > 0) {
             try {
-                const mongoProducts = await apiService.getProducts('all');
-                const mongoCount = mongoProducts ? mongoProducts.length : 0;
+                const dbProducts = await apiService.getProducts('all');
+                const mongoCount = dbProducts ? dbProducts.length : 0;
                 
                 if (mongoCount === 0) {
                     console.log(`\n💡 ========================================`);
@@ -1384,13 +1384,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                             return img && img.trim().length > 0 && 
                                    (img.startsWith('data:image/') || img.startsWith('http://') || img.startsWith('https://'));
                         }).length;
-                        console.log(`💡 You have ${indexedCount} products in IndexedDB (${indexedWithImages} with images) but MongoDB is empty.`);
-                        console.log(`💡 To migrate ALL products from IndexedDB to MongoDB, run:`);
-                        console.log(`💡    migrateFromIndexedDBToMongoDB()`);
+                        console.log(`💡 You have ${indexedCount} products in IndexedDB (${indexedWithImages} with images) but Database is empty.`);
+                        console.log(`💡 To migrate ALL products from IndexedDB to Database, run:`);
+                        console.log(`💡    migrateFromIndexedDBToDatabase()`);
                     } else if (localCount > 0) {
-                        console.log(`💡 You have ${localCount} products in localStorage but MongoDB is empty.`);
-                        console.log(`💡 To migrate ALL products to MongoDB, run:`);
-                        console.log(`💡    migrateProductsToMongoDB()`);
+                        console.log(`💡 You have ${localCount} products in localStorage but Database is empty.`);
+                        console.log(`💡 To migrate ALL products to Database, run:`);
+                        console.log(`💡    migrateProductsToDatabase()`);
                     }
                     console.log(`💡 Or open browser console (F12) and type the migration function`);
                     console.log(`💡 ========================================\n`);
@@ -1399,38 +1399,38 @@ document.addEventListener('DOMContentLoaded', async () => {
                     console.log(`💡 MIGRATION AVAILABLE`);
                     console.log(`💡 ========================================`);
                     if (indexedCount > localCount && indexedCount > 0) {
-                        console.log(`💡 You have ${indexedCount} products in IndexedDB and ${mongoCount} in MongoDB.`);
-                        console.log(`💡 To migrate/merge from IndexedDB to MongoDB, run:`);
-                        console.log(`💡    migrateFromIndexedDBToMongoDB()`);
+                        console.log(`💡 You have ${indexedCount} products in IndexedDB and ${mongoCount} in Database.`);
+                        console.log(`💡 To migrate/merge from IndexedDB to Database, run:`);
+                        console.log(`💡    migrateFromIndexedDBToDatabase()`);
                     } else if (localCount > 0) {
-                        console.log(`💡 You have ${localCount} products in localStorage and ${mongoCount} in MongoDB.`);
-                        console.log(`💡 To migrate/merge to MongoDB, run:`);
-                        console.log(`💡    migrateProductsToMongoDB()`);
+                        console.log(`💡 You have ${localCount} products in localStorage and ${mongoCount} in Database.`);
+                        console.log(`💡 To migrate/merge to Database, run:`);
+                        console.log(`💡    migrateProductsToDatabase()`);
                     }
                     console.log(`💡 This will update existing products and add new ones.`);
                     console.log(`💡 ========================================\n`);
                 } else if (maxCount > 0) {
                     if (indexedCount > 0 && indexedCount > localCount) {
                         console.log(`\n💡 You have ${indexedCount} products in IndexedDB.`);
-                        console.log(`💡 To migrate them to MongoDB, run: migrateFromIndexedDBToMongoDB()`);
+                        console.log(`💡 To migrate them to Database, run: migrateFromIndexedDBToDatabase()`);
                     } else if (localCount > 0) {
                         console.log(`\n💡 You have ${localCount} products in localStorage.`);
-                        console.log(`💡 To migrate them to MongoDB, run: migrateProductsToMongoDB()`);
+                        console.log(`💡 To migrate them to Database, run: migrateProductsToDatabase()`);
                     }
                 }
             } catch (error) {
-                // MongoDB might be empty or not accessible
+                // Database might be empty or not accessible
                 console.log(`\n💡 ========================================`);
                 console.log(`💡 MIGRATION AVAILABLE`);
                 console.log(`💡 ========================================`);
                 if (indexedCount > localCount && indexedCount > 0) {
                     console.log(`💡 You have ${indexedCount} products in IndexedDB.`);
-                    console.log(`💡 To migrate ALL products from IndexedDB to MongoDB, run:`);
-                    console.log(`💡    migrateFromIndexedDBToMongoDB()`);
+                    console.log(`💡 To migrate ALL products from IndexedDB to Database, run:`);
+                    console.log(`💡    migrateFromIndexedDBToDatabase()`);
                 } else if (localCount > 0) {
                     console.log(`💡 You have ${localProducts.length} products in localStorage.`);
-                    console.log(`💡 To migrate ALL products to MongoDB, run:`);
-                    console.log(`💡    migrateProductsToMongoDB()`);
+                    console.log(`💡 To migrate ALL products to Database, run:`);
+                    console.log(`💡    migrateProductsToDatabase()`);
                 }
                 console.log(`💡 ========================================\n`);
             }
@@ -1504,22 +1504,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateContactDisplay();
     updateWebsiteIcon(); // Load website icon
     
-    // Check storage usage on load (only if not using MongoDB)
-    if (!useMongoDB) {
+    // Check storage usage on load (only if not using Database)
+    if (!useDatabase) {
         setTimeout(async () => {
-            console.warn('⚠️ Using localStorage (temporary) - MongoDB is preferred');
-            console.warn('⚠️ Deploy PHP backend to use MongoDB for unlimited storage');
+            console.warn('⚠️ Using localStorage (temporary) - Database is preferred');
+            console.warn('⚠️ Deploy PHP backend to use Database for unlimited storage');
             const storageInfo = await checkStorageUsage();
             if (storageInfo.warning) {
                 console.warn(`⚠️ Storage Usage: ${storageInfo.size.toFixed(2)}MB / ${storageInfo.quota.toFixed(2)}MB limit`);
-                console.warn('⚠️ MongoDB provides unlimited storage - start backend server to use it');
+                console.warn('⚠️ Database provides unlimited storage - start backend server to use it');
             } else {
                 console.log(`ℹ️ Storage: ${storageInfo.size.toFixed(2)}MB used / ${storageInfo.quota.toFixed(2)}MB available (${storageInfo.type})`);
-                console.log('💡 Switch to MongoDB for unlimited storage');
+                console.log('💡 Switch to Database for unlimited storage');
             }
         }, 1000);
     } else {
-        console.log('✅ Using MongoDB - unlimited storage, no quota limits');
+        console.log('✅ Using Database - unlimited storage, no quota limits');
     }
 });
 
@@ -1641,9 +1641,9 @@ function getCategoryDisplayName(category) {
 // Optimized lazy image loading with batching and caching
 async function loadProductImagesLazy(products) {
     try {
-        const useMongoDB = localStorage.getItem('useMongoDB') === 'true';
-        if (!useMongoDB) {
-            // If not using MongoDB, images should already be in localStorage
+        const useDatabase = localStorage.getItem('useDatabase') === 'true';
+        if (!useDatabase) {
+            // If not using Database, images should already be in localStorage
             return;
         }
         
@@ -2000,10 +2000,10 @@ function selectSizeAndAddToCart(productId) {
 function addToCart(productId) {
     console.log('🛒 addToCart called with productId:', productId, 'Type:', typeof productId);
     
-    // Handle both MongoDB ObjectId (string) and numeric IDs
+    // Handle both Database ObjectId (string) and numeric IDs
     let id = productId;
     if (typeof productId === 'string' && productId.length === 24 && /^[0-9a-fA-F]{24}$/.test(productId)) {
-        // MongoDB ObjectId - use as is
+        // Database ObjectId - use as is
         id = productId;
     } else {
         // Try to parse as number if it's a string
@@ -2015,10 +2015,10 @@ function addToCart(productId) {
         }
     }
     
-    // Find product - handle both MongoDB ObjectId and numeric IDs
+    // Find product - handle both Database ObjectId and numeric IDs
     const product = products.find(p => {
         if (typeof id === 'string' && id.length === 24) {
-            // MongoDB ObjectId comparison
+            // Database ObjectId comparison
             return (p.id === id) || (p._id === id);
         } else {
             // Numeric ID comparison
@@ -2840,15 +2840,15 @@ function saveOrderToLocalStorage(order) {
     }
 }
 
-// Sync orders from MongoDB to localStorage
-async function syncOrdersFromMongoDB() {
-    const useMongoDB = localStorage.getItem('useMongoDB') === 'true';
-    if (!useMongoDB) {
-        return; // Skip if MongoDB is not available
+// Sync orders from Database to localStorage
+async function syncOrdersFromDatabase() {
+    const useDatabase = localStorage.getItem('useDatabase') === 'true';
+    if (!useDatabase) {
+        return; // Skip if Database is not available
     }
     
     try {
-        console.log('🔄 Syncing orders from MongoDB to localStorage...');
+        console.log('🔄 Syncing orders from Database to localStorage...');
         const mongoOrders = await apiService.getOrders();
         
         if (mongoOrders && mongoOrders.length > 0) {
@@ -2874,7 +2874,7 @@ async function syncOrdersFromMongoDB() {
                 }
             });
             
-            // Merge MongoDB orders into localStorage
+            // Merge Database orders into localStorage
             let updated = false;
             mongoOrders.forEach(mongoOrder => {
                 if (mongoOrder.mpesaCode) {
@@ -2884,7 +2884,7 @@ async function syncOrdersFromMongoDB() {
                     const existingOrder = localOrdersMap.get(code);
                     
                     if (!existingOrder) {
-                        // Add new order from MongoDB
+                        // Add new order from Database
                         localOrders.push({
                             orderId: mongoOrder.orderId,
                             date: mongoOrder.date,
@@ -2911,7 +2911,7 @@ async function syncOrdersFromMongoDB() {
                 }
             }
             
-            // Add all M-Pesa codes from MongoDB orders
+            // Add all M-Pesa codes from Database orders
             mongoOrders.forEach(order => {
                 if (order.mpesaCode) {
                     const code = order.mpesaCode.toUpperCase().trim();
@@ -2926,17 +2926,17 @@ async function syncOrdersFromMongoDB() {
                 // Save updated orders to localStorage
                 localStorage.setItem('orders', JSON.stringify(localOrders));
                 localStorage.setItem('usedMpesaCodes', JSON.stringify(usedCodes));
-                console.log(`✅ Synced ${mongoOrders.length} orders from MongoDB to localStorage`);
+                console.log(`✅ Synced ${mongoOrders.length} orders from Database to localStorage`);
                 console.log(`📊 Total orders in localStorage: ${localOrders.length}`);
                 console.log(`📊 Total used M-Pesa codes: ${usedCodes.length}`);
             } else {
                 console.log('ℹ️ Orders already synced - no updates needed');
             }
         } else {
-            console.log('ℹ️ No orders in MongoDB to sync');
+            console.log('ℹ️ No orders in Database to sync');
         }
     } catch (error) {
-        console.error('❌ Error syncing orders from MongoDB:', error);
+        console.error('❌ Error syncing orders from Database:', error);
         // Don't throw - allow the app to continue even if sync fails
     }
 }
@@ -2945,7 +2945,7 @@ async function syncOrdersFromMongoDB() {
 async function verifyMpesaCodeBeforePayment(mpesaCode, total, mpesaCodeInput) {
     const code = mpesaCode.toUpperCase().trim();
     
-    // ALWAYS check localStorage for duplicates first (even if MongoDB is available)
+    // ALWAYS check localStorage for duplicates first (even if Database is available)
     const duplicateOrder = checkDuplicateMpesaCodeLocal(code);
     if (duplicateOrder) {
         const errorMessage = `⚠️ This M-Pesa code has already been used!\n\n` +
@@ -2964,12 +2964,12 @@ async function verifyMpesaCodeBeforePayment(mpesaCode, total, mpesaCodeInput) {
         return { valid: false, reason: 'duplicate', existingOrder: duplicateOrder };
     }
     
-    // Also check MongoDB if available
-    const useMongoDB = localStorage.getItem('useMongoDB') === 'true';
-    if (useMongoDB) {
+    // Also check Database if available
+    const useDatabase = localStorage.getItem('useDatabase') === 'true';
+    if (useDatabase) {
         try {
             showNotification('Verifying M-Pesa transaction code...', 'info');
-            console.log('🔍 Verifying M-Pesa code:', { code: mpesaCode, total, useMongoDB });
+            console.log('🔍 Verifying M-Pesa code:', { code: mpesaCode, total, useDatabase });
             
             const verification = await apiService.verifyMpesaCode(mpesaCode, total, new Date());
             console.log('📋 Verification response:', verification);
@@ -3358,7 +3358,7 @@ async function verifyMpesaCodeBeforePayment(mpesaCode, total, mpesaCodeInput) {
         }
     }
     
-    // CRITICAL SECURITY: If MongoDB is not available, BLOCK payment
+    // CRITICAL SECURITY: If Database is not available, BLOCK payment
     // We cannot verify the transaction without the backend, so we must block it
     const errorMessage = `❌ Payment Verification Unavailable!\n\n` +
         `The payment verification service is currently unavailable.\n\n` +
@@ -3478,11 +3478,11 @@ async function completeTillPayment() {
         mpesaCode: validMpesaCode
     };
     
-    // Save order to MongoDB if available
-    if (useMongoDB) {
+    // Save order to Database if available
+    if (useDatabase) {
         try {
             await apiService.createOrder(order);
-            console.log('✅ Order saved to MongoDB');
+            console.log('✅ Order saved to Database');
         } catch (orderError) {
             console.error('❌ Error saving order:', orderError);
             
@@ -3618,8 +3618,8 @@ async function completeTillPayment() {
         }
         
         // Send receipt to WhatsApp via backend API (automatic)
-        const useMongoDB = localStorage.getItem('useMongoDB') === 'true';
-        if (useMongoDB) {
+        const useDatabase = localStorage.getItem('useDatabase') === 'true';
+        if (useDatabase) {
             try {
                 // Call backend to send receipt to WhatsApp
                 await apiService.sendReceiptToWhatsApp(order);
@@ -3630,7 +3630,7 @@ async function completeTillPayment() {
                 sendReceiptViaWhatsAppSilent();
             }
         } else {
-            // If MongoDB not available, use frontend method
+            // If Database not available, use frontend method
             sendReceiptViaWhatsAppSilent();
         }
     } catch (whatsappError) {
@@ -3904,8 +3904,8 @@ async function processPayment(event) {
         // Show loading modal
         showPaymentVerificationModal();
         
-        // Check if MongoDB is available
-        const useMongoDB = localStorage.getItem('useMongoDB') === 'true';
+        // Check if Database is available
+        const useDatabase = localStorage.getItem('useDatabase') === 'true';
         
         // Track payment progress
         let totalPaid = 0;
@@ -4117,11 +4117,11 @@ async function processPayment(event) {
         saveOrderToLocalStorage(order);
         console.log('✅ Order saved to localStorage (prevents duplicate M-Pesa codes)');
         
-        // Save order to MongoDB if available
-        if (useMongoDB) {
+        // Save order to Database if available
+        if (useDatabase) {
             try {
                 await apiService.createOrder(order);
-                console.log('✅ Order saved to MongoDB');
+                console.log('✅ Order saved to Database');
             } catch (orderError) {
                 console.error('❌ Error saving order:', orderError);
                 
@@ -4231,7 +4231,7 @@ async function processPayment(event) {
                 if (orderError.message && (orderError.message.includes('Duplicate') || orderError.message.includes('already been used'))) {
                     cleanupLocalStorage();
                     
-                    const errorMessage = `⚠️ This M-Pesa code has already been used in MongoDB!\n\n` +
+                    const errorMessage = `⚠️ This M-Pesa code has already been used in Database!\n\n` +
                         `Please enter the correct M-Pesa transaction code from your payment confirmation message.\n\n` +
                         `If you believe this is an error, please contact us:\n` +
                         `WhatsApp: +254 724 904 692`;
@@ -4263,8 +4263,8 @@ async function processPayment(event) {
                 }
                 
                 // For other errors, show warning but continue (order is already saved to localStorage)
-                console.warn('⚠️ Order save to MongoDB failed, but order is saved to localStorage');
-                showNotification('Order saved locally. MongoDB save failed. Please contact support if needed.', 'warning');
+                console.warn('⚠️ Order save to Database failed, but order is saved to localStorage');
+                showNotification('Order saved locally. Database save failed. Please contact support if needed.', 'warning');
             }
         }
         
@@ -4308,8 +4308,8 @@ async function processPayment(event) {
             }
             
             // Send receipt to WhatsApp via backend API (automatic) - WITH PDF
-            const useMongoDB = localStorage.getItem('useMongoDB') === 'true';
-            if (useMongoDB) {
+            const useDatabase = localStorage.getItem('useDatabase') === 'true';
+            if (useDatabase) {
                 try {
                     // Call backend to send receipt to WhatsApp (including PDF)
                     await apiService.sendReceiptToWhatsApp(order, currentOrderPDF);
@@ -4320,7 +4320,7 @@ async function processPayment(event) {
                     sendReceiptViaWhatsAppSilent();
                 }
             } else {
-                // If MongoDB not available, use frontend method
+                // If Database not available, use frontend method
                 sendReceiptViaWhatsAppSilent();
             }
         } catch (whatsappError) {
@@ -4351,7 +4351,7 @@ async function processSTKPushPayment(customerName, customerPhone, customerEmail,
         // Show loading modal
         showPaymentVerificationModal();
         
-        // Check if backend is available (STK Push needs backend API, not necessarily MongoDB)
+        // Check if backend is available (STK Push needs backend API, not necessarily Database)
         console.log('🔍 Checking backend availability for STK Push...');
         let backendAvailable = false;
         try {
@@ -4385,7 +4385,7 @@ async function processSTKPushPayment(customerName, customerPhone, customerEmail,
                 errorMessage += 'For Local Development:\n';
                 errorMessage += '1. Navigate to backend folder\n';
                 errorMessage += '2. Run: npm start\n';
-                errorMessage += '3. Wait for "✅ Connected to MongoDB successfully"\n';
+                errorMessage += '3. Wait for "✅ Connected to Database successfully"\n';
                 errorMessage += '4. Refresh this page\n\n';
                 errorMessage += 'Backend URL: ' + apiService.baseURL;
             }
@@ -4487,7 +4487,7 @@ async function processSTKPushPayment(customerName, customerPhone, customerEmail,
                     await new Promise(resolve => setTimeout(resolve, 2000));
                     
                     // Check for transaction in database by checking recent transactions
-                    if (useMongoDB) {
+                    if (useDatabase) {
                         try {
                             // Try to get transactions from API
                             const response = await fetch(`${apiService.baseURL}/mpesa/transactions?phoneNumber=${customerPhone.replace(/^0/, '254')}&limit=1`);
@@ -4524,7 +4524,7 @@ async function processSTKPushPayment(customerName, customerPhone, customerEmail,
                     }
                     
                     // If we couldn't find transaction, still create order (transaction will be linked via webhook)
-                    // Note: createOrderFromSTKPush will save to localStorage even if MongoDB fails
+                    // Note: createOrderFromSTKPush will save to localStorage even if Database fails
                     await createOrderFromSTKPush(
                         orderId,
                         customerName,
@@ -4617,15 +4617,15 @@ async function createOrderFromSTKPush(orderId, customerName, customerPhone, cust
         saveOrderToLocalStorage(order);
         console.log('✅ Order saved to localStorage');
         
-        // Save order to MongoDB if available
-        const useMongoDB = localStorage.getItem('useMongoDB') === 'true';
-        if (useMongoDB) {
+        // Save order to Database if available
+        const useDatabase = localStorage.getItem('useDatabase') === 'true';
+        if (useDatabase) {
             try {
                 await apiService.createOrder(order);
-                console.log('✅ Order saved to MongoDB');
+                console.log('✅ Order saved to Database');
             } catch (orderError) {
                 console.error('❌ Error saving order:', orderError);
-                // Continue even if MongoDB save fails
+                // Continue even if Database save fails
             }
         }
         
@@ -4672,7 +4672,7 @@ async function createOrderFromSTKPush(orderId, customerName, customerPhone, cust
                 await generateReceiptPDF(order);
             }
             
-            if (useMongoDB) {
+            if (useDatabase) {
                 try {
                     await apiService.sendReceiptToWhatsApp(order, currentOrderPDF);
                     console.log('✅ Receipt and PDF sent to WhatsApp via backend');
@@ -5091,8 +5091,8 @@ function toggleMobileMenu() {
 // - UI preferences (filters, theme, etc.)
 // 
 // NOT for core app data:
-// - Products → MongoDB API (permanent storage)
-// - Orders → MongoDB API (permanent storage)
+// - Products → Database API (permanent storage)
+// - Orders → Database API (permanent storage)
 // ============================================
 
 // Save Cart to LocalStorage (UI-related data only)
@@ -5530,12 +5530,12 @@ function editProduct(productId) {
         console.log('📦 Current products count:', products.length);
         console.log('📦 Product IDs:', products.map(p => ({ id: p.id, _id: p._id, name: p.name })));
         
-        // Handle both MongoDB ObjectId (24 char string) and numeric IDs
+        // Handle both Database ObjectId (24 char string) and numeric IDs
         let id = productId;
         if (typeof productId === 'string' && productId.length === 24 && /^[0-9a-fA-F]{24}$/.test(productId)) {
-            // MongoDB ObjectId - use as is
+            // Database ObjectId - use as is
             id = productId;
-            console.log('✅ Detected MongoDB ObjectId:', id);
+            console.log('✅ Detected Database ObjectId:', id);
         } else {
             // Try to parse as number
             id = typeof productId === 'string' ? parseInt(productId) : productId;
@@ -5547,14 +5547,14 @@ function editProduct(productId) {
             console.log('✅ Parsed numeric ID:', id);
         }
         
-        // Find product - handle both MongoDB ObjectId and numeric IDs
+        // Find product - handle both Database ObjectId and numeric IDs
         const product = products.find(p => {
             // Check both id and _id fields
             const pId = p.id || p._id;
             const pIdStr = String(pId);
             
             if (typeof id === 'string' && id.length === 24) {
-                // MongoDB ObjectId comparison
+                // Database ObjectId comparison
                 return (pIdStr === id) || (String(p._id) === id) || (String(p.id) === id);
             } else {
                 // Numeric ID comparison
@@ -5722,10 +5722,10 @@ async function saveProduct(event) {
         
         if (productId) {
             // Edit existing product
-            // Handle both MongoDB ObjectId and numeric IDs
+            // Handle both Database ObjectId and numeric IDs
             let editId = productId;
             if (typeof productId === 'string' && productId.length === 24 && /^[0-9a-fA-F]{24}$/.test(productId)) {
-                // MongoDB ObjectId - use as is
+                // Database ObjectId - use as is
                 editId = productId;
             } else {
                 // Try to parse as number
@@ -5734,7 +5734,7 @@ async function saveProduct(event) {
             
             const index = products.findIndex(p => {
                 if (typeof editId === 'string' && editId.length === 24) {
-                    // MongoDB ObjectId comparison
+                    // Database ObjectId comparison
                     return (p.id === editId) || (p._id === editId);
                 } else {
                     // Numeric ID comparison
@@ -5804,7 +5804,7 @@ async function saveProduct(event) {
             });
         }
         
-        // Sync product to ALL storage locations (MongoDB, localStorage, IndexedDB)
+        // Sync product to ALL storage locations (Database, localStorage, IndexedDB)
         console.log('💾 Attempting to sync product to all storage locations... Current count:', products.length);
         console.log('💾 Product IDs:', products.map(p => p.id));
         console.log('💾 Product names:', products.map(p => p.name));
@@ -5814,12 +5814,12 @@ async function saveProduct(event) {
             const syncResult = await syncProductsToAllStorage(products, { preserveImages: true });
             
             if (syncResult.success) {
-                // Update products array with synced products (in case MongoDB IDs changed)
+                // Update products array with synced products (in case Database IDs changed)
                 if (syncResult.products && syncResult.products.length > 0) {
-                    // Update products array with synced products (preserve order and add MongoDB IDs)
+                    // Update products array with synced products (preserve order and add Database IDs)
                     syncResult.products.forEach((syncedProduct, index) => {
                         if (index < products.length) {
-                            // Update existing product with synced data (especially MongoDB ID)
+                            // Update existing product with synced data (especially Database ID)
                             const currentProduct = products[index];
                             products[index] = {
                                 ...currentProduct,
@@ -5832,7 +5832,7 @@ async function saveProduct(event) {
                 
                 // Update the specific product that was just saved (if editing)
                 if (productId) {
-                    // Find and update the edited product with MongoDB ID if available
+                    // Find and update the edited product with Database ID if available
                     const productIndex = products.findIndex(p => {
                         if (typeof productId === 'string' && productId.length === 24) {
                             return (p.id === productId) || (p._id === productId);
@@ -5843,7 +5843,7 @@ async function saveProduct(event) {
                     });
                     
                     if (productIndex !== -1) {
-                        // Update with MongoDB ID if available
+                        // Update with Database ID if available
                         const syncedProduct = syncResult.products.find(sp => {
                             const spId = sp.id;
                             const currentId = products[productIndex].id;
@@ -5862,7 +5862,7 @@ async function saveProduct(event) {
                         showNotification('Product updated successfully in all storage locations!');
                     }
                 } else {
-                    // New product was added - update with MongoDB ID if available
+                    // New product was added - update with Database ID if available
                     const lastProduct = products[products.length - 1];
                     if (lastProduct) {
                         const syncedProduct = syncResult.products.find(sp => {
@@ -5872,7 +5872,7 @@ async function saveProduct(event) {
                         if (syncedProduct && syncedProduct.id) {
                             lastProduct.id = syncedProduct.id;
                             lastProduct._id = syncedProduct.id;
-                            console.log('✅ New product ID updated with MongoDB ID:', syncedProduct.id);
+                            console.log('✅ New product ID updated with Database ID:', syncedProduct.id);
                         }
                     }
                     
@@ -5880,18 +5880,18 @@ async function saveProduct(event) {
                     showNotification('Product added successfully to all storage locations!');
                 }
                 
-                // Reload products from MongoDB if available (to get latest IDs and ensure sync)
+                // Reload products from Database if available (to get latest IDs and ensure sync)
                 let productsReloaded = false;
                 try {
                 const backendAvailable = await apiService.checkBackend();
                 if (backendAvailable) {
-                        console.log('🔄 Reloading products from MongoDB after save...');
+                        console.log('🔄 Reloading products from Database after save...');
                     await loadProducts();
                         productsReloaded = true;
-                        console.log('✅ Products reloaded from MongoDB. Product count:', products.length);
+                        console.log('✅ Products reloaded from Database. Product count:', products.length);
                     }
                 } catch (reloadError) {
-                    console.warn('⚠️ Could not reload from MongoDB (using local data):', reloadError.message);
+                    console.warn('⚠️ Could not reload from Database (using local data):', reloadError.message);
                     // Continue with local products
                 }
                 
@@ -5930,10 +5930,10 @@ async function saveProduct(event) {
 // Adjust product quantity (add or subtract)
 async function adjustQuantity(productId, change) {
     try {
-        // Handle both MongoDB ObjectId and numeric IDs
+        // Handle both Database ObjectId and numeric IDs
         let id = productId;
         if (typeof productId === 'string' && productId.length === 24 && /^[0-9a-fA-F]{24}$/.test(productId)) {
-            // MongoDB ObjectId - use as is
+            // Database ObjectId - use as is
             id = productId;
         } else {
             // Try to parse as number for legacy numeric IDs
@@ -5945,10 +5945,10 @@ async function adjustQuantity(productId, change) {
             }
         }
         
-        // Find product - handle both MongoDB ObjectId and numeric IDs
+        // Find product - handle both Database ObjectId and numeric IDs
         const product = products.find(p => {
             if (typeof id === 'string' && id.length === 24) {
-                // MongoDB ObjectId comparison
+                // Database ObjectId comparison
                 return (p.id === id) || (p._id === id);
             } else {
                 // Numeric ID comparison
@@ -5966,17 +5966,17 @@ async function adjustQuantity(productId, change) {
         
         const currentQty = product.quantity || 0;
         const newQty = Math.max(0, currentQty + change);
-        const useMongoDB = localStorage.getItem('useMongoDB') === 'true';
+        const useDatabase = localStorage.getItem('useDatabase') === 'true';
         
-        // Update via MongoDB API if available
-        if (useMongoDB) {
+        // Update via Database API if available
+        if (useDatabase) {
             try {
                 // Use the actual product ID (could be _id or id)
                 const productIdForAPI = product._id || product.id || id;
                 await apiService.updateQuantity(productIdForAPI, newQty);
-                console.log('✅ Quantity updated via MongoDB API');
+                console.log('✅ Quantity updated via Database API');
             } catch (error) {
-                console.error('❌ Error updating quantity via MongoDB API:', error);
+                console.error('❌ Error updating quantity via Database API:', error);
                 showNotification('Error updating stock: ' + error.message, 'error');
                 return;
             }
@@ -5991,11 +5991,11 @@ async function adjustQuantity(productId, change) {
         }
         
         // Save to localStorage as backup
-        if (!useMongoDB) {
+        if (!useDatabase) {
             await saveProducts();
         } else {
             try {
-                // When using MongoDB, save lightweight version to avoid quota issues
+                // When using Database, save lightweight version to avoid quota issues
                 const lightweightProducts = products.map(p => ({
                     id: p.id,
                     name: p.name,
@@ -6009,7 +6009,7 @@ async function adjustQuantity(productId, change) {
                 localStorage.setItem('products', JSON.stringify(lightweightProducts));
             } catch (error) {
                 if (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
-                    console.warn('⚠️ localStorage quota exceeded. Products are saved to MongoDB.');
+                    console.warn('⚠️ localStorage quota exceeded. Products are saved to Database.');
                 } else {
                     console.warn('Could not update localStorage:', error);
                 }
@@ -6036,10 +6036,10 @@ async function adjustQuantity(productId, change) {
 // Set product quantity directly
 async function setQuantity(productId, newQuantity) {
     try {
-        // Handle both MongoDB ObjectId and numeric IDs
+        // Handle both Database ObjectId and numeric IDs
         let id = productId;
         if (typeof productId === 'string' && productId.length === 24 && /^[0-9a-fA-F]{24}$/.test(productId)) {
-            // MongoDB ObjectId - use as is
+            // Database ObjectId - use as is
             id = productId;
         } else {
             // Try to parse as number for legacy numeric IDs
@@ -6057,9 +6057,9 @@ async function setQuantity(productId, newQuantity) {
             showNotification('Quantity cannot be negative!', 'error');
             // Reset input to current value
             const product = products.find(p => {
-                // Handle both MongoDB ObjectId and numeric IDs
+                // Handle both Database ObjectId and numeric IDs
                 if (typeof id === 'string' && id.length === 24) {
-                    // MongoDB ObjectId comparison
+                    // Database ObjectId comparison
                     return (p.id === id) || (p._id === id);
                 } else {
                     // Numeric ID comparison
@@ -6076,10 +6076,10 @@ async function setQuantity(productId, newQuantity) {
             return;
         }
         
-        // Find product - handle both MongoDB ObjectId and numeric IDs
+        // Find product - handle both Database ObjectId and numeric IDs
         const product = products.find(p => {
             if (typeof id === 'string' && id.length === 24) {
-                // MongoDB ObjectId comparison
+                // Database ObjectId comparison
                 return (p.id === id) || (p._id === id);
             } else {
                 // Numeric ID comparison
@@ -6096,17 +6096,17 @@ async function setQuantity(productId, newQuantity) {
         }
         
         const oldQty = product.quantity || 0;
-        const useMongoDB = localStorage.getItem('useMongoDB') === 'true';
+        const useDatabase = localStorage.getItem('useDatabase') === 'true';
         
-        // Update via MongoDB API if available
-        if (useMongoDB) {
+        // Update via Database API if available
+        if (useDatabase) {
             try {
                 // Use the actual product ID (could be _id or id)
                 const productIdForAPI = product._id || product.id || id;
                 await apiService.updateQuantity(productIdForAPI, qty);
-                console.log('✅ Quantity updated via MongoDB API');
+                console.log('✅ Quantity updated via Database API');
             } catch (error) {
-                console.error('❌ Error updating quantity via MongoDB API:', error);
+                console.error('❌ Error updating quantity via Database API:', error);
                 showNotification('Error updating stock: ' + error.message, 'error');
                 return;
             }
@@ -6115,11 +6115,11 @@ async function setQuantity(productId, newQuantity) {
         product.quantity = qty;
         
         // Save to localStorage as backup
-        if (!useMongoDB) {
+        if (!useDatabase) {
             await saveProducts();
         } else {
             try {
-                // When using MongoDB, save lightweight version to avoid quota issues
+                // When using Database, save lightweight version to avoid quota issues
                 const lightweightProducts = products.map(p => ({
                     id: p.id,
                     name: p.name,
@@ -6133,7 +6133,7 @@ async function setQuantity(productId, newQuantity) {
                 localStorage.setItem('products', JSON.stringify(lightweightProducts));
             } catch (error) {
                 if (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
-                    console.warn('⚠️ localStorage quota exceeded. Products are saved to MongoDB.');
+                    console.warn('⚠️ localStorage quota exceeded. Products are saved to Database.');
                 } else {
                     console.warn('Could not update localStorage:', error);
                 }
@@ -6170,10 +6170,10 @@ function deleteProduct(productId, event) {
     // Handle async operation properly when called from onclick
     (async () => {
         try {
-            // Handle both MongoDB ObjectId (24 char string) and numeric IDs
+            // Handle both Database ObjectId (24 char string) and numeric IDs
             let id = productId;
             if (typeof productId === 'string' && productId.length === 24 && /^[0-9a-fA-F]{24}$/.test(productId)) {
-                // MongoDB ObjectId - use as is
+                // Database ObjectId - use as is
                 id = productId;
             } else {
                 // Try to parse as number
@@ -6190,9 +6190,9 @@ function deleteProduct(productId, event) {
             
             // Find product first to show its name in confirmation and get index
             const index = products.findIndex(p => {
-                // Handle both MongoDB ObjectId and numeric IDs
+                // Handle both Database ObjectId and numeric IDs
                 if (typeof id === 'string' && id.length === 24) {
-                    // MongoDB ObjectId comparison
+                    // Database ObjectId comparison
                     return (p.id === id) || (p._id === id);
                 } else {
                     // Numeric ID comparison
@@ -6310,41 +6310,41 @@ async function confirmDelete() {
         products.splice(index, 1);
         console.log('✅ Product removed from array. New count:', products.length);
         
-        // Delete from ALL storage locations (MongoDB, localStorage, IndexedDB)
+        // Delete from ALL storage locations (Database, localStorage, IndexedDB)
         const deleteResult = await deleteProductFromAllStorage(id);
         
         if (deleteResult.success) {
             console.log('✅ Product deleted from storage locations');
             
-            // Check if MongoDB is connected before syncing
-            let shouldSyncToMongoDB = false;
+            // Check if Database is connected before syncing
+            let shouldSyncToDatabase = false;
             try {
                 const backendAvailable = await apiService.checkBackend();
                 if (backendAvailable) {
-                    const dbStatus = await apiService.checkMongoDBStatus();
-                    shouldSyncToMongoDB = (dbStatus.readyState === 1);
+                    const dbStatus = await apiService.checkDatabaseStatus();
+                    shouldSyncToDatabase = (dbStatus.readyState === 1);
                 }
             } catch (error) {
-                console.log('ℹ️ Could not check MongoDB status - will skip MongoDB sync');
+                console.log('ℹ️ Could not check Database status - will skip Database sync');
             }
             
             // Sync remaining products to all storage locations to ensure consistency
-            // This saves remaining products to localStorage/IndexedDB (and MongoDB if connected)
+            // This saves remaining products to localStorage/IndexedDB (and Database if connected)
             console.log('🔄 Syncing remaining products to all storage locations...');
             const syncResult = await syncProductsToAllStorage(products, { 
                 preserveImages: true,
-                skipMongoDB: !shouldSyncToMongoDB // Skip MongoDB if not connected
+                skipDatabase: !shouldSyncToDatabase // Skip Database if not connected
             });
             
             if (syncResult.success) {
                 console.log('✅ Remaining products synced to storage locations');
                 
-                // Update products array with synced products (in case MongoDB IDs changed)
+                // Update products array with synced products (in case Database IDs changed)
                 if (syncResult.products && syncResult.products.length > 0) {
-                    // Update products array with synced products (preserve order and add MongoDB IDs)
+                    // Update products array with synced products (preserve order and add Database IDs)
                     syncResult.products.forEach((syncedProduct, idx) => {
                         if (idx < products.length) {
-                            // Update existing product with synced data (especially MongoDB ID)
+                            // Update existing product with synced data (especially Database ID)
                             const currentProduct = products[idx];
                             products[idx] = {
                                 ...currentProduct,
@@ -6383,20 +6383,20 @@ async function confirmDelete() {
                 }
             }
             
-            // Reload products from MongoDB if available (to get latest state and ensure sync)
+            // Reload products from Database if available (to get latest state and ensure sync)
             let productsReloaded = false;
             try {
                 const backendAvailable = await apiService.checkBackend();
                 if (backendAvailable) {
-                    console.log('🔄 Reloading products from MongoDB after deletion...');
+                    console.log('🔄 Reloading products from Database after deletion...');
                     await loadProducts();
                     productsReloaded = true;
-                    console.log('✅ Products reloaded from MongoDB. Product count:', products.length);
+                    console.log('✅ Products reloaded from Database. Product count:', products.length);
                 } else {
                     console.log('ℹ️ Backend not available - using local products array');
                 }
             } catch (reloadError) {
-                console.warn('⚠️ Could not reload from MongoDB (using local data):', reloadError.message);
+                console.warn('⚠️ Could not reload from Database (using local data):', reloadError.message);
                 // Continue with local products
             }
             
@@ -6425,10 +6425,10 @@ async function confirmDelete() {
             console.log('✅ Product deleted successfully from all storage locations');
             showNotification('Product deleted successfully from all storage locations!', 'success');
             
-            // Note: We intentionally don't reload from MongoDB here because:
-            // 1. MongoDB wasn't synced during deletion (database wasn't connected)
-            // 2. MongoDB still has the deleted products
-            // 3. When MongoDB connects and we sync remaining products, deleted products will be removed automatically
+            // Note: We intentionally don't reload from Database here because:
+            // 1. Database wasn't synced during deletion (database wasn't connected)
+            // 2. Database still has the deleted products
+            // 3. When Database connects and we sync remaining products, deleted products will be removed automatically
         } else {
             console.error('❌ Failed to delete product from any storage location');
             showNotification('Error: Failed to delete product from any storage location', 'error');
@@ -6466,12 +6466,12 @@ async function saveProducts() {
         const syncResult = await syncProductsToAllStorage(productsToSave, { preserveImages: true });
         
         if (syncResult.success) {
-            // Update products array with synced products (in case MongoDB IDs changed)
+            // Update products array with synced products (in case Database IDs changed)
             if (syncResult.products && syncResult.products.length > 0) {
-                // Update products array with synced products (preserve order and add MongoDB IDs)
+                // Update products array with synced products (preserve order and add Database IDs)
                 syncResult.products.forEach((syncedProduct, index) => {
                     if (index < products.length) {
-                        // Update existing product with synced data (especially MongoDB ID)
+                        // Update existing product with synced data (especially Database ID)
                         const currentProduct = products[index];
                         products[index] = {
                             ...currentProduct,
@@ -6499,49 +6499,49 @@ async function loadProducts() {
         let loadedProducts = [];
         let loadSource = 'none';
         
-        // Check if MongoDB backend is available AND database is actually connected
-        let useMongoDB = false;
-        let mongoDBConnected = false;
+        // Check if Database backend is available AND database is actually connected
+        let useDatabase = false;
+        let databaseConnected = false;
         
         try {
-            console.log('🔍 Checking MongoDB backend availability...');
+            console.log('🔍 Checking Database backend availability...');
             const backendAvailable = await apiService.checkBackend();
         
         if (backendAvailable) {
-                console.log('🔍 Backend is available - checking MongoDB connection...');
+                console.log('🔍 Backend is available - checking Database connection...');
             try {
-                const dbStatus = await apiService.checkMongoDBStatus();
-                    mongoDBConnected = dbStatus && dbStatus.readyState === 1;
+                const dbStatus = await apiService.checkDatabaseStatus();
+                    databaseConnected = dbStatus && dbStatus.readyState === 1;
                     
-                if (mongoDBConnected) {
-                    useMongoDB = true;
-                        localStorage.setItem('useMongoDB', 'true');
-                        console.log('✅ MongoDB is connected - will use MongoDB');
+                if (databaseConnected) {
+                    useDatabase = true;
+                        localStorage.setItem('useDatabase', 'true');
+                        console.log('✅ Database is connected - will use Database');
                         console.log(`   Database: ${dbStatus.name || 'trendy-dresses'}`);
                         console.log(`   Host: ${dbStatus.host || 'connected'}`);
                 } else {
                         const statusText = dbStatus?.readyStateText || 'unknown';
                         const readyState = dbStatus?.readyState || 0;
-                        console.warn(`⚠️ MongoDB backend available but database not connected`);
+                        console.warn(`⚠️ Database backend available but database not connected`);
                         console.warn(`   Status: ${statusText} (ReadyState: ${readyState})`);
                         console.warn(`   Will use fallback storage (localStorage/IndexedDB)`);
-                    useMongoDB = false;
-                        localStorage.setItem('useMongoDB', 'false');
+                    useDatabase = false;
+                        localStorage.setItem('useDatabase', 'false');
                 }
                 } catch (dbError) {
-                    console.warn('⚠️ Error checking MongoDB connection status:', dbError.message);
-                useMongoDB = false;
-                    localStorage.setItem('useMongoDB', 'false');
+                    console.warn('⚠️ Error checking Database connection status:', dbError.message);
+                useDatabase = false;
+                    localStorage.setItem('useDatabase', 'false');
                 }
             } else {
                 console.log('ℹ️ Backend not available - will use fallback storage');
-                useMongoDB = false;
-                localStorage.setItem('useMongoDB', 'false');
+                useDatabase = false;
+                localStorage.setItem('useDatabase', 'false');
             }
         } catch (checkError) {
-            console.warn('⚠️ Error during MongoDB availability check:', checkError.message);
-            useMongoDB = false;
-            localStorage.setItem('useMongoDB', 'false');
+            console.warn('⚠️ Error during Database availability check:', checkError.message);
+            useDatabase = false;
+            localStorage.setItem('useDatabase', 'false');
         }
         
         // Check localStorage/IndexedDB first to see what we have locally
@@ -6576,23 +6576,23 @@ async function loadProducts() {
             console.error('❌ Error checking local storage:', error);
         }
         
-        // PRIORITY: MongoDB is PERMANENT, CENTRALIZED storage - primary source of truth
-        if (useMongoDB && mongoDBConnected) {
-            // Update localStorage preference to MongoDB
-            localStorage.setItem('useMongoDB', 'true');
-            localStorage.setItem('preferredStorage', 'mongodb');
+        // PRIORITY: Database is PERMANENT, CENTRALIZED storage - primary source of truth
+        if (useDatabase && databaseConnected) {
+            // Update localStorage preference to Database
+            localStorage.setItem('useDatabase', 'true');
+            localStorage.setItem('preferredStorage', 'database');
             
             try {
-                // Step 1: Load products from MongoDB (PERMANENT, CENTRALIZED storage) - WITHOUT images for faster loading
-                const mongoProducts = await apiService.getProducts('all', false);
-                console.log(`📦 Loaded ${mongoProducts.length} products from MongoDB (permanent, centralized storage)`);
+                // Step 1: Load products from Database (PERMANENT, CENTRALIZED storage) - WITHOUT images for faster loading
+                const dbProducts = await apiService.getProducts('all', false);
+                console.log(`📦 Loaded ${dbProducts.length} products from Database (permanent, centralized storage)`);
                 
-                // Step 1.5: Cache MongoDB data to IndexedDB for offline access
+                // Step 1.5: Cache Database data to IndexedDB for offline access
                 try {
                     await storageManager.init();
                     if (storageManager.useIndexedDB && storageManager.db) {
-                        await storageManager.syncFromMongoDB(mongoProducts);
-                        console.log(`✅ Cached MongoDB data to IndexedDB for offline access`);
+                        await storageManager.syncFromDatabase(dbProducts);
+                        console.log(`✅ Cached Database data to IndexedDB for offline access`);
                     }
                 } catch (cacheError) {
                     console.warn('⚠️ Could not cache to IndexedDB:', cacheError.message);
@@ -6601,33 +6601,33 @@ async function loadProducts() {
                 
                 // Step 1.6: Load images for products that have them (lazy load)
                 // This is done asynchronously after initial display
-                if (mongoProducts.length > 0) {
+                if (dbProducts.length > 0) {
                     console.log('🖼️ Loading product images in background...');
-                    loadProductImagesLazy(mongoProducts).catch(err => {
+                    loadProductImagesLazy(dbProducts).catch(err => {
                         console.warn('⚠️ Some product images failed to load:', err.message);
                     });
                 }
                 
-                // Step 2: If we have local products, sync them to MongoDB (MongoDB is authoritative)
+                // Step 2: If we have local products, sync them to Database (Database is authoritative)
                 if (localProductCount > 0 && localProducts.length > 0) {
-                    console.log(`🔄 Found ${localProductCount} products in local cache - syncing to MongoDB (authoritative)...`);
+                    console.log(`🔄 Found ${localProductCount} products in local cache - syncing to Database (authoritative)...`);
                     try {
                         await syncProductsToAllStorage(localProducts, { preserveImages: true });
-                        console.log(`✅ Synced ${localProductCount} local products to MongoDB (permanent storage)`);
+                        console.log(`✅ Synced ${localProductCount} local products to Database (permanent storage)`);
                     
-                        // Reload from MongoDB after sync to get the latest data (without images for speed)
+                        // Reload from Database after sync to get the latest data (without images for speed)
                         const updatedMongoProducts = await apiService.getProducts('all', false);
                         loadedProducts = updatedMongoProducts.map(p => ({
                         ...p,
                             id: p._id || p.id,
                             image: p.image || '' // Will be empty, loaded lazily
                     }));
-                        loadSource = 'MongoDB (permanent, centralized)';
-                        console.log(`📦 Using ${loadedProducts.length} products from MongoDB (authoritative)`);
+                        loadSource = 'Database (permanent, centralized)';
+                        console.log(`📦 Using ${loadedProducts.length} products from Database (authoritative)`);
                     
-                        // Update IndexedDB cache with latest MongoDB data
+                        // Update IndexedDB cache with latest Database data
                         try {
-                            await storageManager.syncFromMongoDB(updatedMongoProducts);
+                            await storageManager.syncFromDatabase(updatedMongoProducts);
                         } catch (cacheError) {
                             console.warn('⚠️ Could not update IndexedDB cache:', cacheError.message);
                         }
@@ -6637,24 +6637,24 @@ async function loadProducts() {
                             console.warn('⚠️ Some product images failed to load:', err.message);
                         });
                     } catch (syncError) {
-                        console.error('❌ Error syncing to MongoDB:', syncError);
-                        // If sync fails, still use MongoDB products (they're the source of truth)
-                    loadedProducts = mongoProducts.map(p => ({
+                        console.error('❌ Error syncing to Database:', syncError);
+                        // If sync fails, still use Database products (they're the source of truth)
+                    loadedProducts = dbProducts.map(p => ({
                         ...p,
                         id: p._id || p.id,
                         image: p.image || ''
                     }));
-                        loadSource = 'MongoDB (permanent, centralized)';
+                        loadSource = 'Database (permanent, centralized)';
                     }
                 } else {
-                    // No local products - use MongoDB directly (primary source)
-                    loadedProducts = mongoProducts.map(p => ({
+                    // No local products - use Database directly (primary source)
+                    loadedProducts = dbProducts.map(p => ({
                         ...p,
                         id: p._id || p.id,
                         image: p.image || '' // Will be empty, loaded lazily
                     }));
-                    loadSource = 'MongoDB (permanent, centralized)';
-                    console.log(`📦 Using ${loadedProducts.length} products from MongoDB (permanent, centralized storage)`);
+                    loadSource = 'Database (permanent, centralized)';
+                    console.log(`📦 Using ${loadedProducts.length} products from Database (permanent, centralized storage)`);
                     
                     // Load images in background for products that have them
                     loadProductImagesLazy(loadedProducts).catch(err => {
@@ -6663,7 +6663,7 @@ async function loadProducts() {
                     }
                 
             } catch (error) {
-                // MongoDB failed - check if it's a transient error or permanent failure
+                // Database failed - check if it's a transient error or permanent failure
                 const errorMsg = error.message || error.toString() || '';
                 const errorName = error.name || '';
                 
@@ -6676,47 +6676,47 @@ async function loadProducts() {
                     errorMsg.includes('network') ||
                     errorMsg.includes('Network') ||
                     errorMsg.includes('Database not connected') || 
-                    errorMsg.includes('MongoDB connection') ||
+                    errorMsg.includes('Database connection') ||
                     errorMsg.includes('backend not available') ||
                     errorMsg.includes('Failed to fetch');
                 
                 if (!isExpectedError) {
-                    console.error('❌ MongoDB API load error:', errorMsg);
+                    console.error('❌ Database API load error:', errorMsg);
                     console.error('❌ Error details:', error);
                 } else {
                     // Expected error (timeout, network issue) - don't log as error
                     if (errorName === 'AbortError' || errorMsg.includes('timed out') || errorMsg.includes('aborted')) {
-                        console.warn(`⚠️ MongoDB request timed out (15s) - this may be due to slow network or backend response`);
+                        console.warn(`⚠️ Database request timed out (15s) - this may be due to slow network or backend response`);
                         console.warn(`   The request will fall back to localStorage/IndexedDB for now`);
-                        console.warn(`   If this persists, check: 1) Backend is running, 2) Network connection, 3) MongoDB Atlas connection`);
+                        console.warn(`   If this persists, check: 1) Backend is running, 2) Network connection, 3) Database Atlas connection`);
                     } else {
-                        console.warn(`⚠️ MongoDB request failed: ${errorMsg}`);
+                        console.warn(`⚠️ Database request failed: ${errorMsg}`);
                     }
                 }
                 
                 // Log fallback message
-                console.log('ℹ️ Failed to load from MongoDB - will load from localStorage/IndexedDB');
+                console.log('ℹ️ Failed to load from Database - will load from localStorage/IndexedDB');
                 
-                // Mark MongoDB as unavailable for this session
-                useMongoDB = false;
-                localStorage.setItem('useMongoDB', 'false');
+                // Mark Database as unavailable for this session
+                useDatabase = false;
+                localStorage.setItem('useDatabase', 'false');
                 
                 // Will fall through to localStorage/IndexedDB fallback below
             }
         }
         
-        // FALLBACK: Use IndexedDB cache ONLY if MongoDB is not available (OFFLINE mode)
+        // FALLBACK: Use IndexedDB cache ONLY if Database is not available (OFFLINE mode)
         // NOTE: localStorage is NOT used for products - only for UI data (cart, preferences)
-        // MongoDB is the ONLY source of truth for core app data
+        // Database is the ONLY source of truth for core app data
         if (loadedProducts.length === 0) {
-            if (useMongoDB && mongoDBConnected) {
-                // MongoDB was available but failed to load products - show error
-                console.error('❌ MongoDB was connected but failed to load products');
-                console.error('   This is an error - products should load from MongoDB');
-                console.error('   Check backend logs and MongoDB connection');
+            if (useDatabase && databaseConnected) {
+                // Database was available but failed to load products - show error
+                console.error('❌ Database was connected but failed to load products');
+                console.error('   This is an error - products should load from Database');
+                console.error('   Check backend logs and Database connection');
             } else {
-                // MongoDB not available - use IndexedDB cache for offline mode ONLY
-                console.warn('⚠️ MongoDB not available - using IndexedDB cache (OFFLINE MODE)');
+                // Database not available - use IndexedDB cache for offline mode ONLY
+                console.warn('⚠️ Database not available - using IndexedDB cache (OFFLINE MODE)');
                 console.warn('   Note: Database (MariaDB) is permanent, centralized storage.');
                 console.warn('   localStorage is NOT used for products - only for UI data (cart, preferences)');
                 
@@ -6733,7 +6733,7 @@ async function loadProducts() {
                             }));
                             loadSource = 'IndexedDB cache (offline mode)';
                             console.log(`📦 Using ${loadedProducts.length} products from IndexedDB cache (offline mode)`);
-                            console.log(`   ⚠️ This is cached data. Reconnect to MongoDB for latest data.`);
+                            console.log(`   ⚠️ This is cached data. Reconnect to Database for latest data.`);
                         }
                     }
                 } catch (error) {
@@ -6742,8 +6742,8 @@ async function loadProducts() {
                 
                 // DO NOT use localStorage for products - it's only for UI data
                 if (loadedProducts.length === 0) {
-                    console.error('❌ No products available - MongoDB is not connected and no cache found');
-                    console.error('   Please ensure backend server is running and MongoDB is connected');
+                    console.error('❌ No products available - Database is not connected and no cache found');
+                    console.error('   Please ensure backend server is running and Database is connected');
                 }
             }
         }
@@ -6794,8 +6794,8 @@ async function loadProducts() {
                 console.error('❌ CRITICAL: Products array length mismatch!', products.length, 'vs', loadedProducts.length);
             }
             
-            // Note: IndexedDB recovery disabled - MongoDB is preferred storage method
-            // If MongoDB backend is available, products should be loaded from MongoDB, not IndexedDB
+            // Note: IndexedDB recovery disabled - Database is preferred storage method
+            // If Database backend is available, products should be loaded from Database, not IndexedDB
     } else {
             // No products found in storage
             console.log('⚠️ No products found in storage');
@@ -6921,7 +6921,7 @@ function checkImageStatus() {
     });
     
     console.log('====================');
-    console.log('💡 To reload products from MongoDB, run: loadProducts()');
+    console.log('💡 To reload products from Database, run: loadProducts()');
     console.log('💡 To refresh display, run: displayProducts("all")');
     
     return {
@@ -7031,10 +7031,10 @@ function compressExistingProductImages() {
 // Check storage usage and show warning if needed
 async function checkStorageUsage() {
     try {
-        // Skip storage check if using MongoDB
-        const useMongoDB = localStorage.getItem('useMongoDB') === 'true';
-        if (useMongoDB) {
-            return { size: 0, quota: Infinity, warning: false, type: 'MongoDB' };
+        // Skip storage check if using Database
+        const useDatabase = localStorage.getItem('useDatabase') === 'true';
+        if (useDatabase) {
+            return { size: 0, quota: Infinity, warning: false, type: 'Database' };
         }
         
         const storageInfo = await storageManager.getStorageInfo();
@@ -7902,16 +7902,16 @@ async function loadAdminOrdersInternal(searchQuery = '', completedOnly = false) 
             </div>
         `;
         
-        const useMongoDB = localStorage.getItem('useMongoDB') === 'true';
+        const useDatabase = localStorage.getItem('useDatabase') === 'true';
         
-        if (useMongoDB) {
+        if (useDatabase) {
             try {
-                // Load orders from MongoDB
+                // Load orders from Database
                 const orders = await apiService.getOrders();
                 allAdminOrders = orders || [];
-                console.log(`✅ Loaded ${allAdminOrders.length} orders from MongoDB`);
+                console.log(`✅ Loaded ${allAdminOrders.length} orders from Database`);
             } catch (apiError) {
-                console.error('❌ Error loading orders from MongoDB:', apiError);
+                console.error('❌ Error loading orders from Database:', apiError);
                 allAdminOrders = [];
             }
         }
@@ -7921,7 +7921,7 @@ async function loadAdminOrdersInternal(searchQuery = '', completedOnly = false) 
             const localOrdersJson = localStorage.getItem('orders');
             if (localOrdersJson) {
                 const localOrders = JSON.parse(localOrdersJson);
-                // Merge with MongoDB orders (avoid duplicates)
+                // Merge with Database orders (avoid duplicates)
                 localOrders.forEach(localOrder => {
                     const exists = allAdminOrders.find(o => o.orderId === localOrder.orderId);
                     if (!exists) {
@@ -8261,11 +8261,11 @@ async function toggleDeliveryStatus(orderId, isDelivered) {
             checkbox.disabled = true;
         }
         
-        const useMongoDB = localStorage.getItem('useMongoDB') === 'true';
+        const useDatabase = localStorage.getItem('useDatabase') === 'true';
         
-        if (useMongoDB) {
+        if (useDatabase) {
             try {
-                // Update in MongoDB
+                // Update in Database
                 await apiService.updateDeliveryStatus(orderId, deliveryStatus);
                 console.log(`✅ Delivery status updated for order ${orderId}: ${deliveryStatus}`);
             } catch (apiError) {

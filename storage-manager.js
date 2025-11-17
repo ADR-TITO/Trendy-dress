@@ -1,14 +1,14 @@
 // Storage Manager - IndexedDB for complex local storage needs
 // Storage Hierarchy:
-// 1. MongoDB (PERMANENT, CENTRALIZED) - Primary source of truth, cloud-based storage
+// 1. Database (PERMANENT, CENTRALIZED) - Primary source of truth, cloud-based storage
 // 2. IndexedDB (CACHE/FALLBACK) - Local cache for offline access, complex queries, large data
 // 3. localStorage (MINIMAL BACKUP) - Lightweight backup only, limited capacity
 
 // IndexedDB is used for:
-// - Caching MongoDB data for offline access
+// - Caching Database data for offline access
 // - Storing large datasets locally (images, complex objects)
-// - Performing complex queries locally when MongoDB is unavailable
-// - Fallback storage when MongoDB backend is down
+// - Performing complex queries locally when Database is unavailable
+// - Fallback storage when Database backend is down
 
 class StorageManager {
     constructor() {
@@ -17,7 +17,7 @@ class StorageManager {
         this.storeName = 'products';
         this.db = null;
         this.useIndexedDB = false;
-        this.isCacheMode = true; // IndexedDB is in cache mode - syncs with MongoDB when available
+        this.isCacheMode = true; // IndexedDB is in cache mode - syncs with Database when available
     }
 
     // Initialize IndexedDB
@@ -59,12 +59,12 @@ class StorageManager {
     }
 
     // Save products to IndexedDB (used as cache for offline access, not primary storage)
-    // Note: MongoDB is the permanent, centralized storage. IndexedDB caches MongoDB data.
+    // Note: Database is the permanent, centralized storage. IndexedDB caches Database data.
     // NOTE: localStorage is NOT used for products - only for UI data (cart, preferences)
     async saveProducts(productsArray) {
         // DO NOT save to localStorage - it's only for UI data
         // localStorage is reserved for: cart, admin credentials, UI preferences
-        // Products are stored in MongoDB (primary) and cached in IndexedDB (offline)
+        // Products are stored in Database (primary) and cached in IndexedDB (offline)
         
         if (!this.useIndexedDB || !this.db) {
             // IndexedDB not available - return false (can't cache)
@@ -84,7 +84,7 @@ class StorageManager {
                 const existingProducts = getAllRequest.result || [];
                 const existingIds = new Set(existingProducts.map(p => p.id || p._id));
                 
-                // Normalize new product IDs (MongoDB uses _id, IndexedDB uses id)
+                // Normalize new product IDs (Database uses _id, IndexedDB uses id)
                 const newIds = new Set(productsArray.map(p => p._id || p.id));
                 
                 // Delete products that are no longer in the array
@@ -136,7 +136,7 @@ class StorageManager {
                         try {
                             // Normalize product data for IndexedDB
                             const normalizedProduct = {
-                                // Convert MongoDB _id to id
+                                // Convert Database _id to id
                                 id: product._id || product.id || String(Date.now()) + Math.random(),
                                 
                                 // Basic product fields
@@ -203,7 +203,7 @@ class StorageManager {
                                 
                                 if (errors === productsArray.length) {
                                     console.error('❌ All products failed to save to IndexedDB');
-                                    resolve(true); // Still resolve - MongoDB is primary
+                                    resolve(true); // Still resolve - Database is primary
                                 } else if (completed + errors === productsArray.length) {
                                     console.log(`⚠️ Some products failed to save to IndexedDB (${errors} errors, ${completed} succeeded)`);
                                     resolve(true); // Some succeeded
@@ -236,7 +236,7 @@ class StorageManager {
     }
 
     // Load products from IndexedDB (cache/fallback only)
-    // Note: MongoDB is the primary source. This loads from local cache when MongoDB is unavailable.
+    // Note: Database is the primary source. This loads from local cache when Database is unavailable.
     async loadProducts() {
         if (!this.useIndexedDB || !this.db) {
             // Fallback to localStorage (minimal backup)
@@ -388,21 +388,21 @@ class StorageManager {
         }
     }
 
-    // Sync products from MongoDB to IndexedDB cache
-    // This caches MongoDB data locally for offline access
-    async syncFromMongoDB(mongoProducts) {
+    // Sync products from Database to IndexedDB cache
+    // This caches Database data locally for offline access
+    async syncFromDatabase(mongoProducts) {
         if (!this.useIndexedDB || !this.db) {
-            console.log('⚠️ IndexedDB not available - cannot cache MongoDB data');
+            console.log('⚠️ IndexedDB not available - cannot cache Database data');
             return false;
         }
 
         try {
-            console.log(`🔄 Syncing ${mongoProducts.length} products from MongoDB to IndexedDB cache...`);
+            console.log(`🔄 Syncing ${mongoProducts.length} products from Database to IndexedDB cache...`);
             await this.saveProducts(mongoProducts);
-            console.log(`✅ Cached ${mongoProducts.length} products from MongoDB to IndexedDB`);
+            console.log(`✅ Cached ${mongoProducts.length} products from Database to IndexedDB`);
             return true;
         } catch (error) {
-            console.error('❌ Error syncing from MongoDB to IndexedDB:', error);
+            console.error('❌ Error syncing from Database to IndexedDB:', error);
             return false;
         }
     }
@@ -419,7 +419,7 @@ class StorageManager {
             const existingProducts = await this.loadProducts();
             if (existingProducts && existingProducts.length > 0) {
                 console.log(`⚠️ IndexedDB cache already has ${existingProducts.length} products. Migration skipped.`);
-                console.log(`   Note: MongoDB is the primary storage. IndexedDB is cache only.`);
+                console.log(`   Note: Database is the primary storage. IndexedDB is cache only.`);
                 return false;
             }
             
@@ -429,7 +429,7 @@ class StorageManager {
             if (localProducts.length > 0) {
                 await this.saveProducts(localProducts);
                 console.log(`✅ Migrated ${localProducts.length} products from localStorage to IndexedDB cache`);
-                console.log(`   Note: These will sync to MongoDB when backend is available`);
+                console.log(`   Note: These will sync to Database when backend is available`);
                 return true;
             }
             return false;
