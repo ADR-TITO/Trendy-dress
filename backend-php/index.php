@@ -18,8 +18,21 @@ if (file_exists(__DIR__ . '/vendor/autoload.php')) {
 
 // Load environment variables
 if (file_exists(__DIR__ . '/.env')) {
-    $dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
-    $dotenv->load();
+    // Try to use dotenv if available
+    if (class_exists('Dotenv\Dotenv')) {
+        $dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
+        $dotenv->load();
+    } else {
+        // Fallback: Simple .env parser (no Composer needed)
+        $lines = file(__DIR__ . '/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if (strpos($line, '#') === 0 || strpos($line, '=') === false) continue;
+            list($key, $value) = explode('=', $line, 2);
+            $_ENV[trim($key)] = trim(trim($value), '"\'');
+            putenv(trim($key) . '=' . trim(trim($value), '"\''));
+        }
+    }
 } else {
     // Don't fail if .env doesn't exist - use defaults
     error_log('⚠️ .env file not found - using default values');

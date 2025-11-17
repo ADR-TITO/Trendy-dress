@@ -4,7 +4,8 @@
     "type": "project",
     "require": {
         "php": ">=7.4",
-        "mongodb/mongodb": "^1.15",
+        "ext-pdo": "*",
+        "ext-pdo_mysql": "*",
         "vlucas/phpdotenv": "^5.5"
     },
     "autoload": {

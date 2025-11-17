@@ -1,94 +1,96 @@
 <?php
-/**
- * Product Model
- */
-
 namespace App\Models;
 
-use MongoDB\BSON\ObjectId;
-use MongoDB\BSON\UTCDateTime;
+require_once __DIR__ . '/../../config/database.php';
+
+use Database;
 
 class Product {
-    private $db;
-    private $collection;
-    
-    public function __construct() {
-        $this->db = \Database::getDatabase();
-        $this->collection = $this->db->products;
-    }
-    
     /**
-     * Get all products
+     * Find all products
      */
     public function findAll($category = null, $includeImages = false) {
         try {
-            $filter = [];
+            $pdo = Database::getConnection();
+            
+            $sql = "SELECT * FROM products";
+            $params = [];
             
             if ($category && $category !== 'all') {
-                $filter['category'] = $category;
+                $sql .= " WHERE category = :category";
+                $params[':category'] = $category;
             }
             
-            $options = [
-                'sort' => ['createdAt' => -1]
-            ];
+            $sql .= " ORDER BY createdAt DESC";
             
-            $products = $this->collection->find($filter, $options)->toArray();
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $products = $stmt->fetchAll();
             
-            // Convert MongoDB objects to arrays
+            // Convert to array format and handle images
             $result = [];
             foreach ($products as $product) {
-                $productArray = [
-                    '_id' => (string)$product['_id'],
-                    'name' => $product['name'] ?? '',
-                    'category' => $product['category'] ?? 'others',
-                    'price' => $product['price'] ?? 0,
-                    'discount' => $product['discount'] ?? 0,
-                    'quantity' => $product['quantity'] ?? 0,
-                    'size' => $product['size'] ?? '',
-                    'createdAt' => $product['createdAt'] ?? new UTCDateTime(),
-                    'updatedAt' => $product['updatedAt'] ?? new UTCDateTime(),
+                $item = [
+                    '_id' => $product['id'],
+                    'id' => $product['id'],
+                    'name' => $product['name'],
+                    'price' => (float)$product['price'],
+                    'description' => $product['description'],
+                    'category' => $product['category'],
+                    'size' => $product['size'],
+                    'quantity' => (int)$product['quantity'],
+                    'createdAt' => $product['createdAt'],
+                    'updatedAt' => $product['updatedAt']
                 ];
                 
-                if ($includeImages) {
-                    $productArray['image'] = $product['image'] ?? '';
+                // Include image only if requested (to reduce response size)
+                if ($includeImages && !empty($product['image'])) {
+                    $item['image'] = $product['image'];
                 } else {
-                    $productArray['image'] = '';
-                    $productArray['hasImage'] = !empty($product['image'] ?? '');
+                    $item['image'] = null;
                 }
                 
-                // Convert dates to ISO strings
-                if ($productArray['createdAt'] instanceof UTCDateTime) {
-                    $productArray['createdAt'] = $productArray['createdAt']->toDateTime()->format('c');
-                }
-                if ($productArray['updatedAt'] instanceof UTCDateTime) {
-                    $productArray['updatedAt'] = $productArray['updatedAt']->toDateTime()->format('c');
-                }
-                
-                $result[] = $productArray;
+                $result[] = $item;
             }
             
             return $result;
         } catch (\Exception $e) {
-            error_log("❌ Error fetching products: " . $e->getMessage());
+            error_log("Error finding products: " . $e->getMessage());
             throw $e;
         }
     }
     
     /**
-     * Get product by ID
+     * Find product by ID
      */
     public function findById($id) {
         try {
-            $product = $this->collection->findOne(['_id' => new ObjectId($id)]);
+            $pdo = Database::getConnection();
+            
+            $stmt = $pdo->prepare("SELECT * FROM products WHERE id = :id");
+            $stmt->execute([':id' => $id]);
+            $product = $stmt->fetch();
             
             if (!$product) {
                 return null;
             }
             
-            return $this->convertToArray($product);
+            return [
+                '_id' => $product['id'],
+                'id' => $product['id'],
+                'name' => $product['name'],
+                'price' => (float)$product['price'],
+                'description' => $product['description'],
+                'category' => $product['category'],
+                'size' => $product['size'],
+                'quantity' => (int)$product['quantity'],
+                'image' => $product['image'],
+                'createdAt' => $product['createdAt'],
+                'updatedAt' => $product['updatedAt']
+            ];
         } catch (\Exception $e) {
-            error_log("❌ Error fetching product: " . $e->getMessage());
-            return null;
+            error_log("Error finding product: " . $e->getMessage());
+            throw $e;
         }
     }
     
@@ -97,25 +99,29 @@ class Product {
      */
     public function create($data) {
         try {
-            $now = new UTCDateTime();
+            $pdo = Database::getConnection();
             
-            $product = [
-                'name' => $data['name'] ?? '',
-                'category' => $data['category'] ?? 'others',
-                'price' => (float)($data['price'] ?? 0),
-                'discount' => (float)($data['discount'] ?? 0),
-                'quantity' => (int)($data['quantity'] ?? 0),
-                'size' => $data['size'] ?? '',
-                'image' => $data['image'] ?? '',
-                'createdAt' => $now,
-                'updatedAt' => $now,
-            ];
+            // Generate ID if not provided
+            $id = $data['id'] ?? $data['_id'] ?? uniqid('prod_', true);
             
-            $result = $this->collection->insertOne($product);
+            $sql = "INSERT INTO products (id, name, price, description, category, size, quantity, image) 
+                    VALUES (:id, :name, :price, :description, :category, :size, :quantity, :image)";
             
-            return $this->findById((string)$result->getInsertedId());
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([
+                ':id' => $id,
+                ':name' => $data['name'] ?? '',
+                ':price' => $data['price'] ?? 0,
+                ':description' => $data['description'] ?? '',
+                ':category' => $data['category'] ?? 'others',
+                ':size' => $data['size'] ?? '',
+                ':quantity' => $data['quantity'] ?? 0,
+                ':image' => $data['image'] ?? null
+            ]);
+            
+            return $this->findById($id);
         } catch (\Exception $e) {
-            error_log("❌ Error creating product: " . $e->getMessage());
+            error_log("Error creating product: " . $e->getMessage());
             throw $e;
         }
     }
@@ -125,31 +131,51 @@ class Product {
      */
     public function update($id, $data) {
         try {
-            $update = [
-                '$set' => [
-                    'updatedAt' => new UTCDateTime(),
-                ]
-            ];
+            $pdo = Database::getConnection();
             
-            $allowedFields = ['name', 'category', 'price', 'discount', 'quantity', 'size', 'image'];
-            foreach ($allowedFields as $field) {
-                if (isset($data[$field])) {
-                    $update['$set'][$field] = $data[$field];
-                }
+            $fields = [];
+            $params = [':id' => $id];
+            
+            if (isset($data['name'])) {
+                $fields[] = "name = :name";
+                $params[':name'] = $data['name'];
+            }
+            if (isset($data['price'])) {
+                $fields[] = "price = :price";
+                $params[':price'] = $data['price'];
+            }
+            if (isset($data['description'])) {
+                $fields[] = "description = :description";
+                $params[':description'] = $data['description'];
+            }
+            if (isset($data['category'])) {
+                $fields[] = "category = :category";
+                $params[':category'] = $data['category'];
+            }
+            if (isset($data['size'])) {
+                $fields[] = "size = :size";
+                $params[':size'] = $data['size'];
+            }
+            if (isset($data['quantity'])) {
+                $fields[] = "quantity = :quantity";
+                $params[':quantity'] = $data['quantity'];
+            }
+            if (isset($data['image'])) {
+                $fields[] = "image = :image";
+                $params[':image'] = $data['image'];
             }
             
-            $result = $this->collection->updateOne(
-                ['_id' => new ObjectId($id)],
-                $update
-            );
-            
-            if ($result->getMatchedCount() === 0) {
-                return null;
+            if (empty($fields)) {
+                return $this->findById($id);
             }
+            
+            $sql = "UPDATE products SET " . implode(', ', $fields) . " WHERE id = :id";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
             
             return $this->findById($id);
         } catch (\Exception $e) {
-            error_log("❌ Error updating product: " . $e->getMessage());
+            error_log("Error updating product: " . $e->getMessage());
             throw $e;
         }
     }
@@ -159,38 +185,15 @@ class Product {
      */
     public function delete($id) {
         try {
-            $result = $this->collection->deleteOne(['_id' => new ObjectId($id)]);
-            return $result->getDeletedCount() > 0;
+            $pdo = Database::getConnection();
+            
+            $stmt = $pdo->prepare("DELETE FROM products WHERE id = :id");
+            $stmt->execute([':id' => $id]);
+            
+            return $stmt->rowCount() > 0;
         } catch (\Exception $e) {
-            error_log("❌ Error deleting product: " . $e->getMessage());
+            error_log("Error deleting product: " . $e->getMessage());
             throw $e;
         }
     }
-    
-    /**
-     * Convert MongoDB document to array
-     */
-    private function convertToArray($product) {
-        $array = [
-            '_id' => (string)$product['_id'],
-            'name' => $product['name'] ?? '',
-            'category' => $product['category'] ?? 'others',
-            'price' => $product['price'] ?? 0,
-            'discount' => $product['discount'] ?? 0,
-            'quantity' => $product['quantity'] ?? 0,
-            'size' => $product['size'] ?? '',
-            'image' => $product['image'] ?? '',
-        ];
-        
-        // Convert dates
-        if (isset($product['createdAt']) && $product['createdAt'] instanceof UTCDateTime) {
-            $array['createdAt'] = $product['createdAt']->toDateTime()->format('c');
-        }
-        if (isset($product['updatedAt']) && $product['updatedAt'] instanceof UTCDateTime) {
-            $array['updatedAt'] = $product['updatedAt']->toDateTime()->format('c');
-        }
-        
-        return $array;
-    }
 }
-

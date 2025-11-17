@@ -1,0 +1,24 @@
+================================================================================
+URGENT: DEPLOY PHP BACKEND TO PRODUCTION
+================================================================================
+
+CURRENT ISSUE:
+Your website is getting 404 errors because the PHP backend is not deployed.
+
+QUICK STEPS:
+1. Upload this entire "backend-php" folder to your production server
+2. Run: composer install (in backend-php folder)
+3. Create .env file with MongoDB connection string
+4. Configure web server to route /api to PHP
+
+DETAILED INSTRUCTIONS:
+See: DEPLOY_PHP_BACKEND_PRODUCTION.md
+Or: URGENT_DEPLOY_PHP_BACKEND.md
+
+TEST AFTER DEPLOYMENT:
+curl https://trendydresses.co.ke/api/health
+
+Should return: {"status":"ok","backend":"PHP"}
+
+================================================================================
+

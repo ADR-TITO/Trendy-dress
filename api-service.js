@@ -8,13 +8,44 @@ async function detectBackendPort() {
     // Check if running on production domain
     if (window.location.hostname === 'trendydresses.co.ke' || 
         window.location.hostname === 'www.trendydresses.co.ke') {
-        // Production: PHP backend on same domain with /api path
-        return window.location.origin + '/api';
+        // Production: Try different possible paths
+        // Option 1: /api (if configured in root)
+        // Option 2: /backend-php/api (if backend-php folder is in root)
+        const possiblePaths = ['/api', '/backend-php/api'];
+        
+        for (const path of possiblePaths) {
+            try {
+                const testURL = window.location.origin + path + '/health';
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 1000);
+                
+                const response = await fetch(testURL, {
+                    signal: controller.signal,
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' }
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (response.ok) {
+                    console.log(`✅ Detected PHP backend at: ${window.location.origin}${path}`);
+                    return window.location.origin + path;
+                }
+            } catch (error) {
+                // Try next path
+                continue;
+            }
+        }
+        
+        // Fallback: Use /backend-php/api (most common for cPanel)
+        console.warn('⚠️ Could not auto-detect backend path, using /backend-php/api');
+        return window.location.origin + '/backend-php/api';
     }
     
-    // Development: Try PHP backend (port 80 or 8000)
-    // PHP backend typically runs on port 80 (via web server) or 8000 (built-in server)
-    const phpPorts = [80, 8000];
+    // Development: Try PHP backend (port 8000 first, then 80)
+    // PHP built-in server typically runs on port 8000 (no admin required)
+    // Port 80 requires admin privileges and is usually for production web servers
+    const phpPorts = [8000, 80];
     
     // Try PHP backend ports
     for (const port of phpPorts) {
@@ -43,9 +74,9 @@ async function detectBackendPort() {
         }
     }
     
-    // Fallback: Use PHP default port
-    console.warn('⚠️ Could not auto-detect PHP backend, using default port 80');
-    return 'http://localhost:80/api';
+    // Fallback: Use PHP default port (8000 for development, 80 for production)
+    console.warn('⚠️ Could not auto-detect PHP backend, using default port 8000');
+    return 'http://localhost:8000/api';
 }
 
 // Initialize backend URL
@@ -59,7 +90,7 @@ const getBackendURL = async () => {
         while (isDetectingPort) {
             await new Promise(resolve => setTimeout(resolve, 100));
         }
-        return detectedBackendURL || 'http://localhost:80/api'; // PHP default
+        return detectedBackendURL || 'http://localhost:8000/api'; // PHP default (development)
     }
     
     isDetectingPort = true;
@@ -71,18 +102,18 @@ const getBackendURL = async () => {
         return detectedBackendURL;
     } catch (error) {
         console.error('❌ Error detecting backend port:', error);
-        return 'http://localhost:80/api'; // PHP default
+        return 'http://localhost:8000/api'; // PHP default (development)
     } finally {
         isDetectingPort = false;
     }
 };
 
 // Initialize with default URL (will be updated after detection)
-// PHP backend on same domain in production, port 80 in development
+// PHP backend on same domain in production, port 8000 in development
 let API_BASE_URL = (window.location.hostname === 'trendydresses.co.ke' || 
                     window.location.hostname === 'www.trendydresses.co.ke')
-    ? window.location.origin + '/api'  // PHP backend on same domain
-    : 'http://localhost:80/api';  // PHP default port
+    ? window.location.origin + '/backend-php/api'  // PHP backend in backend-php folder (cPanel default)
+    : 'http://localhost:8000/api';  // PHP default port (8000 for development)
 
 class ApiService {
     constructor() {
@@ -164,17 +195,37 @@ class ApiService {
                 }
             }
             
-            console.log(`🔍 Backend check: ${isAvailable ? '✅ Available' : '❌ Not available'} (${response.status})`);
+            if (isAvailable) {
+                console.log(`🔍 Backend check: ✅ Available (${response.status})`);
+            } else {
+                console.log(`🔍 Backend check: ❌ Not available (${response.status})`);
+            }
             return isAvailable;
         } catch (error) {
             // Log the error for debugging
             const errorName = error.name || '';
             const errorMsg = error.message || '';
+            const isLocal = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
+            const timeoutDuration = (window.location.hostname === 'trendydresses.co.ke' || 
+                                    window.location.hostname === 'www.trendydresses.co.ke')
+                ? 5000  // 5 seconds for production
+                : 3000; // 3 seconds for local development
             
             if (errorName === 'AbortError' || errorMsg.includes('aborted')) {
-                console.warn('⚠️ Backend check timed out (5s) - may not be available');
+                const timeoutMsg = `${timeoutDuration/1000}s`;
+                console.warn(`⚠️ Backend check timed out (${timeoutMsg}) - may not be available`);
+                if (isLocal) {
+                    console.warn('💡 Local development tip: Start PHP backend with:');
+                    console.warn('   cd backend-php');
+                    console.warn('   php -S localhost:8000 -t .');
+                    console.warn('   Or run: START_LOCAL.bat (Windows) or START_LOCAL.ps1');
+                }
             } else if (errorName === 'TypeError' || errorMsg.includes('fetch')) {
                 console.warn('⚠️ Backend check failed - network error or CORS issue');
+                if (isLocal) {
+                    console.warn('💡 Make sure PHP backend is running on http://localhost:8000');
+                    console.warn('   Start with: cd backend-php && php -S localhost:8000 -t .');
+                }
             } else {
                 console.warn('⚠️ Backend check failed:', error.message);
             }

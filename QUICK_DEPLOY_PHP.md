@@ -1,8 +1,15 @@
-# Quick Deploy PHP Backend - Production
+# ⚠️ URGENT: Quick Deploy PHP Backend - Production
 
 ## The Problem
 
-Your production server returns **404** for `/api/health` because the PHP backend is not deployed.
+Your production server returns **404** for `/api/health` because the PHP backend is **NOT DEPLOYED**.
+
+```
+GET https://trendydresses.co.ke/api/health
+[HTTP/3 404  161ms]
+```
+
+**This means:** The PHP backend files don't exist on your production server yet.
 
 ## Quick Solution
 

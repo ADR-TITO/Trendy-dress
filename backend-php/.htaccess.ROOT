@@ -1,3 +1,6 @@
+# If backend-php is in ROOT directory (same as index.html)
+# Use this .htaccess configuration
+
 # Enable Rewrite Engine
 RewriteEngine On
 
@@ -10,16 +13,9 @@ Header set Access-Control-Allow-Headers "Content-Type, Authorization"
 RewriteCond %{REQUEST_METHOD} OPTIONS
 RewriteRule ^(.*)$ $1 [R=204,L]
 
-# Route all API requests to index.php
-# This works if backend-php/ is accessed directly via /api URL
-# OR if .htaccess is in root and routes /api to backend-php/
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^api/(.*)$ index.php?route=$1 [QSA,L]
-
-# Alternative: If requests come to backend-php/ directly
-RewriteCond %{REQUEST_URI} ^/backend-php/api/(.*)$
-RewriteRule ^api/(.*)$ index.php?route=$1 [QSA,L]
+# Route /api requests to backend-php/index.php
+RewriteCond %{REQUEST_URI} ^/api/(.*)$
+RewriteRule ^api/(.*)$ backend-php/index.php?route=$1 [QSA,L]
 
 # Increase upload size limit (for base64 images)
 php_value upload_max_filesize 50M

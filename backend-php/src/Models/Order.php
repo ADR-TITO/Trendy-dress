@@ -1,31 +1,29 @@
 <?php
-/**
- * Order Model
- */
-
 namespace App\Models;
 
-use MongoDB\BSON\ObjectId;
-use MongoDB\BSON\UTCDateTime;
+require_once __DIR__ . '/../../config/database.php';
+
+use Database;
 
 class Order {
-    private $db;
-    private $collection;
-    
-    public function __construct() {
-        $this->db = \Database::getDatabase();
-        $this->collection = $this->db->orders;
-    }
-    
     /**
      * Find order by orderId
      */
     public function findByOrderId($orderId) {
         try {
-            $order = $this->collection->findOne(['orderId' => $orderId]);
-            return $order ? $this->convertToArray($order) : null;
+            $pdo = Database::getConnection();
+            
+            $stmt = $pdo->prepare("SELECT * FROM orders WHERE orderId = :orderId");
+            $stmt->execute([':orderId' => $orderId]);
+            $order = $stmt->fetch();
+            
+            if (!$order) {
+                return null;
+            }
+            
+            return $this->convertToArray($order);
         } catch (\Exception $e) {
-            error_log("❌ Error finding order: " . $e->getMessage());
+            error_log("Error finding order: " . $e->getMessage());
             return null;
         }
     }
@@ -35,10 +33,19 @@ class Order {
      */
     public function findByMpesaCode($mpesaCode) {
         try {
-            $order = $this->collection->findOne(['mpesaCode' => strtoupper($mpesaCode)]);
-            return $order ? $this->convertToArray($order) : null;
+            $pdo = Database::getConnection();
+            
+            $stmt = $pdo->prepare("SELECT * FROM orders WHERE mpesaCode = :mpesaCode");
+            $stmt->execute([':mpesaCode' => strtoupper($mpesaCode)]);
+            $order = $stmt->fetch();
+            
+            if (!$order) {
+                return null;
+            }
+            
+            return $this->convertToArray($order);
         } catch (\Exception $e) {
-            error_log("❌ Error finding order by M-Pesa code: " . $e->getMessage());
+            error_log("Error finding order by M-Pesa code: " . $e->getMessage());
             return null;
         }
     }
@@ -48,16 +55,16 @@ class Order {
      */
     public function findAll($completedOnly = false) {
         try {
-            $filter = [];
+            $pdo = Database::getConnection();
             
             if ($completedOnly) {
-                $filter['delivery.status'] = 'delivered';
+                $stmt = $pdo->prepare("SELECT * FROM orders WHERE deliveryStatus = 'delivered' ORDER BY createdAt DESC");
             } else {
-                $filter['delivery.status'] = ['$ne' => 'delivered'];
+                $stmt = $pdo->prepare("SELECT * FROM orders WHERE deliveryStatus != 'delivered' OR deliveryStatus IS NULL ORDER BY createdAt DESC");
             }
             
-            $options = ['sort' => ['createdAt' => -1]];
-            $orders = $this->collection->find($filter, $options)->toArray();
+            $stmt->execute();
+            $orders = $stmt->fetchAll();
             
             $result = [];
             foreach ($orders as $order) {
@@ -66,7 +73,7 @@ class Order {
             
             return $result;
         } catch (\Exception $e) {
-            error_log("❌ Error fetching orders: " . $e->getMessage());
+            error_log("Error fetching orders: " . $e->getMessage());
             throw $e;
         }
     }
@@ -76,38 +83,36 @@ class Order {
      */
     public function create($data) {
         try {
-            $now = new UTCDateTime();
+            $pdo = Database::getConnection();
             
-            $order = [
-                'orderId' => $data['orderId'] ?? '',
-                'date' => $data['date'] ?? date('Y-m-d H:i:s'),
-                'customer' => $data['customer'] ?? [],
-                'items' => $data['items'] ?? [],
-                'total' => (float)($data['total'] ?? 0),
-                'paymentMethod' => $data['paymentMethod'] ?? '',
-                'mpesaCode' => strtoupper($data['mpesaCode'] ?? ''),
-                'verified' => $data['verified'] ?? false,
-                'verificationStatus' => $data['verificationStatus'] ?? 'pending',
-                'delivery' => array_merge([
-                    'option' => 'pickup',
-                    'optionText' => 'Shop Pickup',
-                    'cost' => 0,
-                    'address' => '',
-                    'status' => 'pending'
-                ], $data['delivery'] ?? []),
-                'subtotal' => (float)($data['subtotal'] ?? 0),
-                'totalPaid' => (float)($data['totalPaid'] ?? 0),
-                'mpesaCodes' => $data['mpesaCodes'] ?? [],
-                'mpesaCodesString' => $data['mpesaCodesString'] ?? '',
-                'verificationDetails' => $data['verificationDetails'] ?? [],
-                'createdAt' => $now,
-                'updatedAt' => $now,
-            ];
+            // Generate ID if not provided
+            $id = $data['id'] ?? $data['_id'] ?? uniqid('order_', true);
+            $orderId = $data['orderId'] ?? uniqid('ORD', true);
             
-            $result = $this->collection->insertOne($order);
-            return $this->findByOrderId($data['orderId']);
+            $sql = "INSERT INTO orders (id, orderId, customerName, customerPhone, customerEmail, items, totalAmount, paymentMethod, mpesaCode, deliveryStatus) 
+                    VALUES (:id, :orderId, :customerName, :customerPhone, :customerEmail, :items, :totalAmount, :paymentMethod, :mpesaCode, :deliveryStatus)";
+            
+            $customer = $data['customer'] ?? [];
+            $items = is_array($data['items']) ? json_encode($data['items']) : $data['items'];
+            $delivery = $data['delivery'] ?? [];
+            
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([
+                ':id' => $id,
+                ':orderId' => $orderId,
+                ':customerName' => $customer['name'] ?? '',
+                ':customerPhone' => $customer['phone'] ?? '',
+                ':customerEmail' => $customer['email'] ?? '',
+                ':items' => $items,
+                ':totalAmount' => $data['total'] ?? $data['totalAmount'] ?? 0,
+                ':paymentMethod' => $data['paymentMethod'] ?? '',
+                ':mpesaCode' => strtoupper($data['mpesaCode'] ?? ''),
+                ':deliveryStatus' => $delivery['status'] ?? 'pending'
+            ]);
+            
+            return $this->findByOrderId($orderId);
         } catch (\Exception $e) {
-            error_log("❌ Error creating order: " . $e->getMessage());
+            error_log("Error creating order: " . $e->getMessage());
             throw $e;
         }
     }
@@ -117,64 +122,50 @@ class Order {
      */
     public function updateDeliveryStatus($orderId, $status, $deliveredBy = null) {
         try {
-            $update = [
-                '$set' => [
-                    'delivery.status' => $status,
-                    'updatedAt' => new UTCDateTime(),
-                ]
-            ];
+            $pdo = Database::getConnection();
             
-            if ($status === 'delivered') {
-                $update['$set']['delivery.deliveredAt'] = new UTCDateTime();
-                if ($deliveredBy) {
-                    $update['$set']['delivery.deliveredBy'] = $deliveredBy;
-                }
-            }
+            $sql = "UPDATE orders SET deliveryStatus = :status, deliveredBy = :deliveredBy WHERE orderId = :orderId";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([
+                ':status' => $status,
+                ':deliveredBy' => $deliveredBy ?? 'admin',
+                ':orderId' => $orderId
+            ]);
             
-            $result = $this->collection->updateOne(
-                ['orderId' => $orderId],
-                $update
-            );
-            
-            return $result->getMatchedCount() > 0;
+            return $stmt->rowCount() > 0;
         } catch (\Exception $e) {
-            error_log("❌ Error updating delivery status: " . $e->getMessage());
+            error_log("Error updating delivery status: " . $e->getMessage());
             throw $e;
         }
     }
     
     /**
-     * Convert MongoDB document to array
+     * Convert database row to array
      */
     private function convertToArray($order) {
-        $array = [
-            '_id' => (string)$order['_id'],
-            'orderId' => $order['orderId'] ?? '',
-            'date' => $order['date'] ?? '',
-            'customer' => $order['customer'] ?? [],
-            'items' => $order['items'] ?? [],
-            'total' => $order['total'] ?? 0,
-            'paymentMethod' => $order['paymentMethod'] ?? '',
-            'mpesaCode' => $order['mpesaCode'] ?? '',
-            'verified' => $order['verified'] ?? false,
-            'verificationStatus' => $order['verificationStatus'] ?? 'pending',
-            'delivery' => $order['delivery'] ?? [],
-            'subtotal' => $order['subtotal'] ?? 0,
-            'totalPaid' => $order['totalPaid'] ?? 0,
+        $items = json_decode($order['items'], true) ?? [];
+        
+        return [
+            '_id' => $order['id'],
+            'id' => $order['id'],
+            'orderId' => $order['orderId'],
+            'date' => $order['createdAt'],
+            'customer' => [
+                'name' => $order['customerName'],
+                'phone' => $order['customerPhone'],
+                'email' => $order['customerEmail'] ?? ''
+            ],
+            'items' => $items,
+            'total' => (float)$order['totalAmount'],
+            'totalAmount' => (float)$order['totalAmount'],
+            'paymentMethod' => $order['paymentMethod'],
+            'mpesaCode' => $order['mpesaCode'],
+            'delivery' => [
+                'status' => $order['deliveryStatus'] ?? 'pending',
+                'deliveredBy' => $order['deliveredBy'] ?? null
+            ],
+            'createdAt' => $order['createdAt'],
+            'updatedAt' => $order['updatedAt']
         ];
-        
-        // Convert dates
-        if (isset($order['createdAt']) && $order['createdAt'] instanceof UTCDateTime) {
-            $array['createdAt'] = $order['createdAt']->toDateTime()->format('c');
-        }
-        if (isset($order['updatedAt']) && $order['updatedAt'] instanceof UTCDateTime) {
-            $array['updatedAt'] = $order['updatedAt']->toDateTime()->format('c');
-        }
-        if (isset($order['delivery']['deliveredAt']) && $order['delivery']['deliveredAt'] instanceof UTCDateTime) {
-            $array['delivery']['deliveredAt'] = $order['delivery']['deliveredAt']->toDateTime()->format('c');
-        }
-        
-        return $array;
     }
 }
-

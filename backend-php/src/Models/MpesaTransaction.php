@@ -1,33 +1,29 @@
 <?php
-/**
- * M-Pesa Transaction Model
- */
-
 namespace App\Models;
 
-use MongoDB\BSON\ObjectId;
-use MongoDB\BSON\UTCDateTime;
+require_once __DIR__ . '/../../config/database.php';
+
+use Database;
 
 class MpesaTransaction {
-    private $db;
-    private $collection;
-    
-    public function __construct() {
-        $this->db = \Database::getDatabase();
-        $this->collection = $this->db->mpesa_transactions;
-    }
-    
     /**
      * Find by receipt number
      */
     public function findByReceiptNumber($receiptNumber) {
         try {
-            $transaction = $this->collection->findOne([
-                'receiptNumber' => strtoupper($receiptNumber)
-            ]);
-            return $transaction ? $this->convertToArray($transaction) : null;
+            $pdo = Database::getConnection();
+            
+            $stmt = $pdo->prepare("SELECT * FROM mpesa_transactions WHERE receiptNumber = :receiptNumber");
+            $stmt->execute([':receiptNumber' => strtoupper($receiptNumber)]);
+            $transaction = $stmt->fetch();
+            
+            if (!$transaction) {
+                return null;
+            }
+            
+            return $this->convertToArray($transaction);
         } catch (\Exception $e) {
-            error_log("❌ Error finding transaction: " . $e->getMessage());
+            error_log("Error finding transaction: " . $e->getMessage());
             return null;
         }
     }
@@ -37,34 +33,26 @@ class MpesaTransaction {
      */
     public function create($data) {
         try {
-            $now = new UTCDateTime();
+            $pdo = Database::getConnection();
             
-            $transaction = [
-                'receiptNumber' => strtoupper($data['receiptNumber'] ?? ''),
-                'transactionDate' => isset($data['transactionDate']) 
-                    ? new UTCDateTime(strtotime($data['transactionDate']) * 1000)
-                    : $now,
-                'amount' => (float)($data['amount'] ?? 0),
-                'phoneNumber' => $data['phoneNumber'] ?? '',
-                'accountReference' => $data['accountReference'] ?? '',
-                'transactionType' => $data['transactionType'] ?? 'CustomerPayBillOnline',
-                'merchantRequestID' => $data['merchantRequestID'] ?? '',
-                'checkoutRequestID' => $data['checkoutRequestID'] ?? '',
-                'resultCode' => (int)($data['resultCode'] ?? 0),
-                'resultDesc' => $data['resultDesc'] ?? '',
-                'mpesaReceiptNumber' => $data['mpesaReceiptNumber'] ?? '',
-                'rawData' => $data['rawData'] ?? [],
-                'verified' => $data['verified'] ?? false,
-                'verifiedAt' => $data['verified'] ? $now : null,
-                'usedInOrder' => null,
-                'createdAt' => $now,
-                'updatedAt' => $now,
-            ];
+            $sql = "INSERT INTO mpesa_transactions (receiptNumber, transactionDate, phoneNumber, amount, merchantRequestID, checkoutRequestID, resultCode, resultDesc) 
+                    VALUES (:receiptNumber, :transactionDate, :phoneNumber, :amount, :merchantRequestID, :checkoutRequestID, :resultCode, :resultDesc)";
             
-            $result = $this->collection->insertOne($transaction);
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([
+                ':receiptNumber' => strtoupper($data['receiptNumber'] ?? ''),
+                ':transactionDate' => $data['transactionDate'] ?? date('Y-m-d H:i:s'),
+                ':phoneNumber' => $data['phoneNumber'] ?? '',
+                ':amount' => $data['amount'] ?? 0,
+                ':merchantRequestID' => $data['merchantRequestID'] ?? '',
+                ':checkoutRequestID' => $data['checkoutRequestID'] ?? '',
+                ':resultCode' => $data['resultCode'] ?? 0,
+                ':resultDesc' => $data['resultDesc'] ?? ''
+            ]);
+            
             return $this->findByReceiptNumber($data['receiptNumber']);
         } catch (\Exception $e) {
-            error_log("❌ Error creating transaction: " . $e->getMessage());
+            error_log("Error creating transaction: " . $e->getMessage());
             throw $e;
         }
     }
@@ -73,19 +61,13 @@ class MpesaTransaction {
      * Convert to array
      */
     private function convertToArray($transaction) {
-        $array = [
-            '_id' => (string)$transaction['_id'],
-            'receiptNumber' => $transaction['receiptNumber'] ?? '',
-            'amount' => $transaction['amount'] ?? 0,
-            'phoneNumber' => $transaction['phoneNumber'] ?? '',
-            'verified' => $transaction['verified'] ?? false,
+        return [
+            '_id' => $transaction['id'] ?? '',
+            'receiptNumber' => $transaction['receiptNumber'],
+            'amount' => (float)$transaction['amount'],
+            'phoneNumber' => $transaction['phoneNumber'],
+            'transactionDate' => $transaction['transactionDate'],
+            'verified' => !empty($transaction['receiptNumber'])
         ];
-        
-        if (isset($transaction['transactionDate']) && $transaction['transactionDate'] instanceof UTCDateTime) {
-            $array['transactionDate'] = $transaction['transactionDate']->toDateTime()->format('c');
-        }
-        
-        return $array;
     }
 }
-
