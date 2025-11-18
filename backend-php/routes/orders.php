@@ -3,6 +3,9 @@
  * Orders Routes
  */
 
+// Start output buffering to catch any unexpected output
+ob_start();
+
 require_once __DIR__ . '/../config/database.php';
 
 // Autoload models
@@ -22,8 +25,19 @@ $routeParts = explode('/', trim($route, '/'));
 $action = $routeParts[1] ?? null;
 $id = $routeParts[2] ?? null;
 
-$orderModel = new Order();
-$mpesaModel = new MpesaTransaction();
+try {
+    $orderModel = new Order();
+    $mpesaModel = new MpesaTransaction();
+} catch (Exception $e) {
+    ob_clean();
+    http_response_code(500);
+    echo json_encode([
+        'error' => 'Failed to initialize models',
+        'message' => $e->getMessage()
+    ]);
+    error_log('Model initialization error: ' . $e->getMessage());
+    exit;
+}
 
 try {
     // Check MariaDB connection
@@ -115,9 +129,23 @@ try {
                 ]);
             } else {
                 // Get all orders
-                $completedOnly = isset($_GET['completed']) && $_GET['completed'] === 'true';
-                $orders = $orderModel->findAll($completedOnly);
-                echo json_encode($orders);
+                try {
+                    $completedOnly = isset($_GET['completed']) && $_GET['completed'] === 'true';
+                    $orders = $orderModel->findAll($completedOnly);
+                    header('Content-Type: application/json; charset=utf-8');
+                    echo json_encode($orders, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                } catch (Exception $e) {
+                    ob_clean();
+                    error_log('Error fetching orders: ' . $e->getMessage());
+                    error_log('Stack trace: ' . $e->getTraceAsString());
+                    http_response_code(500);
+                    header('Content-Type: application/json; charset=utf-8');
+                    echo json_encode([
+                        'error' => 'Failed to fetch orders',
+                        'message' => $e->getMessage()
+                    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                    exit;
+                }
             }
             break;
 
@@ -204,15 +232,31 @@ try {
             break;
     }
 } catch (Exception $e) {
+    ob_clean();
     http_response_code(500);
     $errorMessage = $e->getMessage();
     error_log("Orders API Error: " . $errorMessage);
     error_log("Stack trace: " . $e->getTraceAsString());
     
     // Return proper JSON error
+    header('Content-Type: application/json; charset=utf-8');
     echo json_encode([
         'error' => 'Failed to process request',
         'message' => $errorMessage,
         'type' => get_class($e)
-    ]);
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+} catch (Error $e) {
+    ob_clean();
+    http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'error' => 'Fatal error occurred',
+        'message' => $e->getMessage(),
+        'file' => $e->getFile(),
+        'line' => $e->getLine(),
+        'type' => get_class($e)
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    error_log("Orders API Fatal Error: " . $e->getMessage());
+    error_log("File: " . $e->getFile() . " Line: " . $e->getLine());
+    error_log("Stack trace: " . $e->getTraceAsString());
 }

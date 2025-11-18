@@ -15,7 +15,7 @@ class MpesaTransaction {
             
             $stmt = $pdo->prepare("SELECT * FROM mpesa_transactions WHERE receiptNumber = :receiptNumber");
             $stmt->execute([':receiptNumber' => strtoupper($receiptNumber)]);
-            $transaction = $stmt->fetch();
+            $transaction = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if (!$transaction) {
                 return null;
@@ -61,13 +61,15 @@ class MpesaTransaction {
      * Convert to array
      */
     private function convertToArray($transaction) {
+        // Defensive: handle missing columns gracefully
+        $receiptNumber = $transaction['receiptNumber'] ?? '';
         return [
             '_id' => $transaction['id'] ?? '',
-            'receiptNumber' => $transaction['receiptNumber'],
-            'amount' => (float)$transaction['amount'],
-            'phoneNumber' => $transaction['phoneNumber'],
-            'transactionDate' => $transaction['transactionDate'],
-            'verified' => !empty($transaction['receiptNumber'])
+            'receiptNumber' => $receiptNumber,
+            'amount' => isset($transaction['amount']) ? (float)$transaction['amount'] : 0.0,
+            'phoneNumber' => $transaction['phoneNumber'] ?? '',
+            'transactionDate' => $transaction['transactionDate'] ?? date('Y-m-d H:i:s'),
+            'verified' => !empty($receiptNumber)
         ];
     }
 }

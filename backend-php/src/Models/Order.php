@@ -15,7 +15,7 @@ class Order {
             
             $stmt = $pdo->prepare("SELECT * FROM orders WHERE orderId = :orderId");
             $stmt->execute([':orderId' => $orderId]);
-            $order = $stmt->fetch();
+            $order = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if (!$order) {
                 return null;
@@ -37,7 +37,7 @@ class Order {
             
             $stmt = $pdo->prepare("SELECT * FROM orders WHERE mpesaCode = :mpesaCode");
             $stmt->execute([':mpesaCode' => strtoupper($mpesaCode)]);
-            $order = $stmt->fetch();
+            $order = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if (!$order) {
                 return null;
@@ -74,7 +74,7 @@ class Order {
             }
             
             $stmt->execute();
-            $orders = $stmt->fetchAll();
+            $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
             $result = [];
             foreach ($orders as $order) {
@@ -156,29 +156,30 @@ class Order {
      * Convert database row to array
      */
     private function convertToArray($order) {
-        $items = json_decode($order['items'], true) ?? [];
+        // Defensive: handle missing columns gracefully
+        $items = json_decode($order['items'] ?? '[]', true) ?? [];
         
         return [
-            '_id' => $order['id'],
-            'id' => $order['id'],
-            'orderId' => $order['orderId'],
-            'date' => $order['createdAt'],
+            '_id' => $order['id'] ?? '',
+            'id' => $order['id'] ?? '',
+            'orderId' => $order['orderId'] ?? '',
+            'date' => $order['createdAt'] ?? date('Y-m-d H:i:s'),
             'customer' => [
-                'name' => $order['customerName'],
-                'phone' => $order['customerPhone'],
+                'name' => $order['customerName'] ?? '',
+                'phone' => $order['customerPhone'] ?? '',
                 'email' => $order['customerEmail'] ?? ''
             ],
             'items' => $items,
-            'total' => (float)$order['totalAmount'],
-            'totalAmount' => (float)$order['totalAmount'],
-            'paymentMethod' => $order['paymentMethod'],
-            'mpesaCode' => $order['mpesaCode'],
+            'total' => isset($order['totalAmount']) ? (float)$order['totalAmount'] : 0.0,
+            'totalAmount' => isset($order['totalAmount']) ? (float)$order['totalAmount'] : 0.0,
+            'paymentMethod' => $order['paymentMethod'] ?? '',
+            'mpesaCode' => $order['mpesaCode'] ?? '',
             'delivery' => [
                 'status' => $order['deliveryStatus'] ?? 'pending',
                 'deliveredBy' => $order['deliveredBy'] ?? null
             ],
-            'createdAt' => $order['createdAt'],
-            'updatedAt' => $order['updatedAt']
+            'createdAt' => $order['createdAt'] ?? date('Y-m-d H:i:s'),
+            'updatedAt' => $order['updatedAt'] ?? date('Y-m-d H:i:s')
         ];
     }
 }

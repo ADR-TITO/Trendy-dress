@@ -3,6 +3,9 @@
  * Products Routes
  */
 
+// Start output buffering to catch any unexpected output
+ob_start();
+
 require_once __DIR__ . '/../config/database.php';
 
 // Autoload Product model
@@ -20,7 +23,18 @@ $route = $_GET['route'] ?? '';
 $routeParts = explode('/', trim($route, '/'));
 $id = $routeParts[1] ?? null;
 
-$productModel = new Product();
+try {
+    $productModel = new Product();
+} catch (Exception $e) {
+    ob_clean();
+    http_response_code(500);
+    echo json_encode([
+        'error' => 'Failed to initialize Product model',
+        'message' => $e->getMessage()
+    ]);
+    error_log('Product model initialization error: ' . $e->getMessage());
+    exit;
+}
 
 try {
     // Check MariaDB connection
@@ -76,19 +90,25 @@ try {
 
                     $products = $productModel->findAll($category === 'all' ? null : $category, $includeImages);
 
+                    // Clean any unexpected output
+                    ob_clean();
+                    
                     // Add caching headers
+                    header('Content-Type: application/json; charset=utf-8');
                     header('Cache-Control: public, max-age=600');
                     header('ETag: "' . count($products) . '-' . time() . '"');
 
-                    echo json_encode($products);
+                    echo json_encode($products, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
                 } catch (Exception $e) {
+                    ob_clean();
                     error_log('Error fetching products: ' . $e->getMessage());
                     error_log('Stack trace: ' . $e->getTraceAsString());
                     http_response_code(500);
+                    header('Content-Type: application/json; charset=utf-8');
                     echo json_encode([
                         'error' => 'Failed to fetch products',
                         'message' => $e->getMessage()
-                    ]);
+                    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
                     exit;
                 }
             }
@@ -157,11 +177,27 @@ try {
             break;
     }
 } catch (Exception $e) {
+    ob_clean();
     http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
     echo json_encode([
         'error' => 'Failed to process request',
         'message' => $e->getMessage()
-    ]);
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     error_log("Products API Error: " . $e->getMessage());
+    error_log("Stack trace: " . $e->getTraceAsString());
+} catch (Error $e) {
+    ob_clean();
+    http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'error' => 'Fatal error occurred',
+        'message' => $e->getMessage(),
+        'file' => $e->getFile(),
+        'line' => $e->getLine()
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    error_log("Products API Fatal Error: " . $e->getMessage());
+    error_log("File: " . $e->getFile() . " Line: " . $e->getLine());
+    error_log("Stack trace: " . $e->getTraceAsString());
 }
 

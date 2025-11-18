@@ -35,22 +35,23 @@ class Product {
             
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
-            $products = $stmt->fetchAll();
+            $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
             // Convert to array format and handle images
             $result = [];
             foreach ($products as $product) {
+                // Defensive: handle missing columns gracefully
                 $item = [
-                    '_id' => $product['id'],
-                    'id' => $product['id'],
-                    'name' => $product['name'],
-                    'price' => (float)$product['price'],
-                    'description' => $product['description'],
-                    'category' => $product['category'],
-                    'size' => $product['size'],
-                    'quantity' => (int)$product['quantity'],
-                    'createdAt' => $product['createdAt'],
-                    'updatedAt' => $product['updatedAt']
+                    '_id' => $product['id'] ?? '',
+                    'id' => $product['id'] ?? '',
+                    'name' => $product['name'] ?? '',
+                    'price' => isset($product['price']) ? (float)$product['price'] : 0.0,
+                    'description' => $product['description'] ?? '',
+                    'category' => $product['category'] ?? 'others',
+                    'size' => $product['size'] ?? '',
+                    'quantity' => isset($product['quantity']) ? (int)$product['quantity'] : 0,
+                    'createdAt' => $product['createdAt'] ?? date('Y-m-d H:i:s'),
+                    'updatedAt' => $product['updatedAt'] ?? date('Y-m-d H:i:s')
                 ];
                 
                 // Include image only if requested (to reduce response size)
@@ -82,7 +83,7 @@ class Product {
             
             $stmt = $pdo->prepare("SELECT * FROM products WHERE id = :id");
             $stmt->execute([':id' => $id]);
-            $product = $stmt->fetch();
+            $product = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if (!$product) {
                 return null;
