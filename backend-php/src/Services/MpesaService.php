@@ -16,10 +16,12 @@ class MpesaService {
     private $tokenExpiry;
     
     public function __construct() {
-        $this->consumerKey = $_ENV['MPESA_CONSUMER_KEY'] ?? '';
-        $this->consumerSecret = $_ENV['MPESA_CONSUMER_SECRET'] ?? '';
-        $this->shortCode = $_ENV['MPESA_SHORTCODE'] ?? '174379';
-        $this->passkey = $_ENV['MPESA_PASSKEY'] ?? '';
+        // M-Pesa Daraja API Credentials
+        // Can be overridden by .env file if present
+        $this->consumerKey = $_ENV['MPESA_CONSUMER_KEY'] ?? 'DVbZeuGGcOQKtRL1Kr4WCV6mOAHoEDwrUGzWgIN2myGN5CFI';
+        $this->consumerSecret = $_ENV['MPESA_CONSUMER_SECRET'] ?? 'tlplomAQhV46CojmgO4nN8wykLA6HCtrRAG6hzWmdX7woPUXpnhN3yPN0LwTgJLJ';
+        $this->shortCode = $_ENV['MPESA_SHORTCODE'] ?? '177104'; // Till Number
+        $this->passkey = $_ENV['MPESA_PASSKEY'] ?? 'bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919'; // Sandbox passkey
         $this->environment = $_ENV['MPESA_ENVIRONMENT'] ?? 'sandbox';
         $this->baseURL = $this->environment === 'production' 
             ? 'https://api.safaricom.co.ke'
