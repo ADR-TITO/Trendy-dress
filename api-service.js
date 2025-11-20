@@ -3,30 +3,30 @@
 let detectedBackendURL = null;
 let isDetectingPort = false;
 
-       // Auto-detect PHP backend
-       async function detectBackendPort() {
-           // Check if running on production domain
-           if (window.location.hostname === 'trendydresses.co.ke' ||
-               window.location.hostname === 'www.trendydresses.co.ke') {
-               // Production: Try different possible paths
-               // Option 1: /backend-php/api (most common for cPanel)
-               // Option 2: /api (if configured in root)
-               const possiblePaths = ['/backend-php/api', '/api'];
-        
+// Auto-detect PHP backend
+async function detectBackendPort() {
+    // Check if running on production domain
+    if (window.location.hostname === 'trendydresses.co.ke' ||
+        window.location.hostname === 'www.trendydresses.co.ke') {
+        // Production: Try different possible paths
+        // Option 1: /backend-php/api (most common for cPanel)
+        // Option 2: /api (if configured in root)
+        const possiblePaths = ['/backend-php/api', '/api'];
+
         for (const path of possiblePaths) {
             try {
                 const testURL = window.location.origin + path + '/health';
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 1000);
-                
+
                 const response = await fetch(testURL, {
                     signal: controller.signal,
                     method: 'GET',
                     headers: { 'Accept': 'application/json' }
                 });
-                
+
                 clearTimeout(timeoutId);
-                
+
                 if (response.ok) {
                     console.log(`✅ Detected PHP backend at: ${window.location.origin}${path}`);
                     return window.location.origin + path;
@@ -36,32 +36,32 @@ let isDetectingPort = false;
                 continue;
             }
         }
-        
+
         // Fallback: Use /backend-php/api (most common for cPanel)
         console.warn('⚠️ Could not auto-detect backend path, using /backend-php/api');
         return window.location.origin + '/backend-php/api';
     }
-    
+
     // Development: Try PHP backend (port 8000 first, then 80)
     // PHP built-in server typically runs on port 8000 (no admin required)
     // Port 80 requires admin privileges and is usually for production web servers
     const phpPorts = [8000, 80];
-    
+
     // Try PHP backend ports
     for (const port of phpPorts) {
         try {
             const testURL = `http://localhost:${port}/api/server-info`;
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 500);
-            
+
             const response = await fetch(testURL, {
                 signal: controller.signal,
                 method: 'GET',
                 headers: { 'Accept': 'application/json' }
             });
-            
+
             clearTimeout(timeoutId);
-            
+
             if (response.ok) {
                 const serverInfo = await response.json();
                 const detectedURL = serverInfo.baseURL || `http://localhost:${port}/api`;
@@ -73,7 +73,7 @@ let isDetectingPort = false;
             continue;
         }
     }
-    
+
     // Fallback: Use PHP default port (8000 for development, 80 for production)
     console.warn('⚠️ Could not auto-detect PHP backend, using default port 8000');
     return 'http://localhost:8000/api';
@@ -84,7 +84,7 @@ const getBackendURL = async () => {
     if (detectedBackendURL) {
         return detectedBackendURL;
     }
-    
+
     if (isDetectingPort) {
         // Wait for ongoing detection
         while (isDetectingPort) {
@@ -92,7 +92,7 @@ const getBackendURL = async () => {
         }
         return detectedBackendURL || 'http://localhost:8000/api'; // PHP default (development)
     }
-    
+
     isDetectingPort = true;
     try {
         detectedBackendURL = await detectBackendPort();
@@ -110,8 +110,8 @@ const getBackendURL = async () => {
 
 // Initialize with default URL (will be updated after detection)
 // PHP backend on same domain in production, port 8000 in development
-let API_BASE_URL = (window.location.hostname === 'trendydresses.co.ke' || 
-                    window.location.hostname === 'www.trendydresses.co.ke')
+let API_BASE_URL = (window.location.hostname === 'trendydresses.co.ke' ||
+    window.location.hostname === 'www.trendydresses.co.ke')
     ? window.location.origin + '/backend-php/api'  // PHP backend in backend-php folder (cPanel default)
     : 'http://localhost:8000/api';  // PHP default port (8000 for development)
 
@@ -119,13 +119,13 @@ class ApiService {
     constructor() {
         this.baseURL = API_BASE_URL;
         this.initialized = false;
-        
+
         // Auto-detect and update port in background
         this.initializePort().catch(err => {
             console.warn('⚠️ Port auto-detection failed, using default:', err);
         });
     }
-    
+
     async initializePort() {
         try {
             const detectedURL = await getBackendURL();
@@ -139,7 +139,7 @@ class ApiService {
             this.initialized = true; // Mark as initialized even if detection failed
         }
     }
-    
+
     // Ensure port is detected before making requests
     async ensureInitialized() {
         if (!this.initialized && !isDetectingPort) {
@@ -156,12 +156,12 @@ class ApiService {
     // Check if backend is available
     async checkBackend() {
         await this.ensureInitialized();
-        
+
         try {
             // Optimized timeout - faster response
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout
-            
+
             const response = await fetch(`${this.baseURL}/health`, {
                 signal: controller.signal,
                 method: 'GET',
@@ -171,7 +171,7 @@ class ApiService {
             });
             clearTimeout(timeoutId);
             const isAvailable = response.ok;
-            
+
             // If check succeeds and we haven't detected port yet, try to get server info
             if (isAvailable && !this.initialized) {
                 try {
@@ -194,7 +194,7 @@ class ApiService {
                     // Ignore server-info errors
                 }
             }
-            
+
             if (isAvailable) {
                 console.log(`🔍 Backend check: ✅ Available (${response.status})`);
             } else {
@@ -206,13 +206,13 @@ class ApiService {
             const errorName = error.name || '';
             const errorMsg = error.message || '';
             const isLocal = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
-            const timeoutDuration = (window.location.hostname === 'trendydresses.co.ke' || 
-                                    window.location.hostname === 'www.trendydresses.co.ke')
+            const timeoutDuration = (window.location.hostname === 'trendydresses.co.ke' ||
+                window.location.hostname === 'www.trendydresses.co.ke')
                 ? 5000  // 5 seconds for production
                 : 3000; // 3 seconds for local development
-            
+
             if (errorName === 'AbortError' || errorMsg.includes('aborted')) {
-                const timeoutMsg = `${timeoutDuration/1000}s`;
+                const timeoutMsg = `${timeoutDuration / 1000}s`;
                 console.warn(`⚠️ Backend check timed out (${timeoutMsg}) - may not be available`);
                 if (isLocal) {
                     console.warn('💡 Local development tip: Start PHP backend with:');
@@ -229,7 +229,7 @@ class ApiService {
             } else {
                 console.warn('⚠️ Backend check failed:', error.message);
             }
-            
+
             return false;
         }
     }
@@ -239,7 +239,7 @@ class ApiService {
         try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 2000); // Optimized timeout to 2 seconds
-            
+
             const response = await fetch(`${this.baseURL}/db-status`, {
                 signal: controller.signal,
                 headers: {
@@ -247,11 +247,11 @@ class ApiService {
                 },
             });
             clearTimeout(timeoutId);
-            
+
             if (!response.ok) {
                 throw new Error(`Failed to get DB status: ${response.status} ${response.statusText}`);
             }
-            
+
             const status = await response.json();
             console.log(`🔍 Database status check: ${status.readyStateText || 'unknown'} (ReadyState: ${status.readyState || 0})`);
             return status;
@@ -259,43 +259,43 @@ class ApiService {
             // Handle errors gracefully
             const errorName = error.name || '';
             const errorMsg = error.message || '';
-            
+
             if (errorName === 'AbortError' || errorMsg.includes('aborted')) {
-                       console.warn('⚠️ Database status check timed out (5s)');
-                       return { readyState: 0, readyStateText: 'timeout', error: 'Status check timed out' };
-                   } else if (errorName === 'TypeError' || errorMsg.includes('fetch')) {
-                       console.warn('⚠️ Database status check failed - network error');
-                       return { readyState: 0, readyStateText: 'network error', error: 'Network error or CORS issue' };
-                   } else {
-                       console.warn('⚠️ Database status check failed:', errorMsg);
-                       return { readyState: 0, readyStateText: 'error', error: errorMsg };
-                   }
+                console.warn('⚠️ Database status check timed out (5s)');
+                return { readyState: 0, readyStateText: 'timeout', error: 'Status check timed out' };
+            } else if (errorName === 'TypeError' || errorMsg.includes('fetch')) {
+                console.warn('⚠️ Database status check failed - network error');
+                return { readyState: 0, readyStateText: 'network error', error: 'Network error or CORS issue' };
+            } else {
+                console.warn('⚠️ Database status check failed:', errorMsg);
+                return { readyState: 0, readyStateText: 'error', error: errorMsg };
+            }
         }
     }
 
-    // Get all products (optimized - without images by default)
-    async getProducts(category = 'all', includeImages = false, retryCount = 0) {
+    // Get all products (now includes images by default for proper display)
+    async getProducts(category = 'all', includeImages = true, retryCount = 0) {
         await this.ensureInitialized();
         const maxRetries = 2; // Retry up to 2 times (3 total attempts)
-        
+
         try {
-            // OPTIMIZATION: Don't include images in list request (reduces response from 28MB to ~100KB)
-            const url = category && category !== 'all' 
-                ? `${this.baseURL}/products?category=${category}${includeImages ? '&includeImages=true' : ''}`
-                : `${this.baseURL}/products${includeImages ? '?includeImages=true' : ''}`;
-            
+            // Include images by default so products display correctly
+            const url = category && category !== 'all'
+                ? `${this.baseURL}/products?category=${category}${includeImages ? '&includeImages=true' : '&includeImages=false'}`
+                : `${this.baseURL}/products${includeImages ? '?includeImages=true' : '?includeImages=false'}`;
+
             // Optimized timeouts - reduced for faster failure detection
             // Products without images should load quickly (< 5s)
             const timeoutDuration = includeImages ? 15000 : 5000; // 15s with images, 5s without
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), timeoutDuration);
-            
+
             if (retryCount > 0) {
                 console.log(`📡 Retrying product fetch (attempt ${retryCount + 1}/${maxRetries + 1})...`);
             } else {
-                console.log(`📡 Fetching products from Database API (${includeImages ? 'with' : 'without'} images, timeout: ${timeoutDuration/1000}s)...`);
+                console.log(`📡 Fetching products from Database API (${includeImages ? 'with' : 'without'} images, timeout: ${timeoutDuration / 1000}s)...`);
             }
-            
+
             let response;
             try {
                 response = await fetch(url, {
@@ -315,11 +315,11 @@ class ApiService {
                         await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
                         return this.getProducts(category, includeImages, retryCount + 1);
                     }
-                    throw new Error(`Request timed out after ${timeoutDuration/1000} seconds (${retryCount + 1} attempts)`);
+                    throw new Error(`Request timed out after ${timeoutDuration / 1000} seconds (${retryCount + 1} attempts)`);
                 }
                 throw fetchError;
             }
-            
+
             console.log(`📡 Response received: ${response.status} ${response.statusText}`);
             const contentLength = response.headers.get('content-length');
             if (contentLength) {
@@ -331,7 +331,7 @@ class ApiService {
                     console.log(`📦 Response size: ${sizeKB} KB (optimized - no images)`);
                 }
             }
-            
+
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
                 if (response.status === 503) {
@@ -346,7 +346,7 @@ class ApiService {
             // Log error details for debugging
             const errorName = error.name || '';
             const errorMsg = error.message || '';
-            
+
             if (errorName === 'AbortError' || errorMsg.includes('timed out') || errorMsg.includes('aborted')) {
                 const timeoutMsg = errorMsg.includes('timed out') ? errorMsg.match(/\d+ seconds?/)?.[0] || '20 seconds' : '20 seconds';
                 const attemptsMsg = errorMsg.includes('attempts') ? errorMsg.match(/\(\d+ attempts\)/)?.[0] || '' : '';
@@ -361,7 +361,7 @@ class ApiService {
             } else {
                 console.error('❌ Error fetching products from API:', errorMsg);
             }
-            
+
             // Re-throw error so caller can handle fallback
             throw error;
         }
@@ -392,7 +392,7 @@ class ApiService {
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
                 const errorMessage = errorData.message || errorData.error || `HTTP ${response.status}: Failed to create product`;
-                
+
                 if (response.status === 503) {
                     throw new Error('Database not connected: ' + errorMessage);
                 }
@@ -478,10 +478,10 @@ class ApiService {
                     transactionDate: transactionDate || new Date()
                 })
             });
-            
+
             // Always try to parse JSON, even if response is not ok
             const data = await response.json().catch(() => ({}));
-            
+
             if (!response.ok) {
                 // If it's a 400 error with a valid response structure, return it (might be duplicate/invalid format)
                 if (response.status === 400 && (data.valid !== undefined || data.reason)) {
@@ -489,7 +489,7 @@ class ApiService {
                 }
                 throw new Error(data.error || data.message || 'Failed to verify M-Pesa code');
             }
-            
+
             return data;
         } catch (error) {
             console.error('Error verifying M-Pesa code:', error);
@@ -568,12 +568,12 @@ class ApiService {
                     transactionDesc: transactionDesc || 'Payment for order'
                 })
             });
-            
+
             if (!response.ok) {
                 const error = await response.json();
                 throw new Error(error.error || error.message || 'Failed to initiate M-Pesa payment prompt');
             }
-            
+
             return await response.json();
         } catch (error) {
             console.error('Error initiating STK Push:', error);
@@ -593,12 +593,12 @@ class ApiService {
                     checkoutRequestID
                 })
             });
-            
+
             if (!response.ok) {
                 const error = await response.json();
                 throw new Error(error.error || error.message || 'Failed to query STK Push status');
             }
-            
+
             return await response.json();
         } catch (error) {
             console.error('Error querying STK Push status:', error);
@@ -619,12 +619,12 @@ class ApiService {
                     deliveredBy: deliveredBy || 'admin'
                 })
             });
-            
+
             if (!response.ok) {
                 const error = await response.json();
                 throw new Error(error.error || error.message || 'Failed to update delivery status');
             }
-            
+
             return await response.json();
         } catch (error) {
             console.error('Error updating delivery status:', error);
@@ -654,7 +654,7 @@ class ApiService {
                     // Continue without PDF if conversion fails
                 }
             }
-            
+
             const response = await fetch(`${this.baseURL}/orders/${order.orderId}/send-whatsapp`, {
                 method: 'POST',
                 headers: {
