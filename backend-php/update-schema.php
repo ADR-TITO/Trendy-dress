@@ -32,7 +32,18 @@ try {
         $result['errors'][] = 'Failed to update products table: ' . $e->getMessage();
     }
     
-    // 2. Update orders table items column to LONGTEXT (just in case)
+    // 2. Add discount column if it doesn't exist
+    try {
+        $pdo->exec("ALTER TABLE products ADD COLUMN IF NOT EXISTS discount INT DEFAULT 0");
+        $result['updates'][] = 'Added products.discount column';
+    } catch (Exception $e) {
+        // Column might already exist, that's okay
+        if (strpos($e->getMessage(), 'Duplicate column') === false) {
+            $result['errors'][] = 'Failed to add discount column: ' . $e->getMessage();
+        }
+    }
+    
+    // 3. Update orders table items column to LONGTEXT (just in case)
     try {
         $pdo->exec("ALTER TABLE orders MODIFY COLUMN items LONGTEXT");
         $result['updates'][] = 'Updated orders.items to LONGTEXT';

@@ -55,11 +55,12 @@ class Product {
                     'updatedAt' => $product['updatedAt'] ?? date('Y-m-d H:i:s')
                 ];
                 
-                // Include image only if requested (to reduce response size)
-                if ($includeImages && !empty($product['image'])) {
-                    $item['image'] = $product['image'];
-                } else {
-                    $item['image'] = null;
+                // Always include image (even if empty)
+                $item['image'] = $product['image'] ?? null;
+                
+                // Add discount field if it exists
+                if (isset($product['discount'])) {
+                    $item['discount'] = (int)$product['discount'];
                 }
                 
                 $result[] = $item;
@@ -122,8 +123,8 @@ class Product {
             // Generate ID if not provided
             $id = $data['id'] ?? $data['_id'] ?? uniqid('prod_', true);
             
-            $sql = "INSERT INTO products (id, name, price, description, category, size, quantity, image) 
-                    VALUES (:id, :name, :price, :description, :category, :size, :quantity, :image)";
+            $sql = "INSERT INTO products (id, name, price, description, category, size, quantity, discount, image) 
+                    VALUES (:id, :name, :price, :description, :category, :size, :quantity, :discount, :image)";
             
             $stmt = $pdo->prepare($sql);
             $stmt->execute([
@@ -134,6 +135,7 @@ class Product {
                 ':category' => $data['category'] ?? 'others',
                 ':size' => $data['size'] ?? '',
                 ':quantity' => $data['quantity'] ?? 0,
+                ':discount' => $data['discount'] ?? 0,
                 ':image' => $data['image'] ?? null
             ]);
             
@@ -180,6 +182,10 @@ class Product {
             if (isset($data['quantity'])) {
                 $fields[] = "quantity = :quantity";
                 $params[':quantity'] = $data['quantity'];
+            }
+            if (isset($data['discount'])) {
+                $fields[] = "discount = :discount";
+                $params[':discount'] = $data['discount'];
             }
             if (isset($data['image'])) {
                 $fields[] = "image = :image";

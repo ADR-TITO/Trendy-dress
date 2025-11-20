@@ -91,7 +91,8 @@ try {
                 // Get all products
                 try {
                     $category = $_GET['category'] ?? 'all';
-                    $includeImages = isset($_GET['includeImages']) && $_GET['includeImages'] === 'true';
+                    // Always include images by default (changed from false to true)
+                    $includeImages = isset($_GET['includeImages']) ? $_GET['includeImages'] === 'true' : true;
 
                     $products = $productModel->findAll($category === 'all' ? null : $category, $includeImages);
 

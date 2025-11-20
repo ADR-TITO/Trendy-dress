@@ -36,6 +36,7 @@ try {
             category VARCHAR(100),
             size VARCHAR(50),
             quantity INT DEFAULT 0,
+            discount INT DEFAULT 0,
             image LONGTEXT,
             createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
