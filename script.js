@@ -3840,37 +3840,9 @@ async function processPayment(event) {
         // Get selected payment method
         const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked')?.value || 'till';
 
-        // Format phone number for STK Push (convert 07XX to 2547XX if needed)
-        if (customerPhone && paymentMethod === 'stk-push') {
-            // Remove any spaces, dashes, or other characters
-            customerPhone = customerPhone.replace(/[\s\-\(\)]/g, '');
-
-            // Convert 07XX format to 2547XX for STK Push
-            if (customerPhone.startsWith('0') && customerPhone.length === 10) {
-                customerPhone = '254' + customerPhone.substring(1);
-            } else if (customerPhone.startsWith('254') && customerPhone.length === 12) {
-                // Already in correct format
-                customerPhone = customerPhone;
-            } else if (customerPhone.length === 9) {
-                // 7XX format - add 254 prefix
-                customerPhone = '254' + customerPhone;
-            }
-
-            // Validate phone number format for STK Push
-            if (!/^2547\d{8}$/.test(customerPhone)) {
-                alert('Please enter a valid M-Pesa phone number.\n\nFormat: 0724904692 or 254724904692\n\nThe number must start with 07XX or 2547XX and be registered with M-Pesa.');
-                document.getElementById('customerPhone')?.focus();
-                return;
-            }
-        }
-
         // Validate required fields
         if (!customerName || !customerPhone) {
-            if (paymentMethod === 'stk-push') {
-                alert('Please enter your name and M-Pesa phone number. The payment prompt will be sent to this phone number.');
-            } else {
-                alert('Please fill in all required fields: Name and Phone Number.');
-            }
+            alert('Please fill in all required fields: Name and Phone Number.');
             if (!customerName) document.getElementById('customerName')?.focus();
             else if (!customerPhone) document.getElementById('customerPhone')?.focus();
             return;
@@ -3891,11 +3863,9 @@ async function processPayment(event) {
         const deliveryCost = getDeliveryCost();
         const total = subtotal + deliveryCost;
 
-        // Handle STK Push payment differently
-        if (paymentMethod === 'stk-push') {
-            await processSTKPushPayment(customerName, customerPhone, customerEmail, total, deliveryOption, deliveryAddress, subtotal, deliveryCost);
-            return;
-        }
+        // Force payment method to 'till' (Manual M-Pesa)
+        // We removed STK Push option, so this is the only path
+
 
         // Handle Till Number payment (existing flow)
         // Get all M-Pesa codes (first + additional)
