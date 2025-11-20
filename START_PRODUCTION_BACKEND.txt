@@ -1,0 +1,43 @@
+========================================
+QUICK START - Production Backend
+========================================
+
+Copy and paste these commands on your production server:
+
+1. SSH into server:
+   ssh user@your-server-ip
+
+2. Navigate to backend:
+   cd /var/www/trendydresses.co.ke/backend
+
+3. Install dependencies:
+   npm install
+
+4. Create .env file:
+   nano .env
+   (Add your MongoDB connection string and M-Pesa credentials)
+
+5. Install PM2:
+   npm install -g pm2
+
+6. Start backend:
+   pm2 start npm --name "trendy-dresses-api" -- start
+   pm2 save
+   pm2 startup
+   (Follow the instructions from pm2 startup)
+
+7. Test backend:
+   curl http://localhost:3000/api/health
+
+8. Configure Nginx (see PRODUCTION_BACKEND_SETUP.md for details)
+
+9. Test public URL:
+   curl https://trendydresses.co.ke/api/health
+
+========================================
+For detailed instructions, see:
+- DEPLOY_NOW.md (step-by-step guide)
+- QUICK_PRODUCTION_DEPLOYMENT.md (quick guide)
+- PRODUCTION_BACKEND_SETUP.md (complete guide)
+========================================
+

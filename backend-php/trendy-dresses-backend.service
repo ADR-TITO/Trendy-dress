@@ -1,0 +1,22 @@
+[Unit]
+Description=Trendy Dresses PHP Backend API
+After=network.target mongodb.service
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/var/www/trendydresses.co.ke/backend-php
+ExecStart=/usr/bin/php -S 127.0.0.1:8000 -t /var/www/trendydresses.co.ke/backend-php
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=trendy-dresses-backend
+
+; Environment
+Environment="PATH=/usr/bin:/usr/local/bin"
+EnvironmentFile=/var/www/trendydresses.co.ke/backend-php/.env
+
+[Install]
+WantedBy=multi-user.target
+

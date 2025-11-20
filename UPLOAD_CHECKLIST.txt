@@ -1,0 +1,77 @@
+================================================================================
+BACKEND-PHP UPLOAD CHECKLIST
+================================================================================
+
+BEFORE UPLOAD:
+[ ] Verified backend-php/ folder exists locally
+[ ] Checked that all required files are present
+[ ] Created ZIP file (optional, for easier upload)
+
+UPLOAD PROCESS:
+[ ] Connected to FTP/SFTP server
+[ ] Navigated to website root (same directory as index.html)
+[ ] Uploaded backend-php/ folder (or extracted backend-php.zip)
+[ ] Verified upload completed successfully
+
+AFTER UPLOAD - VERIFY FILES:
+[ ] backend-php/index.php exists
+[ ] backend-php/.htaccess exists
+[ ] backend-php/composer.json exists
+[ ] backend-php/config/ folder exists
+[ ] backend-php/src/ folder exists
+[ ] backend-php/routes/ folder exists
+
+AFTER UPLOAD - CONFIGURE:
+[ ] Installed dependencies: composer install (in backend-php folder)
+[ ] Created .env file from .env.example
+[ ] Added MongoDB connection string to .env
+[ ] Set file permissions (755 for folders, 644 for files)
+[ ] Configured web server (Apache/Nginx)
+
+TEST:
+[ ] Test: curl https://trendydresses.co.ke/api/health
+[ ] Should return: {"status":"ok","backend":"PHP"}
+[ ] Test: https://trendydresses.co.ke/backend-php/test-backend.php
+[ ] Refresh website and check browser console
+
+================================================================================
+FILES TO UPLOAD:
+================================================================================
+
+Upload the ENTIRE backend-php/ folder containing:
+
+REQUIRED FILES:
+- index.php
+- .htaccess
+- composer.json
+- .env.example
+
+REQUIRED FOLDERS:
+- config/
+- src/
+- routes/
+
+OPTIONAL (but recommended):
+- test-backend.php
+- README.md
+- All documentation files
+
+================================================================================
+QUICK COMMANDS (if you have SSH):
+================================================================================
+
+cd /path/to/your/website
+# Upload backend-php folder first, then:
+
+cd backend-php
+composer install --no-dev
+cp .env.example .env
+nano .env  # Add MongoDB connection string
+chmod -R 755 .
+chmod 644 .htaccess
+
+# Test
+curl https://trendydresses.co.ke/api/health
+
+================================================================================
+

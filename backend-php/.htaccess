@@ -1,0 +1,28 @@
+# Enable Rewrite Engine
+RewriteEngine On
+
+# Allow CORS
+Header set Access-Control-Allow-Origin "*"
+Header set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+Header set Access-Control-Allow-Headers "Content-Type, Authorization"
+
+# Handle preflight requests
+RewriteCond %{REQUEST_METHOD} OPTIONS
+RewriteRule ^(.*)$ $1 [R=204,L]
+
+# Route all API requests to index.php
+# This works if backend-php/ is accessed directly via /api URL
+# OR if .htaccess is in root and routes /api to backend-php/
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^api/(.*)$ index.php?route=$1 [QSA,L]
+
+# Alternative: If requests come to backend-php/ directly
+RewriteCond %{REQUEST_URI} ^/backend-php/api/(.*)$
+RewriteRule ^api/(.*)$ index.php?route=$1 [QSA,L]
+
+# Increase upload size limit (for base64 images)
+php_value upload_max_filesize 50M
+php_value post_max_size 50M
+php_value memory_limit 256M
+
