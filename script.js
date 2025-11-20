@@ -1094,14 +1094,12 @@ async function deleteProductFromAllStorage(productId) {
         indexedDB: { success: false, error: null }
     };
 
-    // Helper function to compare IDs (handles both Database ObjectId and numeric IDs)
+    // Helper function to compare IDs (handles both Database ObjectId, prod_ IDs, and numeric IDs)
     const compareIds = (id1, id2) => {
-        // Handle Database ObjectId (24 char hex string)
-        if (typeof id1 === 'string' && id1.length === 24 && /^[0-9a-fA-F]{24}$/.test(id1)) {
-            return (id1 === id2) || (id1 === id2.toString());
-        }
-        if (typeof id2 === 'string' && id2.length === 24 && /^[0-9a-fA-F]{24}$/.test(id2)) {
-            return (id2 === id1) || (id2 === id1.toString());
+        // Handle Database ObjectId (24 char hex string) or prod_ IDs
+        if ((typeof id1 === 'string' && (id1.length === 24 && /^[0-9a-fA-F]{24}$/.test(id1) || id1.startsWith('prod_'))) ||
+            (typeof id2 === 'string' && (id2.length === 24 && /^[0-9a-fA-F]{24}$/.test(id2) || id2.startsWith('prod_')))) {
+            return String(id1) === String(id2);
         }
         // Handle numeric IDs
         const id1Num = typeof id1 === 'string' ? parseInt(id1) : id1;
@@ -1122,9 +1120,9 @@ async function deleteProductFromAllStorage(productId) {
                 } else {
                     console.log('🗑️ Deleting from Database...');
 
-                    // Check if productId is a Database ObjectId (24 char hex string)
-                    if (typeof productId === 'string' && productId.length === 24 && /^[0-9a-fA-F]{24}$/.test(productId)) {
-                        // Database ObjectId - try to delete directly
+                    // Check if productId is a Database ObjectId (24 char hex string) or prod_ ID
+                    if (typeof productId === 'string' && ((productId.length === 24 && /^[0-9a-fA-F]{24}$/.test(productId)) || productId.startsWith('prod_'))) {
+                        // Database ObjectId or prod_ ID - try to delete directly
                         try {
                             await apiService.deleteProduct(productId);
                             results.database.success = true;
@@ -1136,10 +1134,10 @@ async function deleteProductFromAllStorage(productId) {
                     } else {
                         // Numeric ID or other format - try to find product by name+size and delete
                         // Note: We need the product name and size to find it in Database
-                        // For now, we'll skip Database deletion if ID is not a Database ObjectId
+                        // For now, we'll skip Database deletion if ID is not a Database ObjectId or prod_ ID
                         // The product will be removed when we sync remaining products
-                        console.log('ℹ️ Product ID is not a Database ObjectId - will remove during sync of remaining products');
-                        results.database.error = 'Invalid product ID format (not Database ObjectId)';
+                        console.log('ℹ️ Product ID is not a Database ObjectId or prod_ ID - will remove during sync of remaining products');
+                        results.database.error = 'Invalid product ID format (not Database ObjectId or prod_ ID)';
                         // This is okay - the product will be removed when we sync remaining products
                     }
                 }

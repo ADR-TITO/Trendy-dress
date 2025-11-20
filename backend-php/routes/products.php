@@ -168,12 +168,17 @@ try {
                 exit;
             }
             
+            error_log("Attempting to delete product with ID: " . $id);
+            
             $deleted = $productModel->delete($id);
+            
             if (!$deleted) {
+                error_log("Delete failed - Product not found: " . $id);
                 http_response_code(404);
                 echo json_encode(['error' => 'Product not found']);
                 exit;
             }
+            error_log("Product deleted successfully: " . $id);
             echo json_encode(['message' => 'Product deleted successfully']);
             break;
             
