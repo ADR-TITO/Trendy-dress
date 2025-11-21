@@ -23,8 +23,6 @@ let currentCategory = 'all';
 
 // Admin
 let isAdmin = false;
-// Admin
-let isAdmin = false;
 
 // Admin credentials are now handled by the backend
 

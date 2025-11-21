@@ -96,7 +96,8 @@ body {
     gap: 1.5rem;
 }
 
-.login-btn, .admin-btn {
+.login-btn,
+.admin-btn {
     padding: 8px 16px;
     background: var(--primary-color);
     color: white;
@@ -110,7 +111,8 @@ body {
     gap: 5px;
 }
 
-.login-btn:hover, .admin-btn:hover {
+.login-btn:hover,
+.admin-btn:hover {
     background: var(--secondary-color);
 }
 
@@ -411,19 +413,16 @@ body {
     font-size: 3rem;
     font-weight: bold;
     color: rgba(255, 0, 0, 0.8);
-    background: linear-gradient(
-        to bottom right,
-        rgba(255, 0, 0, 0.3) 0%,
-        rgba(255, 0, 0, 0.15) 50%,
-        rgba(255, 0, 0, 0.3) 100%
-    );
+    background: linear-gradient(to bottom right,
+            rgba(255, 0, 0, 0.3) 0%,
+            rgba(255, 0, 0, 0.15) 50%,
+            rgba(255, 0, 0, 0.3) 100%);
     transform: rotate(-45deg);
     transform-origin: center;
     z-index: 5;
     pointer-events: none;
     text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
     letter-spacing: 8px;
-    text-stroke: 2px rgba(255, 255, 255, 0.8);
     -webkit-text-stroke: 2px rgba(255, 255, 255, 0.8);
 }
 
@@ -440,9 +439,12 @@ body {
 }
 
 @keyframes pulse {
-    0%, 100% {
+
+    0%,
+    100% {
         transform: scale(1);
     }
+
     50% {
         transform: scale(1.05);
     }
@@ -1230,7 +1232,8 @@ body {
     gap: 10px;
 }
 
-.btn-edit, .btn-delete {
+.btn-edit,
+.btn-delete {
     padding: 8px 16px;
     border: none;
     border-radius: 5px;
@@ -1356,7 +1359,7 @@ body {
     cursor: pointer;
 }
 
-.payment-option input[type="radio"]:checked + .payment-option-content {
+.payment-option input[type="radio"]:checked+.payment-option-content {
     color: var(--primary-color);
 }
 
@@ -1436,7 +1439,7 @@ body {
     height: 18px;
 }
 
-.delivery-option input[type="radio"]:checked ~ div {
+.delivery-option input[type="radio"]:checked~div {
     color: var(--primary-color);
 }
 
@@ -1526,6 +1529,7 @@ body {
         opacity: 0;
         transform: translateY(30px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -1604,7 +1608,8 @@ body {
 
     /* Smaller product images on mobile */
     .product-image {
-        height: 180px; /* Reduced from 300px */
+        height: 180px;
+        /* Reduced from 300px */
     }
 
     .product-image img.product-img {
@@ -1612,7 +1617,8 @@ body {
     }
 
     .no-image-placeholder i {
-        font-size: 2rem; /* Reduced from 3rem */
+        font-size: 2rem;
+        /* Reduced from 3rem */
     }
 
     .product-info {
@@ -1620,11 +1626,13 @@ body {
     }
 
     .product-name {
-        font-size: 1rem; /* Slightly smaller */
+        font-size: 1rem;
+        /* Slightly smaller */
     }
 
     .product-price {
-        font-size: 1.2rem; /* Slightly smaller */
+        font-size: 1.2rem;
+        /* Slightly smaller */
     }
 
     .add-to-cart {
@@ -1651,7 +1659,8 @@ body {
         right: -100%;
     }
 
-    .login-btn, .admin-btn {
+    .login-btn,
+    .admin-btn {
         padding: 6px 12px;
         font-size: 0.9rem;
     }
@@ -1668,9 +1677,11 @@ body {
 
 /* Extra small screens (phones in portrait) */
 @media (max-width: 480px) {
+
     /* Even smaller product images */
     .product-image {
-        height: 150px; /* Further reduced for very small screens */
+        height: 150px;
+        /* Further reduced for very small screens */
     }
 
     .product-image img.product-img {
@@ -1709,4 +1720,3 @@ body {
         max-width: 100%;
     }
 }
-
