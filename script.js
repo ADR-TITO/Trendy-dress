@@ -7914,3 +7914,5 @@ ${order.delivery?.option !== 'pickup' ? `Delivery Address:\n${order.delivery?.ad
 
                     // Expose to global scope
                     window.refreshProducts = refreshProducts;
+
+                }); // End of DOMContentLoaded
