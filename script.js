@@ -7922,3 +7922,6 @@ ${order.delivery?.option !== 'pickup' ? `Delivery Address:\n${order.delivery?.ad
 
                 } // End of if (useDatabase) block
             } // End of verifyMpesaCodeBeforePayment function
+        } // End of another unclosed block
+    } // Final closing brace
+} // Very final closing brace
