@@ -54,7 +54,154 @@ try {
             break;
             
         case 'POST':
-            if ($action === 'webhook') {
+            if ($action === 'verify-code') {
+                // Manual M-Pesa code verification with amount check
+                $data = json_decode(file_get_contents('php://input'), true);
+                $mpesaCode = strtoupper(trim($data['mpesaCode'] ?? ''));
+                $amount = (float)($data['amount'] ?? 0);
+                $orderId = $data['orderId'] ?? '';
+
+                // Validate code format (10 characters, alphanumeric)
+                if (strlen($mpesaCode) !== 10) {
+                    echo json_encode([
+                        'success' => false,
+                        'error' => 'Invalid M-Pesa code format. Code must be exactly 10 characters.',
+                        'code' => 'INVALID_FORMAT'
+                    ]);
+                    break;
+                }
+                if (!preg_match('/^[A-Z0-9]+$/', $mpesaCode)) {
+                    echo json_encode([
+                        'success' => false,
+                        'error' => 'Invalid M-Pesa code. Only letters and numbers are allowed.',
+                        'code' => 'INVALID_CHARACTERS'
+                    ]);
+                    break;
+                }
+                // Verify amount against order (if orderId provided)
+                if ($orderId !== '') {
+                    try {
+                        $pdo = Database::getConnection();
+                        $stmt = $pdo->prepare("SELECT totalAmount FROM orders WHERE orderId = :orderId");
+                        $stmt->execute([':orderId' => $orderId]);
+                        $order = $stmt->fetch(PDO::FETCH_ASSOC);
+                        if (!$order) {
+                            echo json_encode([
+                                'success' => false,
+                                'error' => 'Order not found for amount verification.',
+                                'code' => 'ORDER_NOT_FOUND'
+                            ]);
+                            break;
+                        }
+                        if (abs($order['totalAmount'] - $amount) > 0.01) {
+                            echo json_encode([
+                                'success' => false,
+                                'error' => 'Paid amount does not match order total.',
+                                'code' => 'AMOUNT_MISMATCH'
+                            ]);
+                            break;
+                        }
+                    } catch (\Exception $e) {
+                        error_log('Amount verification error: ' . $e->getMessage());
+                        echo json_encode([
+                            'success' => false,
+                            'error' => 'Unable to verify amount at this time.',
+                            'code' => 'SERVICE_ERROR'
+                        ]);
+                        break;
+                    }
+                }
+                // Check if code has been used before
+                try {
+                    $pdo = Database::getConnection();
+                    if ($orderId !== '') {
+                        $stmt = $pdo->prepare("SELECT COUNT(*) FROM orders WHERE mpesaCode = :code AND orderId != :orderId");
+                        $stmt->execute([':code' => $mpesaCode, ':orderId' => $orderId]);
+                    } else {
+                        $stmt = $pdo->prepare("SELECT COUNT(*) FROM orders WHERE mpesaCode = :code");
+                        $stmt->execute([':code' => $mpesaCode]);
+                    }
+                    $count = $stmt->fetchColumn();
+                    if ($count > 0) {
+                        echo json_encode([
+                            'success' => false,
+                            'error' => 'This M-Pesa code has already been used. Please use a different transaction code.',
+                            'code' => 'DUPLICATE_CODE'
+                        ]);
+                        break;
+                    }
+                    // Code is valid and not used
+                    echo json_encode([
+                        'success' => true,
+                        'message' => 'M-Pesa code verified successfully',
+                        'mpesaCode' => $mpesaCode,
+                        'verified' => true
+                    ]);
+                } catch (\\Exception $e) {
+                    error_log("M-Pesa verification error: " . $e->getMessage());
+                    echo json_encode([
+                        'success' => false,
+                        'error' => 'Payment verification service is temporarily unavailable. Please try again.',
+                        'code' => 'SERVICE_ERROR'
+                    ]);
+                }
+            } elseif ($action === 'webhook') {
+                // Manual M-Pesa code verification
+                $data = json_decode(file_get_contents('php://input'), true);
+                $mpesaCode = strtoupper(trim($data['mpesaCode'] ?? ''));
+                $amount = (float)($data['amount'] ?? 0);
+                
+                // Validate code format (10 characters, alphanumeric)
+                if (strlen($mpesaCode) !== 10) {
+                    echo json_encode([
+                        'success' => false,
+                        'error' => 'Invalid M-Pesa code format. Code must be exactly 10 characters.',
+                        'code' => 'INVALID_FORMAT'
+                    ]);
+                    break;
+                }
+                
+                if (!preg_match('/^[A-Z0-9]+$/', $mpesaCode)) {
+                    echo json_encode([
+                        'success' => false,
+                        'error' => 'Invalid M-Pesa code. Only letters and numbers are allowed.',
+                        'code' => 'INVALID_CHARACTERS'
+                    ]);
+                    break;
+                }
+                
+                // Check if code has been used before
+                try {
+                    $pdo = Database::getConnection();
+                    $stmt = $pdo->prepare("SELECT COUNT(*) FROM orders WHERE mpesaCode = :code");
+                    $stmt->execute([':code' => $mpesaCode]);
+                    $count = $stmt->fetchColumn();
+                    
+                    if ($count > 0) {
+                        echo json_encode([
+                            'success' => false,
+                            'error' => 'This M-Pesa code has already been used. Please use a different transaction code.',
+                            'code' => 'DUPLICATE_CODE'
+                        ]);
+                        break;
+                    }
+                    
+                    // Code is valid and not used
+                    echo json_encode([
+                        'success' => true,
+                        'message' => 'M-Pesa code verified successfully',
+                        'mpesaCode' => $mpesaCode,
+                        'verified' => true
+                    ]);
+                } catch (\Exception $e) {
+                    error_log("M-Pesa verification error: " . $e->getMessage());
+                    echo json_encode([
+                        'success' => false,
+                        'error' => 'Payment verification service is temporarily unavailable. Please try again.',
+                        'code' => 'SERVICE_ERROR'
+                    ]);
+                }
+            } elseif ($action === 'webhook') {
                 // M-Pesa webhook
                 $data = json_decode(file_get_contents('php://input'), true);
                 

@@ -274,15 +274,18 @@ class ApiService {
     }
 
     // Get all products (now includes images by default for proper display)
+    // Get all products (now includes images by default for proper display)
     async getProducts(category = 'all', includeImages = true, retryCount = 0) {
         await this.ensureInitialized();
         const maxRetries = 2; // Retry up to 2 times (3 total attempts)
 
         try {
             // Include images by default so products display correctly
+            // Add timestamp to prevent caching
+            const timestamp = Date.now();
             const url = category && category !== 'all'
-                ? `${this.baseURL}/products?category=${category}${includeImages ? '&includeImages=true' : '&includeImages=false'}`
-                : `${this.baseURL}/products${includeImages ? '?includeImages=true' : '?includeImages=false'}`;
+                ? `${this.baseURL}/products?category=${category}${includeImages ? '&includeImages=true' : '&includeImages=false'}&_t=${timestamp}`
+                : `${this.baseURL}/products${includeImages ? '?includeImages=true' : '?includeImages=false'}&_t=${timestamp}`;
 
             // Optimized timeouts - reduced for faster failure detection
             // Products without images should load quickly (< 5s)
@@ -300,8 +303,12 @@ class ApiService {
             try {
                 response = await fetch(url, {
                     signal: controller.signal,
+                    cache: 'no-store', // CRITICAL: Disable browser caching
                     headers: {
                         'Accept': 'application/json',
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache',
+                        'Expires': '0'
                     },
                 });
                 clearTimeout(timeoutId);
@@ -465,17 +472,17 @@ class ApiService {
     }
 
     // Verify M-Pesa transaction code
-    async verifyMpesaCode(mpesaCode, amount, transactionDate) {
+    async verifyMpesaCode(mpesaCode, amount, transactionDate, orderId) {
         try {
-            const response = await fetch(`${this.baseURL}/orders/verify`, {
+            const response = await fetch(`${this.baseURL}/mpesa/verify-code`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
                     mpesaCode,
-                    amount: amount || 0, // Always send amount (required for verification)
-                    transactionDate: transactionDate || new Date()
+                    amount: amount || 0,
+                    orderId: orderId || ''
                 })
             });
 
@@ -483,19 +490,36 @@ class ApiService {
             const data = await response.json().catch(() => ({}));
 
             if (!response.ok) {
-                // If it's a 400 error with a valid response structure, return it (might be duplicate/invalid format)
-                if (response.status === 400 && (data.valid !== undefined || data.reason)) {
-                    return data;
-                }
-                throw new Error(data.error || data.message || 'Failed to verify M-Pesa code');
+                // Return structured error data
+                return {
+                    success: false,
+                    valid: false,
+                    error: data.error || 'Failed to verify M-Pesa code',
+                    code: data.code || 'VERIFICATION_FAILED',
+                    reason: data.code === 'DUPLICATE_CODE' ? 'duplicate' :
+                        data.code === 'INVALID_FORMAT' ? 'invalid_format' :
+                            data.code === 'INVALID_CHARACTERS' ? 'invalid_characters' :
+                                'unknown'
+                };
             }
 
-            return data;
+            return {
+                success: true,
+                valid: true,
+                verified: true,
+                mpesaCode: data.mpesaCode,
+                message: data.message || 'M-Pesa code verified successfully'
+            };
         } catch (error) {
             console.error('Error verifying M-Pesa code:', error);
-            // CRITICAL SECURITY: Always throw errors - don't allow payment without verification
-            // The frontend will handle the error and block the payment
-            throw error;
+            // Return error in consistent format
+            return {
+                success: false,
+                valid: false,
+                error: error.message || 'Payment verification service is temporarily unavailable',
+                code: 'SERVICE_ERROR',
+                reason: 'service_error'
+            };
         }
     }
 

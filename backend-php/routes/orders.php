@@ -169,26 +169,29 @@ try {
                 $mpesaCode = strtoupper($data['mpesaCode']);
                 $amount = $data['total'] ?? $data['totalAmount'] ?? 0;
                 $transactionDate = $data['date'] ?? date('Y-m-d H:i:s');
+                $skipTransactionCheck = $data['skipTransactionCheck'] ?? false;
                 
-                $transaction = $mpesaModel->findByReceiptNumber($mpesaCode);
-                if (!$transaction) {
-                    http_response_code(400);
-                    echo json_encode([
-                        'error' => 'M-Pesa code not found',
-                        'mpesaCode' => $mpesaCode
-                    ]);
-                    exit;
-                }
-                
-                // Verify amount
-                if (abs($transaction['amount'] - $amount) >= 0.01) {
-                    http_response_code(400);
-                    echo json_encode([
-                        'error' => 'Amount mismatch',
-                        'expected' => $transaction['amount'],
-                        'provided' => $amount
-                    ]);
-                    exit;
+                if (!$skipTransactionCheck) {
+                    $transaction = $mpesaModel->findByReceiptNumber($mpesaCode);
+                    if (!$transaction) {
+                        http_response_code(400);
+                        echo json_encode([
+                            'error' => 'M-Pesa code not found',
+                            'mpesaCode' => $mpesaCode
+                        ]);
+                        exit;
+                    }
+                    
+                    // Verify amount
+                    if (abs($transaction['amount'] - $amount) >= 0.01) {
+                        http_response_code(400);
+                        echo json_encode([
+                            'error' => 'Amount mismatch',
+                            'expected' => $transaction['amount'],
+                            'provided' => $amount
+                        ]);
+                        exit;
+                    }
                 }
                 
                 // Check for duplicate
