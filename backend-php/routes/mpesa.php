@@ -34,40 +34,86 @@ try {
     }
     
     switch ($method) {
+        case 'GET':
+            if ($action === 'transactions') {
+                // Get recent transactions (for frontend polling)
+                $phoneNumber = $_GET['phoneNumber'] ?? null;
+                $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
+                
+                $transactionModel = new MpesaTransaction();
+                $transactions = $transactionModel->findAll($phoneNumber, $limit);
+                
+                echo json_encode([
+                    'success' => true,
+                    'transactions' => $transactions
+                ]);
+            } else {
+                http_response_code(404);
+                echo json_encode(['error' => 'Endpoint not found']);
+            }
+            break;
+            
         case 'POST':
             if ($action === 'webhook') {
                 // M-Pesa webhook
                 $data = json_decode(file_get_contents('php://input'), true);
                 
-                if (isset($data['Body']['stkCallback']) && $data['Body']['stkCallback']['ResultCode'] === 0) {
+                if (isset($data['Body']['stkCallback'])) {
                     $callback = $data['Body']['stkCallback'];
-                    $metadata = $callback['CallbackMetadata']['Item'] ?? [];
+                    $checkoutRequestID = $callback['CheckoutRequestID'] ?? '';
+                    $resultCode = $callback['ResultCode'] ?? -1;
                     
-                    $receiptNumber = '';
-                    $amount = 0;
-                    $phoneNumber = '';
+                    $transactionModel = new MpesaTransaction();
                     
-                    foreach ($metadata as $item) {
-                        if ($item['Name'] === 'MpesaReceiptNumber') {
-                            $receiptNumber = $item['Value'] ?? '';
-                        } elseif ($item['Name'] === 'Amount') {
-                            $amount = (float)($item['Value'] ?? 0);
-                        } elseif ($item['Name'] === 'PhoneNumber') {
-                            $phoneNumber = $item['Value'] ?? '';
-                        }
-                    }
+                    // Find existing pending transaction
+                    $existingTransaction = $transactionModel->findByCheckoutRequestID($checkoutRequestID);
                     
-                    if ($receiptNumber) {
-                        $transactionModel = new MpesaTransaction();
-                        $existing = $transactionModel->findByReceiptNumber($receiptNumber);
+                    if ($resultCode === 0) {
+                        // Payment successful
+                        $metadata = $callback['CallbackMetadata']['Item'] ?? [];
                         
-                        if (!$existing) {
+                        $receiptNumber = '';
+                        $amount = 0;
+                        $phoneNumber = '';
+                        
+                        foreach ($metadata as $item) {
+                            if ($item['Name'] === 'MpesaReceiptNumber') {
+                                $receiptNumber = $item['Value'] ?? '';
+                            } elseif ($item['Name'] === 'Amount') {
+                                $amount = (float)($item['Value'] ?? 0);
+                            } elseif ($item['Name'] === 'PhoneNumber') {
+                                $phoneNumber = $item['Value'] ?? '';
+                            }
+                        }
+                        
+                        if ($existingTransaction) {
+                            // Update existing pending transaction
+                            $transactionModel->update($existingTransaction['_id'], [
+                                'receiptNumber' => $receiptNumber,
+                                'amount' => $amount,
+                                'phoneNumber' => $phoneNumber,
+                                'resultCode' => 0,
+                                'resultDesc' => 'Success'
+                            ]);
+                        } else {
+                            // Create new transaction (fallback)
                             $transactionModel->create([
                                 'receiptNumber' => $receiptNumber,
                                 'amount' => $amount,
                                 'phoneNumber' => $phoneNumber,
-                                'verified' => true,
-                                'rawData' => $data
+                                'merchantRequestID' => $callback['MerchantRequestID'] ?? '',
+                                'checkoutRequestID' => $checkoutRequestID,
+                                'resultCode' => 0,
+                                'resultDesc' => 'Success',
+                                'transactionDate' => date('Y-m-d H:i:s')
+                            ]);
+                        }
+                    } else {
+                        // Payment failed or cancelled
+                        if ($existingTransaction) {
+                            $transactionModel->update($existingTransaction['_id'], [
+                                'resultCode' => $resultCode,
+                                'resultDesc' => $callback['ResultDesc'] ?? 'Failed'
                             ]);
                         }
                     }
@@ -82,12 +128,33 @@ try {
                 // Initiate STK Push
                 $data = json_decode(file_get_contents('php://input'), true);
                 $mpesaService = new MpesaService();
+                
                 $result = $mpesaService->initiateSTKPush(
                     $data['phoneNumber'] ?? '',
                     $data['amount'] ?? 0,
                     $data['accountReference'] ?? 'TrendyDresses',
                     $data['transactionDesc'] ?? 'Payment for order'
                 );
+                
+                // Save pending transaction
+                if (isset($result['CheckoutRequestID'])) {
+                    $transactionModel = new MpesaTransaction();
+                    try {
+                        $transactionModel->create([
+                            'phoneNumber' => $data['phoneNumber'] ?? '',
+                            'amount' => $data['amount'] ?? 0,
+                            'merchantRequestID' => $result['MerchantRequestID'] ?? '',
+                            'checkoutRequestID' => $result['CheckoutRequestID'],
+                            'transactionDate' => date('Y-m-d H:i:s')
+                            // receiptNumber will be auto-generated as PENDING_...
+                        ]);
+                    } catch (\Exception $e) {
+                        error_log("Error saving pending transaction: " . $e->getMessage());
+                    }
+                }
+                
+                // Return result with success flag
+                $result['success'] = isset($result['ResponseCode']) && $result['ResponseCode'] === '0';
                 echo json_encode($result);
             } elseif ($action === 'stk-push-status') {
                 // Query STK Push status
@@ -111,4 +178,5 @@ try {
     ]);
     error_log("M-Pesa API Error: " . $e->getMessage());
 }
+
 

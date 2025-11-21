@@ -676,8 +676,105 @@ class ApiService {
             throw error;
         }
     }
+
+    // Login
+    async login(username, password) {
+        try {
+            const response = await fetch(`${this.baseURL}/auth/login`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ username, password })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Login failed');
+            }
+
+            return data;
+        } catch (error) {
+            console.error('Login error:', error);
+            throw error;
+        }
+    }
+
+    // Logout
+    async logout() {
+        try {
+            const response = await fetch(`${this.baseURL}/auth/logout`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Logout failed');
+            }
+
+            return data;
+        } catch (error) {
+            console.error('Logout error:', error);
+            throw error;
+        }
+    }
+
+    // Check admin auth status
+    async checkAuth() {
+        try {
+            const response = await fetch(`${this.baseURL}/auth/check`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                }
+            });
+
+            if (!response.ok) {
+                return { authenticated: false };
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error('Auth check error:', error);
+            return { authenticated: false };
+        }
+    }
+
+    // Change admin credentials
+    async changeCredentials(currentPassword, newUsername, newPassword) {
+        try {
+            const response = await fetch(`${this.baseURL}/auth/change-credentials`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    currentPassword,
+                    newUsername,
+                    newPassword
+                })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || data.message || 'Failed to update credentials');
+            }
+
+            return data;
+        } catch (error) {
+            console.error('Error changing credentials:', error);
+            throw error;
+        }
+    }
 }
 
 // Create global API service instance
 const apiService = new ApiService();
+
 

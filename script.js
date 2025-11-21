@@ -23,26 +23,11 @@ let currentCategory = 'all';
 
 // Admin
 let isAdmin = false;
-let ADMIN_CREDENTIALS = {
-    username: 'admin',
-    password: 'admin123' // Change this to a secure password
-};
+// Admin
+let isAdmin = false;
 
-// Load admin credentials from localStorage
-function loadAdminCredentials() {
-    const savedCredentials = localStorage.getItem('adminCredentials');
-    if (savedCredentials) {
-        ADMIN_CREDENTIALS = JSON.parse(savedCredentials);
-    } else {
-        // Save default credentials on first load
-        saveAdminCredentials();
-    }
-}
+// Admin credentials are now handled by the backend
 
-// Save admin credentials to localStorage
-function saveAdminCredentials() {
-    localStorage.setItem('adminCredentials', JSON.stringify(ADMIN_CREDENTIALS));
-}
 
 // Website Content
 let websiteContent = {
@@ -5231,52 +5216,77 @@ function closeLoginModal() {
     document.getElementById('loginForm').reset();
 }
 
-function handleLogin(event) {
+async function handleLogin(event) {
     event.preventDefault();
     const username = document.getElementById('username').value;
     const password = document.getElementById('password').value;
+    const loginBtn = document.querySelector('#loginForm button[type="submit"]');
+    const originalBtnText = loginBtn.textContent;
 
-    // Load latest credentials before checking
-    loadAdminCredentials();
+    try {
+        loginBtn.textContent = 'Logging in...';
+        loginBtn.disabled = true;
 
-    if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
-        isAdmin = true;
-        localStorage.setItem('isAdmin', 'true');
-        checkAdminStatus();
-        closeLoginModal();
-        showNotification('Login successful!');
-    } else {
-        alert('Invalid username or password!');
+        const result = await apiService.login(username, password);
+
+        if (result.success) {
+            isAdmin = true;
+            // No longer storing isAdmin in localStorage for security
+            // Session cookie handles persistence
+            await checkAdminStatus();
+            closeLoginModal();
+            showNotification('Login successful!');
+        } else {
+            alert(result.message || 'Login failed');
+        }
+    } catch (error) {
+        console.error('Login error:', error);
+        alert('Login failed: ' + error.message);
+    } finally {
+        loginBtn.textContent = originalBtnText;
+        loginBtn.disabled = false;
     }
 }
 
-function checkAdminStatus() {
-    const savedAdmin = localStorage.getItem('isAdmin');
-    if (savedAdmin === 'true') {
-        isAdmin = true;
+async function checkAdminStatus() {
+    try {
+        const status = await apiService.checkAuth();
+        isAdmin = status.authenticated;
+    } catch (error) {
+        console.error('Error checking admin status:', error);
+        isAdmin = false;
     }
 
     const loginBtn = document.getElementById('loginBtn');
     const adminBtn = document.getElementById('adminBtn');
 
     if (isAdmin) {
-        loginBtn.style.display = 'none';
-        adminBtn.style.display = 'flex';
+        if (loginBtn) loginBtn.style.display = 'none';
+        if (adminBtn) adminBtn.style.display = 'flex';
     } else {
-        loginBtn.style.display = 'flex';
-        adminBtn.style.display = 'none';
+        if (loginBtn) loginBtn.style.display = 'flex';
+        if (adminBtn) adminBtn.style.display = 'none';
     }
 
     // Refresh product display to show/hide product count
-    displayProducts(currentCategory);
+    // Only if displayProducts is defined
+    if (typeof displayProducts === 'function') {
+        displayProducts(currentCategory);
+    }
 }
 
-function logout() {
-    isAdmin = false;
-    localStorage.removeItem('isAdmin');
-    checkAdminStatus();
-    closeAdminPanel();
-    showNotification('Logged out successfully!');
+async function logout() {
+    try {
+        await apiService.logout();
+        isAdmin = false;
+        // localStorage.removeItem('isAdmin'); // No longer used
+        await checkAdminStatus();
+        closeAdminPanel();
+        showNotification('Logged out successfully!');
+    } catch (error) {
+        console.error('Logout error:', error);
+        showNotification('Error logging out', 'error');
+    }
 }
 
 function openAdminPanel() {
@@ -5720,13 +5730,20 @@ async function saveProduct(event) {
 
         // Check if editing existing product or adding new
         // productId already declared at line 5672
-        const editId = productId ? (typeof productId === 'string' && productId.length === 24 ? productId : parseInt(productId)) : null;
+        let editId = null;
+        if (productId) {
+            if (typeof productId === 'string' && (productId.length === 24 || productId.startsWith('prod_'))) {
+                editId = productId;
+            } else {
+                editId = parseInt(productId);
+            }
+        }
 
         // Find product index if editing
         const index = editId ? products.findIndex(p => {
             const pId = p.id || p._id;
-            if (typeof editId === 'string' && editId.length === 24) {
-                return (pId === editId) || (p._id === editId) || (p.id === editId);
+            if (typeof editId === 'string' && (editId.length === 24 || editId.startsWith('prod_'))) {
+                return (String(pId) === editId) || (String(p._id) === editId) || (String(p.id) === editId);
             } else {
                 const productIdNum = typeof pId === 'string' ? parseInt(pId) : pId;
                 return productIdNum === editId;
@@ -7745,7 +7762,8 @@ function updateWebsiteIcon() {
 }
 
 // Change Admin Credentials
-function changeAdminCredentials(event) {
+// Change Admin Credentials
+async function changeAdminCredentials(event) {
     event.preventDefault();
 
     const currentPassword = document.getElementById('currentPassword').value;
@@ -7753,9 +7771,9 @@ function changeAdminCredentials(event) {
     const newPassword = document.getElementById('newPassword').value;
     const confirmNewPassword = document.getElementById('confirmNewPassword').value;
 
-    // Verify current password
-    if (currentPassword !== ADMIN_CREDENTIALS.password) {
-        alert('Current password is incorrect!');
+    // Basic validation
+    if (!currentPassword) {
+        alert('Please enter your current password');
         document.getElementById('currentPassword').focus();
         return;
     }
@@ -7767,7 +7785,6 @@ function changeAdminCredentials(event) {
             document.getElementById('newUsername').focus();
             return;
         }
-        ADMIN_CREDENTIALS.username = newUsername;
     }
 
     // Check if password is being changed
@@ -7783,23 +7800,41 @@ function changeAdminCredentials(event) {
             document.getElementById('confirmNewPassword').focus();
             return;
         }
-
-        ADMIN_CREDENTIALS.password = newPassword;
     }
 
-    // Save updated credentials
-    saveAdminCredentials();
+    try {
+        // Show loading state
+        const submitBtn = event.target.querySelector('button[type="submit"]');
+        const originalText = submitBtn.textContent;
+        submitBtn.textContent = 'Updating...';
+        submitBtn.disabled = true;
 
-    // Update username display
-    const currentUsernameDisplay = document.getElementById('currentUsernameDisplay');
-    if (currentUsernameDisplay) {
-        currentUsernameDisplay.textContent = ADMIN_CREDENTIALS.username;
+        // Call API to change credentials
+        const result = await apiService.changeCredentials(currentPassword, newUsername, newPassword);
+
+        // Update username display if changed
+        if (result.username) {
+            const currentUsernameDisplay = document.getElementById('currentUsernameDisplay');
+            if (currentUsernameDisplay) {
+                currentUsernameDisplay.textContent = result.username;
+            }
+        }
+
+        // Reset form
+        document.getElementById('changeCredentialsForm').reset();
+        showNotification('Admin credentials updated successfully!');
+
+    } catch (error) {
+        console.error('Error updating credentials:', error);
+        alert(error.message || 'Failed to update credentials');
+    } finally {
+        // Restore button state
+        const submitBtn = event.target.querySelector('button[type="submit"]');
+        if (submitBtn) {
+            submitBtn.textContent = 'Update Credentials';
+            submitBtn.disabled = false;
+        }
     }
-
-    // Reset form
-    document.getElementById('changeCredentialsForm').reset();
-
-    showNotification('Admin credentials updated successfully!');
 }
 
 // Ensure functions are globally accessible (for onclick handlers)

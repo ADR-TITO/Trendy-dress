@@ -910,13 +910,15 @@ body {
     position: fixed;
     top: 50%;
     left: 50%;
-    transform: translate(-50%, -50%) scale(0);
+    transform: translate(-50%, -50%) scale(0.9);
     background: white;
     border-radius: 10px;
     box-shadow: var(--shadow-hover);
     z-index: 2000;
     opacity: 0;
-    transition: all 0.3s;
+    visibility: hidden;
+    pointer-events: none;
+    transition: all 0.3s ease-in-out;
     max-width: 500px;
     width: 90%;
     max-height: 90vh;
@@ -927,6 +929,8 @@ body {
 .modal.show {
     transform: translate(-50%, -50%) scale(1);
     opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
 }
 
 .payment-modal-content {

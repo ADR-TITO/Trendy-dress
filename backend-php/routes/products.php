@@ -24,22 +24,6 @@ spl_autoload_register(function ($class) {
 use App\Models\Product;
 
 $method = $_SERVER['REQUEST_METHOD'];
-$route = $_GET['route'] ?? '';
-$routeParts = explode('/', trim($route, '/'));
-$id = $routeParts[1] ?? null;
-
-try {
-    $productModel = new Product();
-} catch (Exception $e) {
-    ob_clean();
-    http_response_code(500);
-    echo json_encode([
-        'error' => 'Failed to initialize Product model',
-        'message' => $e->getMessage()
-    ]);
-    error_log('Product model initialization error: ' . $e->getMessage());
-    exit;
-}
 
 try {
     // Check MariaDB connection
@@ -154,7 +138,11 @@ try {
             $product = $productModel->update($id, $data);
             if (!$product) {
                 http_response_code(404);
-                echo json_encode(['error' => 'Product not found']);
+                echo json_encode([
+                    'error' => 'Product not found',
+                    'received_id' => $id,
+                    'id_length' => strlen($id)
+                ]);
                 exit;
             }
             echo json_encode($product);
@@ -175,7 +163,11 @@ try {
             if (!$deleted) {
                 error_log("Delete failed - Product not found: " . $id);
                 http_response_code(404);
-                echo json_encode(['error' => 'Product not found']);
+                echo json_encode([
+                    'error' => 'Product not found',
+                    'received_id' => $id,
+                    'id_length' => strlen($id)
+                ]);
                 exit;
             }
             error_log("Product deleted successfully: " . $id);

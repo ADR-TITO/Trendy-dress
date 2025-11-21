@@ -94,6 +94,31 @@ try {
     } catch (Exception $e) {
         $result['errors'][] = 'Mpesa transactions table: ' . $e->getMessage();
     }
+
+    // Admins table
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS admins (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            username VARCHAR(50) UNIQUE NOT NULL,
+            password_hash VARCHAR(255) NOT NULL,
+            createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $result['tables_created'][] = 'admins';
+
+        // Check if default admin exists
+        $stmt = $pdo->query("SELECT COUNT(*) FROM admins");
+        if ($stmt->fetchColumn() == 0) {
+            // Create default admin: admin / admin123
+            // Note: In a real production app, we should force a password change on first login
+            $defaultPass = password_hash('admin123', PASSWORD_DEFAULT);
+            $stmt = $pdo->prepare("INSERT INTO admins (username, password_hash) VALUES (:username, :password)");
+            $stmt->execute([':username' => 'admin', ':password' => $defaultPass]);
+            $result['messages'][] = 'Default admin created';
+        }
+    } catch (Exception $e) {
+        $result['errors'][] = 'Admins table: ' . $e->getMessage();
+    }
     
     $result['success'] = count($result['errors']) === 0;
     
