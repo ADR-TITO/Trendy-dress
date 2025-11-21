@@ -87,6 +87,10 @@ try {
             require_once __DIR__ . '/routes/orders.php';
             break;
             
+        case 'auth':
+            require_once __DIR__ . '/routes/auth.php';
+            break;
+            
         case 'admin':
             require_once __DIR__ . '/routes/admin.php';
             break;
@@ -97,6 +101,10 @@ try {
             
         case 'mpesa':
             require_once __DIR__ . '/routes/mpesa.php';
+            break;
+            
+        case 'create-tables':
+            require_once __DIR__ . '/create-tables.php';
             break;
             
         default:
