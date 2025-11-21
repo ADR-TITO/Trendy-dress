@@ -1316,7 +1316,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.log('ℹ️ Currently using localStorage/IndexedDB as fallback (temporary)');
     }
 
-    loadAdminCredentials(); // Load admin credentials (UI data - localStorage OK)
     loadCart(); // Load cart (UI data - localStorage OK)
     await loadProducts(); // Load products from Database API using fetch() - NOT localStorage
 
