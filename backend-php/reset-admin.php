@@ -47,41 +47,23 @@ try {
         $result['message'] .= 'Admins table created. ';
     }
     
-    // Check if any admin exists
-    $stmt = $pdo->query("SELECT COUNT(*) FROM admins");
-    $adminCount = $stmt->fetchColumn();
+    // DELETE ALL existing admins to start fresh
+    $pdo->exec("DELETE FROM admins");
+    $result['message'] .= 'All existing admins deleted. ';
     
-    if ($adminCount == 0) {
-        // No admins exist - create new one
-        $stmt = $pdo->prepare("INSERT INTO admins (username, password_hash) VALUES (:username, :password)");
-        $stmt->execute([':username' => $defaultUsername, ':password' => $passwordHash]);
-        $result['message'] .= 'Default admin created successfully.';
-    } else {
-        // Admins exist - reset the first one (or the one with username 'admin')
-        $stmt = $pdo->prepare("SELECT id FROM admins WHERE username = :username LIMIT 1");
-        $stmt->execute([':username' => $defaultUsername]);
-        $existingAdmin = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        if ($existingAdmin) {
-            // Update existing admin with username 'admin'
-            $stmt = $pdo->prepare("UPDATE admins SET password_hash = :password WHERE id = :id");
-            $stmt->execute([':password' => $passwordHash, ':id' => $existingAdmin['id']]);
-            $result['message'] .= 'Admin password reset successfully.';
-        } else {
-            // No admin with username 'admin' - update the first admin to have username 'admin'
-            $stmt = $pdo->query("SELECT id FROM admins ORDER BY id ASC LIMIT 1");
-            $firstAdmin = $stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if ($firstAdmin) {
-                $stmt = $pdo->prepare("UPDATE admins SET username = :username, password_hash = :password WHERE id = :id");
-                $stmt->execute([
-                    ':username' => $defaultUsername,
-                    ':password' => $passwordHash,
-                    ':id' => $firstAdmin['id']
-                ]);
-                $result['message'] .= 'Admin credentials reset successfully.';
-            }
-        }
+    // Create fresh admin account
+    $stmt = $pdo->prepare("INSERT INTO admins (username, password_hash) VALUES (:username, :password)");
+    $stmt->execute([':username' => $defaultUsername, ':password' => $passwordHash]);
+    $result['message'] .= 'Fresh admin account created successfully.';
+    
+    // Verify the account was created correctly
+    $stmt = $pdo->prepare("SELECT id, username FROM admins WHERE username = :username");
+    $stmt->execute([':username' => $defaultUsername]);
+    $verifyAdmin = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($verifyAdmin) {
+        $result['message'] .= ' Admin account verified.';
+        $result['admin_id'] = $verifyAdmin['id'];
     }
     
     $result['success'] = true;
@@ -89,6 +71,13 @@ try {
         'username' => $defaultUsername,
         'password' => $defaultPassword,
         'note' => 'You can change these credentials from the Admin Panel > Settings tab after logging in'
+    ];
+    $result['instructions'] = [
+        '1. Go to your website',
+        '2. Click the "Login" button',
+        '3. Enter username: admin',
+        '4. Enter password: admin123',
+        '5. Click Login'
     ];
     
 } catch (Exception $e) {
