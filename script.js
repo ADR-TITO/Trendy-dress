@@ -5476,6 +5476,11 @@ ${currentOrder.delivery && currentOrder.delivery.option !== 'pickup' ? `*Deliver
                     } catch (error) {
                         console.error('❌ Error in editProduct:', error);
                         console.error('Error stack:', error.stack);
+                        showNotification('Error loading product for editing: ' + error.message, 'error');
+                    }
+
+                    // Adjust product quantity (+ or -)
+                    async function adjustQuantity(productId, change) {
                         // Handle both Database ObjectId (24 char string), numeric IDs, and string IDs (e.g. prod_...)
                         let id = productId;
                         if (typeof productId === 'string' && (productId.length === 24 && /^[0-9a-fA-F]{24}$/.test(productId) || productId.startsWith('prod_'))) {
