@@ -3,22 +3,6 @@
  * Authentication Routes
  */
 
-// Start session if not already started
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
-$method = $_SERVER['REQUEST_METHOD'];
-$route = $_GET['route'] ?? '';
-$routeParts = explode('/', trim($route, '/'));
-$action = $routeParts[1] ?? null;
-
-// Set JSON response header
-<?php
-/**
- * Authentication Routes
- */
-
 require_once __DIR__ . '/../config/database.php';
 
 // Start session securely
