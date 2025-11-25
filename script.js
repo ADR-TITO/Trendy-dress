@@ -5194,11 +5194,17 @@ function loadAdminProducts(searchQuery = '') {
 
     // Display ALL filtered products - no limits, no pagination
     if (filteredProducts.length === 0) {
-        productsList.innerHTML = '<p style="text-align: center; padding: 40px; color: #666;">No products found.</p>';
+        if (productsList) {
+            productsList.innerHTML = '<p style="text-align: center; padding: 40px; color: #666;">No products found.</p>';
+        }
         return;
     }
 
     // Display ALL products - no limits, no pagination, shows everything
+    if (!productsList) {
+        console.error('adminProductsList element not found in DOM');
+        return;
+    }
     productsList.innerHTML = filteredProducts.map(product => {
         const discount = product.discount || 0;
         const finalPrice = getFinalPrice(product);
@@ -7356,7 +7362,7 @@ async function changeAdminCredentials(event) {
 // Ensure functions are globally accessible (for onclick handlers)
 // Functions are already in global scope, but this ensures they're available
 if (typeof window !== 'undefined') {
-    window.saveProduct = saveProduct;
+    // window.saveProduct = saveProduct; // Function not defined - removed to prevent error
     window.deleteProduct = deleteProduct;
     window.editProduct = editProduct;
     window.openAddProductModal = openAddProductModal;

@@ -50,6 +50,9 @@ try {
         exit;
     }
     
+    // Instantiate Product model
+    $productModel = new Product();
+    
     switch ($method) {
         case 'GET':
             if ($id) {
