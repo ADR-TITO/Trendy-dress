@@ -5296,6 +5296,81 @@ function openAddProductModal() {
     overlay.classList.add('show');
 }
 
+// Save product (Create or Update)
+async function saveProduct(event) {
+    if (event) event.preventDefault();
+
+    const submitBtn = document.querySelector('#productForm button[type="submit"]');
+    const originalBtnText = submitBtn ? submitBtn.innerHTML : 'Upload Item';
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+    }
+
+    try {
+        const id = document.getElementById('productId').value;
+        const name = document.getElementById('productName').value;
+        const category = document.getElementById('productCategory').value;
+        const price = parseFloat(document.getElementById('productPrice').value);
+        const size = document.getElementById('productSize').value;
+        const image = document.getElementById('productImage').value;
+        const quantity = parseInt(document.getElementById('productQuantity').value) || 0;
+        const discount = parseInt(document.getElementById('productDiscount').value) || 0;
+
+        if (!name || !category || !price || !size || !image) {
+            showNotification('Please fill in all required fields', 'error');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnText;
+            }
+            return;
+        }
+
+        const productData = {
+            name,
+            category,
+            price,
+            size,
+            image,
+            quantity,
+            discount
+        };
+
+        let result;
+        if (id) {
+            // Update existing product
+            console.log('📝 Updating product:', id);
+            result = await apiService.updateProduct(id, productData);
+            showNotification('Product updated successfully!', 'success');
+        } else {
+            // Create new product
+            console.log('✨ Creating new product');
+            result = await apiService.createProduct(productData);
+            showNotification('Product created successfully!', 'success');
+        }
+
+        // Close modal and refresh products
+        closeModal();
+
+        // Refresh products list
+        if (typeof loadAdminProducts === 'function') {
+            await loadAdminProducts();
+        }
+        if (typeof loadProducts === 'function') {
+            await loadProducts();
+        }
+
+    } catch (error) {
+        console.error('❌ Error saving product:', error);
+        showNotification(error.message || 'Failed to save product', 'error');
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnText;
+        }
+    }
+}
+
 function closeModal() {
     // Close product modal
     const productModal = document.getElementById('productModal');
@@ -7364,7 +7439,7 @@ async function changeAdminCredentials(event) {
 // Ensure functions are globally accessible (for onclick handlers)
 // Functions are already in global scope, but this ensures they're available
 if (typeof window !== 'undefined') {
-    // window.saveProduct = saveProduct; // Function not defined - removed to prevent error
+    window.saveProduct = saveProduct;
     window.deleteProduct = deleteProduct;
     window.editProduct = editProduct;
     window.openAddProductModal = openAddProductModal;
