@@ -3253,159 +3253,129 @@ async function verifyMpesaCodeBeforePayment(mpesaCode, total, mpesaCodeInput) {
                         `If you believe this is an error, please contact us:\n` +
                         `WhatsApp: +254 724 904 692`;
                     alert(errorMessage);
-                    // Refresh product display to show updated quantities
-                    displayProducts(currentCategory);
-
-                    // Generate PDF receipt (only if verification passed)
-                    generateReceiptPDF(order);
-
-                    // Store order
-                    currentOrder = order;
-
-                    // Close modals
-                    closeTillPaymentModal();
-                    closePaymentModal();
-
-                    // Automatically send receipt to WhatsApp via backend (no notification on website)
-                    try {
-                        // Generate PDF first if not already generated
-                        if (!currentOrderPDF) {
-                            await generateReceiptPDF(order);
-                        }
-
-                        // Send receipt to WhatsApp via backend API (automatic)
-                        const useDatabase = localStorage.getItem('useDatabase') === 'true';
-                        if (useDatabase) {
-                            try {
-                                // Call backend to send receipt to WhatsApp
-                                await apiService.sendReceiptToWhatsApp(order);
-                                console.log('✅ Receipt sent to WhatsApp via backend');
-                            } catch (backendError) {
-                                console.error('❌ Backend WhatsApp send failed, trying frontend method:', backendError);
-                                // Fallback to frontend method (opens WhatsApp with pre-filled message)
-                                sendReceiptViaWhatsAppSilent();
-                            }
-                        } else {
-                            // If Database not available, use frontend method
-                            sendReceiptViaWhatsAppSilent();
-                        }
-                    } catch (whatsappError) {
-                        console.error('❌ Error sending receipt to WhatsApp:', whatsappError);
-                        // Don't show error to user - fail silently
+                    if (mpesaCodeInput) {
+                        mpesaCodeInput.focus();
+                        mpesaCodeInput.style.borderColor = '#f44336';
                     }
-
-                    // Clear cart
-                    cart = [];
-                    updateCartUI();
-                    saveCart();
-
-                    // No notification shown - receipt is sent to WhatsApp automatically
+                    showNotification('M-Pesa transaction amount mismatch. Payment blocked.', 'error');
+                    return { valid: false, reason: 'amount_mismatch', verification };
                 }
+            }
+        } catch (error) {
+            console.error('❌ Error verifying M-Pesa code:', error);
+            showNotification('Error verifying M-Pesa code. Please try again.', 'error');
+            return { valid: false, reason: 'error', message: error.message };
+        }
+    }
 
-                // Paybill payment functions removed - only Till Number is supported now
+    // If no database or verification passed without issues, allow by default for localStorage
+    return { valid: true, reason: 'no_verification_needed' };
+}
 
-                // Close Payment Modal
-                function closePaymentModal() {
-                    const modal = document.getElementById('paymentModal');
-                    const overlay = document.getElementById('paymentOverlay');
-                    modal.classList.remove('show');
-                    overlay.classList.remove('show');
-                    overlay.style.display = 'none';
-                    document.getElementById('paymentForm').reset();
-                    // Reset partial payment state
-                    resetPartialPaymentState();
-                }
+// Paybill payment functions removed - only Till Number is supported now
 
-                // Show Payment Verification Loading Modal
-                function showPaymentVerificationModal() {
-                    const modal = document.getElementById('paymentVerificationModal');
-                    const overlay = document.getElementById('paymentVerificationOverlay');
-                    if (modal && overlay) {
-                        modal.style.display = 'block';
-                        overlay.style.display = 'block';
-                        modal.classList.add('show');
-                        overlay.classList.add('show');
-                    }
-                }
+// Close Payment Modal
+function closePaymentModal() {
+    const modal = document.getElementById('paymentModal');
+    const overlay = document.getElementById('paymentOverlay');
+    modal.classList.remove('show');
+    overlay.classList.remove('show');
+    overlay.style.display = 'none';
+    document.getElementById('paymentForm').reset();
+    // Reset partial payment state
+    resetPartialPaymentState();
+}
 
-                // Hide Payment Verification Loading Modal
-                function hidePaymentVerificationModal() {
-                    const modal = document.getElementById('paymentVerificationModal');
-                    const overlay = document.getElementById('paymentVerificationOverlay');
-                    if (modal && overlay) {
-                        modal.style.display = 'none';
-                        overlay.style.display = 'none';
-                        modal.classList.remove('show');
-                        overlay.classList.remove('show');
-                    }
-                }
+// Show Payment Verification Loading Modal
+function showPaymentVerificationModal() {
+    const modal = document.getElementById('paymentVerificationModal');
+    const overlay = document.getElementById('paymentVerificationOverlay');
+    if (modal && overlay) {
+        modal.style.display = 'block';
+        overlay.style.display = 'block';
+        modal.classList.add('show');
+        overlay.classList.add('show');
+    }
+}
 
-                // Partial Payment State Management
-                let partialPaymentState = {
-                    totalAmount: 0,
-                    paidAmount: 0,
-                    remainingBalance: 0,
-                    paymentCodes: [] // Array of {code, amount} objects
-                };
+// Hide Payment Verification Loading Modal
+function hidePaymentVerificationModal() {
+    const modal = document.getElementById('paymentVerificationModal');
+    const overlay = document.getElementById('paymentVerificationOverlay');
+    if (modal && overlay) {
+        modal.style.display = 'none';
+        overlay.style.display = 'none';
+        modal.classList.remove('show');
+        overlay.classList.remove('show');
+    }
+}
 
-                function resetPartialPaymentState() {
-                    partialPaymentState = {
-                        totalAmount: 0,
-                        paidAmount: 0,
-                        remainingBalance: 0,
-                        paymentCodes: []
-                    };
-                    // Hide payment progress
-                    const progressDiv = document.getElementById('paymentProgress');
-                    if (progressDiv) {
-                        progressDiv.style.display = 'none';
-                    }
-                    // Clear additional M-Pesa code inputs
-                    const container = document.getElementById('additionalMpesaCodesContainer');
-                    if (container) {
-                        container.innerHTML = '';
-                    }
-                }
+// Partial Payment State Management
+let partialPaymentState = {
+    totalAmount: 0,
+    paidAmount: 0,
+    remainingBalance: 0,
+    paymentCodes: [] // Array of {code, amount} objects
+};
 
-                function updatePaymentProgress(totalAmount, paidAmount, remainingBalance) {
-                    partialPaymentState.totalAmount = totalAmount;
-                    partialPaymentState.paidAmount = paidAmount;
-                    partialPaymentState.remainingBalance = remainingBalance;
+function resetPartialPaymentState() {
+    partialPaymentState = {
+        totalAmount: 0,
+        paidAmount: 0,
+        remainingBalance: 0,
+        paymentCodes: []
+    };
+    // Hide payment progress
+    const progressDiv = document.getElementById('paymentProgress');
+    if (progressDiv) {
+        progressDiv.style.display = 'none';
+    }
+    // Clear additional M-Pesa code inputs
+    const container = document.getElementById('additionalMpesaCodesContainer');
+    if (container) {
+        container.innerHTML = '';
+    }
+}
 
-                    const progressDiv = document.getElementById('paymentProgress');
-                    const totalAmountSpan = document.getElementById('paymentTotalAmount');
-                    const paidAmountSpan = document.getElementById('paymentPaidAmount');
-                    const remainingAmountSpan = document.getElementById('paymentRemainingAmount');
-                    const codesDiv = document.getElementById('partialPaymentCodes');
+function updatePaymentProgress(totalAmount, paidAmount, remainingBalance) {
+    partialPaymentState.totalAmount = totalAmount;
+    partialPaymentState.paidAmount = paidAmount;
+    partialPaymentState.remainingBalance = remainingBalance;
 
-                    if (progressDiv && totalAmountSpan && paidAmountSpan && remainingAmountSpan) {
-                        progressDiv.style.display = 'block';
-                        totalAmountSpan.textContent = totalAmount.toLocaleString('en-KE');
-                        paidAmountSpan.textContent = paidAmount.toLocaleString('en-KE');
-                        remainingAmountSpan.textContent = remainingBalance.toLocaleString('en-KE');
+    const progressDiv = document.getElementById('paymentProgress');
+    const totalAmountSpan = document.getElementById('paymentTotalAmount');
+    const paidAmountSpan = document.getElementById('paymentPaidAmount');
+    const remainingAmountSpan = document.getElementById('paymentRemainingAmount');
+    const codesDiv = document.getElementById('partialPaymentCodes');
 
-                        // Update payment codes list
-                        if (codesDiv && partialPaymentState.paymentCodes.length > 0) {
-                            codesDiv.innerHTML = '<strong>Payment Codes:</strong><ul style="margin: 10px 0 0 20px; padding: 0;">';
-                            partialPaymentState.paymentCodes.forEach((payment, index) => {
-                                codesDiv.innerHTML += `<li style="margin: 5px 0;">Code ${index + 1}: ${payment.code} - KSh ${payment.amount.toLocaleString('en-KE')}</li>`;
-                            });
-                            codesDiv.innerHTML += '</ul>';
-                        }
-                    }
-                }
+    if (progressDiv && totalAmountSpan && paidAmountSpan && remainingAmountSpan) {
+        progressDiv.style.display = 'block';
+        totalAmountSpan.textContent = totalAmount.toLocaleString('en-KE');
+        paidAmountSpan.textContent = paidAmount.toLocaleString('en-KE');
+        remainingAmountSpan.textContent = remainingBalance.toLocaleString('en-KE');
 
-                function addAdditionalMpesaCodeInput(remainingBalance, index) {
-                    const container = document.getElementById('additionalMpesaCodesContainer');
-                    if (!container) return;
+        // Update payment codes list
+        if (codesDiv && partialPaymentState.paymentCodes.length > 0) {
+            codesDiv.innerHTML = '<strong>Payment Codes:</strong><ul style="margin: 10px 0 0 20px; padding: 0;">';
+            partialPaymentState.paymentCodes.forEach((payment, index) => {
+                codesDiv.innerHTML += `<li style="margin: 5px 0;">Code ${index + 1}: ${payment.code} - KSh ${payment.amount.toLocaleString('en-KE')}</li>`;
+            });
+            codesDiv.innerHTML += '</ul>';
+        }
+    }
+}
 
-                    const inputId = `mpesaCodeAdditional${index}`;
-                    const errorId = `mpesaCodeErrorAdditional${index}`;
+function addAdditionalMpesaCodeInput(remainingBalance, index) {
+    const container = document.getElementById('additionalMpesaCodesContainer');
+    if (!container) return;
 
-                    const inputGroup = document.createElement('div');
-                    inputGroup.className = 'form-group';
-                    inputGroup.id = `mpesaCodeGroup${index}`;
-                    inputGroup.innerHTML = `
+    const inputId = `mpesaCodeAdditional${index}`;
+    const errorId = `mpesaCodeErrorAdditional${index}`;
+
+    const inputGroup = document.createElement('div');
+    inputGroup.className = 'form-group';
+    inputGroup.id = `mpesaCodeGroup${index}`;
+    inputGroup.innerHTML = `
         <label for="${inputId}">Additional M-Pesa Transaction Code (Remaining Balance: KSh ${remainingBalance.toLocaleString('en-KE')}) *</label>
         <input type="text" id="${inputId}" required placeholder="Enter 10-character code (e.g., ABC1234XYZ)" 
                pattern="[A-Z0-9]{10}" maxlength="10"
@@ -3416,1412 +3386,1412 @@ async function verifyMpesaCodeBeforePayment(mpesaCode, total, mpesaCodeInput) {
         <small style="color: #666; display: block; margin-top: 5px;">Enter the 10-character code from your M-Pesa confirmation message for the remaining balance</small>
     `;
 
-                    container.appendChild(inputGroup);
+    container.appendChild(inputGroup);
 
-                    // Scroll to the new input
+    // Scroll to the new input
+    setTimeout(() => {
+        const newInput = document.getElementById(inputId);
+        if (newInput) {
+            newInput.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    }, 100);
+}
+
+function getAllMpesaCodes() {
+    const codes = [];
+
+    // Get first M-Pesa code
+    const firstCode = document.getElementById('mpesaCode')?.value?.trim().toUpperCase();
+    if (firstCode) {
+        codes.push({ inputId: 'mpesaCode', code: firstCode });
+    }
+
+    // Get additional M-Pesa codes
+    let index = 1;
+    while (true) {
+        const inputId = `mpesaCodeAdditional${index}`;
+        const input = document.getElementById(inputId);
+        if (!input) break;
+
+        const code = input.value?.trim().toUpperCase();
+        if (code) {
+            codes.push({ inputId, code });
+        }
+        index++;
+    }
+
+    return codes;
+}
+
+// Complete Till Payment
+async function completeTillPayment() {
+    const mpesaCodeInput = document.getElementById('tillMpesaCode');
+    const mpesaCode = mpesaCodeInput?.value || '';
+
+    // Validate M-Pesa code
+    const validation = validateMpesaCode(mpesaCode);
+    if (!validation.valid) {
+        alert(validation.error);
+        if (mpesaCodeInput) {
+            mpesaCodeInput.focus();
+            mpesaCodeInput.style.borderColor = '#f44336';
+            setTimeout(() => {
+                mpesaCodeInput.style.borderColor = '#ddd';
+            }, 3000);
+        }
+        return;
+    }
+
+    const validMpesaCode = validation.code;
+
+    // Check local duplicates first
+    const duplicateOrder = checkDuplicateMpesaCodeLocal(validMpesaCode);
+    if (duplicateOrder) {
+        const errorMessage = `⚠️ This M-Pesa code has already been used!\n\n` +
+            `Order ID: ${duplicateOrder.orderId || 'N/A'}\n` +
+            `Date: ${duplicateOrder.date || 'N/A'}\n` +
+            `Amount: KSh ${(duplicateOrder.total || 0).toLocaleString('en-KE')}\n\n` +
+            `Please enter the correct M-Pesa transaction code from your payment confirmation message.`;
+        alert(errorMessage);
+        return;
+    }
+
+    const paymentInfo = window.tillPaymentInfo || {};
+    const customerName = paymentInfo.customerName || document.getElementById('customerName')?.value || '';
+    const customerPhone = paymentInfo.customerPhone || document.getElementById('customerPhone')?.value || '';
+    const customerEmail = paymentInfo.customerEmail || document.getElementById('customerEmail')?.value || '';
+    const subtotal = paymentInfo.subtotal || cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const deliveryCost = paymentInfo.deliveryCost || getDeliveryCost();
+    const total = paymentInfo.total || (subtotal + deliveryCost);
+
+    // Get delivery information
+    const deliveryOption = document.querySelector('input[name="deliveryOption"]:checked');
+    const deliveryAddress = document.getElementById('deliveryAddress')?.value || '';
+
+    // Validate required fields
+    if (!customerName || !customerPhone) {
+        alert('Please fill in your name and phone number in the payment form first');
+        closeTillPaymentModal();
+        return;
+    }
+
+    // Validate delivery address if delivery is selected
+    if (deliveryOption && (deliveryOption.value === 'nairobi-cbd' || deliveryOption.value === 'elsewhere')) {
+        if (!deliveryAddress || deliveryAddress.trim() === '') {
+            alert('Please provide delivery address/details for delivery option.');
+            closeTillPaymentModal();
+            return;
+        }
+    }
+
+    // Get delivery option text
+    let deliveryOptionText = 'Shop Pickup';
+    if (deliveryOption) {
+        switch (deliveryOption.value) {
+            case 'pickup':
+                deliveryOptionText = 'Shop Pickup';
+                break;
+            case 'nairobi-cbd':
+                deliveryOptionText = 'Delivery within Nairobi CBD (KSh 250)';
+                break;
+            case 'elsewhere':
+                deliveryOptionText = 'Delivery Elsewhere (within Kenya) (KSh 300)';
+                break;
+        }
+    }
+
+    // Generate Order ID early
+    const orderId = 'ORD-' + Date.now();
+
+    // Create order object
+    const order = {
+        orderId: orderId,
+        date: new Date().toLocaleString('en-KE'),
+        customer: {
+            name: customerName,
+            phone: customerPhone,
+            email: customerEmail
+        },
+        items: cart.map(item => {
+            const product = products.find(p => p.id === item.id);
+            return {
+                name: item.name,
+                quantity: item.quantity,
+                price: item.price,
+                subtotal: item.price * item.quantity,
+                productId: item.id || '',
+                image: product?.image || item.image || ''
+            };
+        }),
+        subtotal: subtotal,
+        delivery: {
+            option: deliveryOption ? deliveryOption.value : 'pickup',
+            optionText: deliveryOptionText,
+            cost: deliveryCost,
+            address: deliveryAddress || ''
+        },
+        total: total,
+        paymentMethod: 'M-Pesa Till (177104)',
+        mpesaCode: validMpesaCode,
+        skipTransactionCheck: true // CRITICAL: Skip strict check during creation
+    };
+
+    // Save order to Database if available
+    const useDatabase = localStorage.getItem('useDatabase') === 'true';
+    if (useDatabase) {
+        try {
+            console.log('💾 Saving order to Database before verification...');
+            await apiService.createOrder(order);
+            console.log('✅ Order saved to Database (pending verification)');
+        } catch (orderError) {
+            console.error('❌ Error saving order:', orderError);
+            alert('Failed to initialize order. Please try again or contact support.');
+            return;
+        }
+    }
+
+    // Verify M-Pesa code (now checking against the saved order)
+    const verificationResult = await verifyMpesaCodeBeforePayment(validMpesaCode, total, mpesaCodeInput, orderId);
+    if (!verificationResult.valid) {
+        // Verification failed
+        return;
+    }
+
+    // Subtract quantity from products
+    cart.forEach(cartItem => {
+        const product = products.find(p => p.id === cartItem.id);
+        if (product) {
+            const currentQuantity = product.quantity || 0;
+            const purchasedQuantity = cartItem.quantity;
+            product.quantity = Math.max(0, currentQuantity - purchasedQuantity);
+        }
+    });
+
+    // Save updated products
+    await saveProducts();
+
+    // Refresh product display
+    displayProducts(currentCategory);
+
+    // Generate PDF receipt
+    generateReceiptPDF(order);
+
+    // Store order
+    currentOrder = order;
+
+    // Close modals
+    closeTillPaymentModal();
+    closePaymentModal();
+
+    // Send receipt to WhatsApp
+    try {
+        if (!currentOrderPDF) {
+            await generateReceiptPDF(order);
+        }
+
+        if (useDatabase) {
+            try {
+                await apiService.sendReceiptToWhatsApp(order);
+                console.log('✅ Receipt sent to WhatsApp via backend');
+            } catch (backendError) {
+                console.error('❌ Backend WhatsApp send failed, trying frontend method:', backendError);
+                sendReceiptViaWhatsAppSilent();
+            }
+        } else {
+            sendReceiptViaWhatsAppSilent();
+        }
+    } catch (whatsappError) {
+        console.error('❌ Error sending receipt to WhatsApp:', whatsappError);
+    }
+
+    // Clear cart
+    cart = [];
+    updateCartUI();
+    saveCart();
+
+    showNotification('Payment verified and order placed successfully!', 'success');
+}
+// Expose to window
+window.completeTillPayment = completeTillPayment;
+
+// Process Payment
+async function processPayment(event) {
+    event.preventDefault();
+
+    try {
+        // Check if cart is empty
+        if (!cart || cart.length === 0) {
+            alert('Your cart is empty. Please add items to cart before proceeding to payment.');
+            closePaymentModal();
+            return;
+        }
+
+        const customerName = document.getElementById('customerName')?.value?.trim();
+        let customerPhone = document.getElementById('customerPhone')?.value?.trim() || '';
+        const customerEmail = document.getElementById('customerEmail')?.value?.trim() || '';
+
+        // Get selected payment method
+        const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked')?.value || 'till';
+
+        // Validate required fields
+        if (!customerName || !customerPhone) {
+            alert('Please fill in all required fields: Name and Phone Number.');
+            if (!customerName) document.getElementById('customerName')?.focus();
+            else if (!customerPhone) document.getElementById('customerPhone')?.focus();
+            return;
+        }
+        const deliveryOption = document.querySelector('input[name="deliveryOption"]:checked');
+        const deliveryAddress = document.getElementById('deliveryAddress')?.value || '';
+
+        // Validate delivery address if delivery is selected
+        if (deliveryOption && (deliveryOption.value === 'nairobi-cbd' || deliveryOption.value === 'elsewhere')) {
+            if (!deliveryAddress || deliveryAddress.trim() === '') {
+                alert('Please provide delivery address/details for delivery option.');
+                document.getElementById('deliveryAddress')?.focus();
+                return;
+            }
+        }
+
+        const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        const deliveryCost = getDeliveryCost();
+        const total = subtotal + deliveryCost;
+
+        // Force payment method to 'till' (Manual M-Pesa)
+        // We removed STK Push option, so this is the only path
+
+
+        // Handle Till Number payment (existing flow)
+        // Get all M-Pesa codes (first + additional)
+        const allMpesaCodes = getAllMpesaCodes();
+
+        // Validate that at least one M-Pesa code is provided
+        if (allMpesaCodes.length === 0) {
+            alert('Please enter at least one M-Pesa transaction code.');
+            document.getElementById('mpesaCode')?.focus();
+            return;
+        }
+
+        // Validate all M-Pesa codes
+        for (const codeInfo of allMpesaCodes) {
+            const validation = validateMpesaCode(codeInfo.code);
+            if (!validation.valid) {
+                alert(`Invalid M-Pesa code: ${codeInfo.code}\n\n${validation.error}`);
+                const input = document.getElementById(codeInfo.inputId);
+                if (input) {
+                    input.focus();
+                    input.style.borderColor = '#f44336';
                     setTimeout(() => {
-                        const newInput = document.getElementById(inputId);
-                        if (newInput) {
-                            newInput.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                        }
-                    }, 100);
+                        input.style.borderColor = '#ddd';
+                    }, 3000);
+                }
+                return;
+            }
+        }
+
+        // Show loading modal
+        showPaymentVerificationModal();
+
+        // Check if Database is available
+        const useDatabase = localStorage.getItem('useDatabase') === 'true';
+
+        // Track payment progress
+        let totalPaid = 0;
+        const paymentCodes = [];
+        let remainingBalance = total;
+
+        // Verify each M-Pesa code and track amounts
+        for (let i = 0; i < allMpesaCodes.length; i++) {
+            const codeInfo = allMpesaCodes[i];
+            const validMpesaCode = codeInfo.code.toUpperCase().trim();
+            const codeInput = document.getElementById(codeInfo.inputId);
+
+            // Verify this M-Pesa code
+            try {
+                // For additional codes, verify against remaining balance
+                const verifyAmount = (i === 0) ? total : remainingBalance;
+                const verificationResult = await verifyMpesaCodeBeforePayment(validMpesaCode, verifyAmount, codeInput);
+
+                if (!verificationResult.valid) {
+                    hidePaymentVerificationModal(); // Hide loading modal
+                    return; // Stop here - verification failed
                 }
 
-                function getAllMpesaCodes() {
-                    const codes = [];
+                // Get actual amount paid from this transaction
+                let actualAmount = verificationResult.actualAmount || verifyAmount;
 
-                    // Get first M-Pesa code
-                    const firstCode = document.getElementById('mpesaCode')?.value?.trim().toUpperCase();
-                    if (firstCode) {
-                        codes.push({ inputId: 'mpesaCode', code: firstCode });
-                    }
-
-                    // Get additional M-Pesa codes
-                    let index = 1;
-                    while (true) {
-                        const inputId = `mpesaCodeAdditional${index}`;
-                        const input = document.getElementById(inputId);
-                        if (!input) break;
-
-                        const code = input.value?.trim().toUpperCase();
-                        if (code) {
-                            codes.push({ inputId, code });
-                        }
-                        index++;
-                    }
-
-                    return codes;
+                // If it's a partial payment, use the actual amount
+                if (verificationResult.reason === 'partial_payment') {
+                    actualAmount = verificationResult.actualAmount;
                 }
 
-                // Complete Till Payment
-                async function completeTillPayment() {
-                    const mpesaCodeInput = document.getElementById('tillMpesaCode');
-                    const mpesaCode = mpesaCodeInput?.value || '';
+                // Track this payment
+                totalPaid += actualAmount;
+                paymentCodes.push({ code: validMpesaCode, amount: actualAmount });
+                remainingBalance = total - totalPaid;
 
-                    // Validate M-Pesa code
-                    const validation = validateMpesaCode(mpesaCode);
-                    if (!validation.valid) {
-                        alert(validation.error);
-                        if (mpesaCodeInput) {
-                            mpesaCodeInput.focus();
-                            mpesaCodeInput.style.borderColor = '#f44336';
-                            setTimeout(() => {
-                                mpesaCodeInput.style.borderColor = '#ddd';
-                            }, 3000);
+                console.log(`💰 Payment ${i + 1}: Code ${validMpesaCode}, Amount: KSh ${actualAmount.toLocaleString('en-KE')}, Total Paid: KSh ${totalPaid.toLocaleString('en-KE')}, Remaining: KSh ${remainingBalance.toLocaleString('en-KE')}`);
+
+                // If partial payment detected and this is the first code, show additional input
+                if (verificationResult.reason === 'partial_payment' && i === 0 && remainingBalance > 0) {
+                    hidePaymentVerificationModal(); // Hide loading modal
+                    // Update payment progress
+                    partialPaymentState.paymentCodes = paymentCodes;
+                    updatePaymentProgress(total, totalPaid, remainingBalance);
+
+                    // Show additional M-Pesa code input
+                    const additionalIndex = allMpesaCodes.length; // Next index
+                    addAdditionalMpesaCodeInput(remainingBalance, additionalIndex);
+
+                    // Update payment amount in instructions
+                    const paymentAmountSpan = document.getElementById('paymentAmount');
+                    if (paymentAmountSpan) {
+                        paymentAmountSpan.textContent = `KSh ${remainingBalance.toLocaleString('en-KE')}`;
+                    }
+
+                    showNotification(`Partial payment received: KSh ${actualAmount.toLocaleString('en-KE')}. Please enter M-Pesa code for remaining balance: KSh ${remainingBalance.toLocaleString('en-KE')}`, 'info');
+                    return; // Stop here, wait for additional code
+                }
+
+            } catch (verifyError) {
+                console.error('Error verifying M-Pesa code:', verifyError);
+
+                // Even if verification fails, check localStorage for duplicates
+                const duplicateOrder = checkDuplicateMpesaCodeLocal(validMpesaCode);
+                if (duplicateOrder) {
+                    const errorMessage = `⚠️ This M-Pesa code has already been used!\n\n` +
+                        `Order ID: ${duplicateOrder.orderId || 'N/A'}\n` +
+                        `Date: ${duplicateOrder.date || 'N/A'}\n` +
+                        `Amount: KSh ${duplicateOrder.total?.toLocaleString('en-KE') || 'N/A'}\n\n` +
+                        `Please enter the correct M-Pesa transaction code from your payment confirmation message.\n\n` +
+                        `If you believe this is an error, please contact us:\n` +
+                        `WhatsApp: +254 724 904 692`;
+                    hidePaymentVerificationModal(); // Hide loading modal
+                    alert(errorMessage);
+                    if (codeInput) {
+                        codeInput.focus();
+                        codeInput.style.borderColor = '#f44336';
+                    }
+                    showNotification('M-Pesa code already used. Please check and try again.', 'error');
+                    return;
+                }
+
+                // CRITICAL SECURITY: Block payment if verification fails
+                // Never allow payment without proper verification
+                hidePaymentVerificationModal(); // Hide loading modal
+                const errorMessage = `❌ M-Pesa Verification Failed!\n\n` +
+                    `Error: ${verifyError.message}\n\n` +
+                    `⚠️ SECURITY: Payment cannot be accepted without proper verification.\n\n` +
+                    `Please ensure:\n` +
+                    `1. You have a stable internet connection\n` +
+                    `2. You entered the correct M-Pesa transaction code\n` +
+                    `3. The transaction was completed recently (within 24 hours)\n\n` +
+                    `Please try again or contact us:\n` +
+                    `WhatsApp: +254 724 904 692`;
+                alert(errorMessage);
+                if (codeInput) {
+                    codeInput.focus();
+                    codeInput.style.borderColor = '#f44336';
+                }
+                showNotification('M-Pesa verification failed. Payment blocked for security.', 'error');
+                return;
+            }
+        }
+
+        // Check if full payment has been made
+        if (remainingBalance > 0) {
+            hidePaymentVerificationModal(); // Hide loading modal
+            // Still need more payment - show additional input
+            partialPaymentState.paymentCodes = paymentCodes;
+            updatePaymentProgress(total, totalPaid, remainingBalance);
+
+            const additionalIndex = allMpesaCodes.length;
+            addAdditionalMpesaCodeInput(remainingBalance, additionalIndex);
+
+            // Update payment amount in instructions
+            const paymentAmountSpan = document.getElementById('paymentAmount');
+            if (paymentAmountSpan) {
+                paymentAmountSpan.textContent = `KSh ${remainingBalance.toLocaleString('en-KE')}`;
+            }
+
+            showNotification(`Payment incomplete. Amount paid: KSh ${totalPaid.toLocaleString('en-KE')}. Please enter M-Pesa code for remaining balance: KSh ${remainingBalance.toLocaleString('en-KE')}`, 'warning');
+            return; // Stop here, wait for additional code
+        }
+
+        // Full payment received - proceed with order creation
+        console.log('✅ Full payment received! Total paid: KSh', totalPaid.toLocaleString('en-KE'));
+        hidePaymentVerificationModal(); // Hide loading modal - verification complete
+
+        // Get delivery option text
+        let deliveryOptionText = 'Shop Pickup';
+        if (deliveryOption) {
+            switch (deliveryOption.value) {
+                case 'pickup':
+                    deliveryOptionText = 'Shop Pickup';
+                    break;
+                case 'nairobi-cbd':
+                    deliveryOptionText = 'Delivery within Nairobi CBD (KSh 250)';
+                    break;
+                case 'elsewhere':
+                    deliveryOptionText = 'Delivery Elsewhere (within Kenya) (KSh 300)';
+                    break;
+            }
+        }
+
+        // CRITICAL: Final duplicate check before creating order (race condition protection)
+        // Check all payment codes for duplicates
+        for (const payment of paymentCodes) {
+            const finalDuplicateCheck = checkDuplicateMpesaCodeLocal(payment.code);
+            if (finalDuplicateCheck) {
+                const errorMessage = `⚠️ M-Pesa code ${payment.code} has already been used!\n\n` +
+                    `Order ID: ${finalDuplicateCheck.orderId || 'N/A'}\n` +
+                    `Date: ${finalDuplicateCheck.date || 'N/A'}\n` +
+                    `Amount: KSh ${finalDuplicateCheck.total?.toLocaleString('en-KE') || 'N/A'}\n\n` +
+                    `Please enter the correct M-Pesa transaction code from your payment confirmation message.\n\n` +
+                    `If you believe this is an error, please contact us:\n` +
+                    `WhatsApp: +254 724 904 692`;
+                alert(errorMessage);
+                const codeInput = document.getElementById(allMpesaCodes.find(c => c.code === payment.code)?.inputId || 'mpesaCode');
+                if (codeInput) {
+                    codeInput.focus();
+                    codeInput.style.borderColor = '#f44336';
+                }
+                showNotification('M-Pesa code already used. Please check and try again.', 'error');
+                return; // Stop here - don't generate receipt
+            }
+        }
+
+        // Combine all M-Pesa codes into a single string for the order
+        const allMpesaCodesString = paymentCodes.map(p => `${p.code} (KSh ${p.amount.toLocaleString('en-KE')})`).join(', ');
+        const primaryMpesaCode = paymentCodes[0]?.code || '';
+
+        // Create order object
+        const order = {
+            orderId: 'ORD-' + Date.now(),
+            date: new Date().toLocaleString('en-KE'),
+            customer: {
+                name: customerName,
+                phone: customerPhone,
+                email: customerEmail
+            },
+            items: cart.map(item => {
+                // Find the product to get the image
+                const product = products.find(p => p.id === item.id);
+                return {
+                    name: item.name,
+                    quantity: item.quantity,
+                    price: item.price,
+                    subtotal: item.price * item.quantity,
+                    productId: item.id || '',
+                    image: product?.image || item.image || '' // Include image in order items
+                };
+            }),
+            subtotal: subtotal,
+            delivery: {
+                option: deliveryOption ? deliveryOption.value : 'pickup',
+                optionText: deliveryOptionText,
+                cost: deliveryCost,
+                address: deliveryAddress || ''
+            },
+            total: total,
+            totalPaid: totalPaid, // Track total paid (may differ from total if overpaid)
+            paymentMethod: 'M-Pesa Till (177104)',
+            mpesaCode: primaryMpesaCode, // Primary code for backward compatibility
+            mpesaCodes: paymentCodes, // All payment codes with amounts
+            mpesaCodesString: allMpesaCodesString // Human-readable string
+        };
+
+        // CRITICAL: Save order to localStorage FIRST (prevents duplicates immediately)
+        saveOrderToLocalStorage(order);
+        console.log('✅ Order saved to localStorage (prevents duplicate M-Pesa codes)');
+
+        // Save order to Database if available
+        if (useDatabase) {
+            try {
+                await apiService.createOrder(order);
+                console.log('✅ Order saved to Database');
+            } catch (orderError) {
+                console.error('❌ Error saving order:', orderError);
+
+                // Helper function to cleanup localStorage
+                const cleanupLocalStorage = () => {
+                    try {
+                        const ordersJson = localStorage.getItem('orders');
+                        if (ordersJson) {
+                            let orders = JSON.parse(ordersJson);
+                            orders = orders.filter(o => o.orderId !== order.orderId);
+                            localStorage.setItem('orders', JSON.stringify(orders));
+
+                            // Remove all payment codes from used codes
+                            const usedCodesJson = localStorage.getItem('usedMpesaCodes');
+                            if (usedCodesJson) {
+                                let usedCodes = JSON.parse(usedCodesJson);
+                                paymentCodes.forEach(payment => {
+                                    usedCodes = usedCodes.filter(c => c !== payment.code);
+                                });
+                                localStorage.setItem('usedMpesaCodes', JSON.stringify(usedCodes));
+                            }
                         }
-                        return;
+                    } catch (cleanupError) {
+                        console.error('Error cleaning up localStorage:', cleanupError);
                     }
+                };
 
-                    const validMpesaCode = validation.code;
+                // CRITICAL: Check if it's an amount mismatch error
+                if (orderError.message && (orderError.message.includes('Amount mismatch') || orderError.message.includes('amount mismatch'))) {
+                    cleanupLocalStorage();
 
-                    // Check local duplicates first
-                    const duplicateOrder = checkDuplicateMpesaCodeLocal(validMpesaCode);
-                    if (duplicateOrder) {
-                        const errorMessage = `⚠️ This M-Pesa code has already been used!\n\n` +
-                            `Order ID: ${duplicateOrder.orderId || 'N/A'}\n` +
-                            `Date: ${duplicateOrder.date || 'N/A'}\n` +
-                            `Amount: KSh ${(duplicateOrder.total || 0).toLocaleString('en-KE')}\n\n` +
-                            `Please enter the correct M-Pesa transaction code from your payment confirmation message.`;
-                        alert(errorMessage);
-                        return;
-                    }
-
-                    const paymentInfo = window.tillPaymentInfo || {};
-                    const customerName = paymentInfo.customerName || document.getElementById('customerName')?.value || '';
-                    const customerPhone = paymentInfo.customerPhone || document.getElementById('customerPhone')?.value || '';
-                    const customerEmail = paymentInfo.customerEmail || document.getElementById('customerEmail')?.value || '';
-                    const subtotal = paymentInfo.subtotal || cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-                    const deliveryCost = paymentInfo.deliveryCost || getDeliveryCost();
-                    const total = paymentInfo.total || (subtotal + deliveryCost);
-
-                    // Get delivery information
-                    const deliveryOption = document.querySelector('input[name="deliveryOption"]:checked');
-                    const deliveryAddress = document.getElementById('deliveryAddress')?.value || '';
-
-                    // Validate required fields
-                    if (!customerName || !customerPhone) {
-                        alert('Please fill in your name and phone number in the payment form first');
-                        closeTillPaymentModal();
-                        return;
-                    }
-
-                    // Validate delivery address if delivery is selected
-                    if (deliveryOption && (deliveryOption.value === 'nairobi-cbd' || deliveryOption.value === 'elsewhere')) {
-                        if (!deliveryAddress || deliveryAddress.trim() === '') {
-                            alert('Please provide delivery address/details for delivery option.');
-                            closeTillPaymentModal();
-                            return;
+                    // Parse error message to get amounts
+                    let errorMessage = `❌ M-Pesa Transaction Amount Mismatch!\n\n`;
+                    try {
+                        // Try to extract amounts from error message
+                        const amountMatch = orderError.message.match(/Expected: KSh ([\d,]+).*Found: KSh ([\d,]+)/);
+                        if (amountMatch) {
+                            errorMessage += `Expected Amount: KSh ${amountMatch[1]}\n`;
+                            errorMessage += `Transaction Amount: KSh ${amountMatch[2]}\n\n`;
+                        } else {
+                            errorMessage += orderError.message + '\n\n';
                         }
+                    } catch (parseError) {
+                        errorMessage += orderError.message + '\n\n';
                     }
 
-                    // Get delivery option text
-                    let deliveryOptionText = 'Shop Pickup';
-                    if (deliveryOption) {
-                        switch (deliveryOption.value) {
-                            case 'pickup':
-                                deliveryOptionText = 'Shop Pickup';
-                                break;
-                            case 'nairobi-cbd':
-                                deliveryOptionText = 'Delivery within Nairobi CBD (KSh 250)';
-                                break;
-                            case 'elsewhere':
-                                deliveryOptionText = 'Delivery Elsewhere (within Kenya) (KSh 300)';
-                                break;
-                        }
+                    errorMessage += `The M-Pesa transaction amount does not match your order total.\n\n` +
+                        `Please verify:\n` +
+                        `1. You entered the correct M-Pesa transaction code\n` +
+                        `2. You paid the correct amount (KSh ${total.toLocaleString('en-KE')})\n` +
+                        `3. You selected the correct delivery option\n\n` +
+                        `If you believe this is an error, please contact us:\n` +
+                        `WhatsApp: +254 724 904 692`;
+                    alert(errorMessage);
+                    if (mpesaCodeInput) {
+                        mpesaCodeInput.focus();
+                        mpesaCodeInput.style.borderColor = '#f44336';
                     }
+                    showNotification('M-Pesa transaction amount mismatch. Payment blocked.', 'error');
+                    return; // Stop here - don't generate receipt
+                }
 
-                    // Generate Order ID early
-                    const orderId = 'ORD-' + Date.now();
+                // Check if it's a date mismatch error
+                if (orderError.message && (orderError.message.includes('Date mismatch') || orderError.message.includes('date mismatch'))) {
+                    cleanupLocalStorage();
 
-                    // Create order object
-                    const order = {
-                        orderId: orderId,
-                        date: new Date().toLocaleString('en-KE'),
-                        customer: {
-                            name: customerName,
-                            phone: customerPhone,
-                            email: customerEmail
-                        },
-                        items: cart.map(item => {
-                            const product = products.find(p => p.id === item.id);
-                            return {
-                                name: item.name,
-                                quantity: item.quantity,
-                                price: item.price,
-                                subtotal: item.price * item.quantity,
-                                productId: item.id || '',
-                                image: product?.image || item.image || ''
-                            };
-                        }),
-                        subtotal: subtotal,
-                        delivery: {
-                            option: deliveryOption ? deliveryOption.value : 'pickup',
-                            optionText: deliveryOptionText,
-                            cost: deliveryCost,
-                            address: deliveryAddress || ''
-                        },
-                        total: total,
-                        paymentMethod: 'M-Pesa Till (177104)',
-                        mpesaCode: validMpesaCode,
-                        skipTransactionCheck: true // CRITICAL: Skip strict check during creation
-                    };
+                    const errorMessage = `❌ M-Pesa Transaction Date Invalid!\n\n` +
+                        `The M-Pesa transaction date is outside the valid range (24 hours).\n\n` +
+                        `${orderError.message}\n\n` +
+                        `Please ensure you are using a recent transaction code from your M-Pesa confirmation message.\n\n` +
+                        `If you believe this is an error, please contact us:\n` +
+                        `WhatsApp: +254 724 904 692`;
+                    alert(errorMessage);
+                    if (mpesaCodeInput) {
+                        mpesaCodeInput.focus();
+                        mpesaCodeInput.style.borderColor = '#f44336';
+                    }
+                    showNotification('M-Pesa transaction date invalid. Payment blocked.', 'error');
+                    return; // Stop here - don't generate receipt
+                }
 
-                    // Save order to Database if available
-                    const useDatabase = localStorage.getItem('useDatabase') === 'true';
+                // CRITICAL SECURITY: Check if transaction not found error
+                if (orderError.message && (orderError.message.includes('Transaction not found') || orderError.message.includes('transaction not found') || orderError.message.includes('not found in database'))) {
+                    cleanupLocalStorage();
+
+                    const errorMessage = `❌ M-Pesa Transaction Not Verified!\n\n` +
+                        `${orderError.message}\n\n` +
+                        `⚠️ SECURITY: Payment cannot be accepted until the transaction is verified through M-Pesa API.\n\n` +
+                        `Please ensure:\n` +
+                        `1. You completed the M-Pesa payment successfully\n` +
+                        `2. You entered the correct M-Pesa transaction code\n` +
+                        `3. You wait a few moments for the transaction to be received via webhook\n` +
+                        `4. You try again after the transaction has been processed\n\n` +
+                        `If you continue to have issues, please contact us:\n` +
+                        `WhatsApp: +254 724 904 692\n\n` +
+                        `This security measure prevents fake or guessed transaction codes from being accepted.`;
+                    alert(errorMessage);
+                    if (mpesaCodeInput) {
+                        mpesaCodeInput.focus();
+                        mpesaCodeInput.style.borderColor = '#f44336';
+                    }
+                    showNotification('Transaction not verified. Payment blocked for security.', 'error');
+                    return; // Stop here - don't generate receipt
+                }
+
+                // Check if it's a duplicate code error
+                if (orderError.message && (orderError.message.includes('Duplicate') || orderError.message.includes('already been used'))) {
+                    cleanupLocalStorage();
+
+                    const errorMessage = `⚠️ This M-Pesa code has already been used in Database!\n\n` +
+                        `Please enter the correct M-Pesa transaction code from your payment confirmation message.\n\n` +
+                        `If you believe this is an error, please contact us:\n` +
+                        `WhatsApp: +254 724 904 692`;
+                    alert(errorMessage);
+                    if (mpesaCodeInput) {
+                        mpesaCodeInput.focus();
+                        mpesaCodeInput.style.borderColor = '#f44336';
+                    }
+                    showNotification('M-Pesa code already used. Please check and try again.', 'error');
+                    return; // Stop here - don't generate receipt
+                }
+
+                // Check if it's a verification error
+                if (orderError.message && (orderError.message.includes('Verification error') || orderError.message.includes('verification error'))) {
+                    cleanupLocalStorage();
+
+                    const errorMessage = `❌ M-Pesa Verification Error!\n\n` +
+                        `${orderError.message}\n\n` +
+                        `Payment cannot be accepted until verification is successful.\n\n` +
+                        `Please try again or contact us:\n` +
+                        `WhatsApp: +254 724 904 692`;
+                    alert(errorMessage);
+                    if (mpesaCodeInput) {
+                        mpesaCodeInput.focus();
+                        mpesaCodeInput.style.borderColor = '#f44336';
+                    }
+                    showNotification('Verification error. Payment blocked. Please try again.', 'error');
+                    return; // Stop here - don't generate receipt
+                }
+
+                // For other errors, show warning but continue (order is already saved to localStorage)
+                console.warn('⚠️ Order save to Database failed, but order is saved to localStorage');
+                showNotification('Order saved locally. Database save failed. Please contact support if needed.', 'warning');
+            }
+        }
+
+        // Subtract quantity from products when payment is completed
+        cart.forEach(cartItem => {
+            const product = products.find(p => p.id === cartItem.id);
+            if (product) {
+                const currentQuantity = product.quantity || 0;
+                const purchasedQuantity = cartItem.quantity;
+                product.quantity = Math.max(0, currentQuantity - purchasedQuantity);
+            }
+        });
+
+        // Save updated products
+        try {
+            await saveProducts();
+        } catch (saveError) {
+            console.error('❌ Error saving products:', saveError);
+            // Continue even if save fails
+        }
+
+        // Refresh product display to show updated quantities
+        try {
+            displayProducts(currentCategory);
+        } catch (displayError) {
+            console.error('❌ Error displaying products:', displayError);
+            // Continue even if display fails
+        }
+
+        // Store order
+        currentOrder = order;
+
+        // Close payment modal silently
+        closePaymentModal();
+
+        // Automatically send receipt to WhatsApp via backend (no notification on website)
+        try {
+            // Generate PDF first (await to ensure it's ready)
+            if (!currentOrderPDF) {
+                await generateReceiptPDF(order);
+            }
+
+            // Send receipt to WhatsApp via backend API (automatic) - WITH PDF
+            const useDatabase = localStorage.getItem('useDatabase') === 'true';
+            if (useDatabase) {
+                try {
+                    // Call backend to send receipt to WhatsApp (including PDF)
+                    await apiService.sendReceiptToWhatsApp(order, currentOrderPDF);
+                    console.log('✅ Receipt and PDF sent to WhatsApp via backend');
+                } catch (backendError) {
+                    console.error('❌ Backend WhatsApp send failed, trying frontend method:', backendError);
+                    // Fallback to frontend method (opens WhatsApp with pre-filled message)
+                    sendReceiptViaWhatsAppSilent();
+                }
+            } else {
+                // If Database not available, use frontend method
+                sendReceiptViaWhatsAppSilent();
+            }
+        } catch (whatsappError) {
+            console.error('❌ Error sending receipt to WhatsApp:', whatsappError);
+            // Don't show error to user - fail silently
+        }
+
+        // Clear cart
+        cart = [];
+        updateCartUI();
+        saveCart();
+        toggleCart();
+
+        // No notification shown - receipt is sent to WhatsApp automatically
+
+    } catch (error) {
+        // Hide loading modal in case of any unexpected error
+        hidePaymentVerificationModal();
+        console.error('❌ Error processing payment:', error);
+        alert('An error occurred while processing your payment. Please try again or contact support.\n\nError: ' + error.message);
+        showNotification('Payment processing failed. Please try again.', 'error');
+    }
+}
+
+// Process STK Push (M-Pesa Prompt) payment
+async function processSTKPushPayment(customerName, customerPhone, customerEmail, total, deliveryOption, deliveryAddress, subtotal, deliveryCost) {
+    try {
+        // Show loading modal
+        showPaymentVerificationModal();
+
+        // Check if backend is available (STK Push needs backend API, not necessarily Database)
+        console.log('🔍 Checking backend availability for STK Push...');
+        let backendAvailable = false;
+        try {
+            backendAvailable = await apiService.checkBackend();
+            console.log('📊 Backend available:', backendAvailable);
+        } catch (backendError) {
+            console.error('❌ Error checking backend:', backendError);
+            backendAvailable = false;
+        }
+
+        if (!backendAvailable) {
+            hidePaymentVerificationModal();
+
+            // Provide helpful error message based on environment
+            const isProduction = window.location.hostname === 'trendydresses.co.ke' ||
+                window.location.hostname === 'www.trendydresses.co.ke';
+
+            let errorMessage = 'STK Push payment requires the backend server to be running.\n\n';
+
+            if (isProduction) {
+                errorMessage += 'For Production Website:\n';
+                errorMessage += '1. SSH into your production server\n';
+                errorMessage += '2. Navigate to backend folder: cd /path/to/backend\n';
+                errorMessage += '3. Install dependencies: npm install\n';
+                errorMessage += '4. Start with PM2: pm2 start npm --name "trendy-dresses-api" -- start\n';
+                errorMessage += '5. Save PM2: pm2 save && pm2 startup\n';
+                errorMessage += '6. Configure Nginx/Apache reverse proxy (see PRODUCTION_BACKEND_SETUP.md)\n\n';
+                errorMessage += 'Backend URL being checked: ' + apiService.baseURL + '\n\n';
+                errorMessage += 'See PRODUCTION_BACKEND_SETUP.md for detailed instructions.';
+            } else {
+                errorMessage += 'For Local Development:\n';
+                errorMessage += '1. Navigate to backend folder\n';
+                errorMessage += '2. Run: npm start\n';
+                errorMessage += '3. Wait for "✅ Connected to Database successfully"\n';
+                errorMessage += '4. Refresh this page\n\n';
+                errorMessage += 'Backend URL: ' + apiService.baseURL;
+            }
+
+            alert(errorMessage);
+            console.error('❌ Backend not available at:', apiService.baseURL);
+            console.error('📋 See PRODUCTION_BACKEND_SETUP.md or backend/QUICK_START.md for setup instructions');
+            return;
+        }
+
+        console.log('✅ Backend is available - proceeding with STK Push');
+
+        // Generate order ID first
+        const orderId = 'ORD-' + Date.now();
+
+        // Get delivery option text
+        let deliveryOptionText = 'Shop Pickup';
+        if (deliveryOption) {
+            switch (deliveryOption.value) {
+                case 'pickup':
+                    deliveryOptionText = 'Shop Pickup';
+                    break;
+                case 'nairobi-cbd':
+                    deliveryOptionText = 'Delivery within Nairobi CBD (KSh 250)';
+                    break;
+                case 'elsewhere':
+                    deliveryOptionText = 'Delivery Elsewhere (within Kenya) (KSh 300)';
+                    break;
+            }
+        }
+
+        // Format phone number for STK Push API (ensure it's in 254 format)
+        let formattedPhone = customerPhone.trim();
+        if (!formattedPhone.startsWith('254')) {
+            // Remove leading 0 and add 254
+            if (formattedPhone.startsWith('0')) {
+                formattedPhone = '254' + formattedPhone.substring(1);
+            } else if (formattedPhone.length === 9) {
+                // 7XX format - add 254 prefix
+                formattedPhone = '254' + formattedPhone;
+            }
+        }
+
+        // Validate phone number format
+        if (!/^2547\d{8}$/.test(formattedPhone)) {
+            hidePaymentVerificationModal();
+            alert('Please enter a valid M-Pesa phone number.\n\nFormat: 0724904692 or 254724904692\n\nThe number must be registered with M-Pesa.');
+            document.getElementById('customerPhone')?.focus();
+            return;
+        }
+
+        // Initiate STK Push
+        console.log('📱 Initiating STK Push payment...');
+        console.log('📞 Phone number:', formattedPhone.replace(/(\d{3})(\d{3})(\d{3})/, '$1***$3')); // Mask middle digits for privacy
+        console.log('💰 Amount: KSh', total.toLocaleString('en-KE'));
+        console.log('📦 Order ID:', orderId);
+
+        const stkResult = await apiService.initiateSTKPush(
+            formattedPhone, // Use formatted phone number
+            total,
+            orderId,
+            `Payment for order ${orderId}`
+        );
+
+        if (!stkResult.success) {
+            hidePaymentVerificationModal();
+            alert(`Failed to initiate M-Pesa payment prompt:\n\n${stkResult.responseDescription || 'Unknown error'}\n\nPlease ensure your phone number is correct and registered with M-Pesa.`);
+            return;
+        }
+
+        // Show waiting message with phone number
+        const verificationModal = document.getElementById('paymentVerificationModal');
+        const verificationText = verificationModal?.querySelector('p');
+        if (verificationText) {
+            const displayPhone = formattedPhone.replace(/(\d{3})(\d{3})(\d{3})/, '$1***$3'); // Mask for display
+            verificationText.innerHTML = `A payment prompt has been sent to <strong>${displayPhone}</strong>.<br><br>Please check your phone and enter your M-Pesa PIN to complete the payment...`;
+        }
+
+        console.log('✅ STK Push initiated:', stkResult.checkoutRequestID);
+        console.log('📱 Customer message:', stkResult.customerMessage);
+
+        // Poll for payment completion
+        const checkoutRequestID = stkResult.checkoutRequestID;
+        let attempts = 0;
+        const maxAttempts = 60; // Poll for up to 2 minutes (60 * 2 seconds)
+
+        const pollPaymentStatus = async () => {
+            attempts++;
+
+            try {
+                // Query STK Push status
+                const statusResult = await apiService.querySTKPushStatus(checkoutRequestID);
+
+                if (statusResult.resultCode === '0') {
+                    // Payment successful! Check for transaction in database
+                    console.log('✅ Payment completed via STK Push');
+
+                    // Wait a moment for webhook to process
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+
+                    // Check for transaction in database by checking recent transactions
                     if (useDatabase) {
                         try {
-                            console.log('💾 Saving order to Database before verification...');
-                            await apiService.createOrder(order);
-                            console.log('✅ Order saved to Database (pending verification)');
-                        } catch (orderError) {
-                            console.error('❌ Error saving order:', orderError);
-                            alert('Failed to initialize order. Please try again or contact support.');
-                            return;
+                            // Try to get transactions from API
+                            const response = await fetch(`${apiService.baseURL}/mpesa/transactions?phoneNumber=${customerPhone.replace(/^0/, '254')}&limit=1`);
+                            if (response.ok) {
+                                const data = await response.json();
+                                if (data.success && data.transactions && data.transactions.length > 0) {
+                                    const transaction = data.transactions[0];
+                                    const receiptNumber = transaction.receiptNumber;
+                                    const transactionAmount = transaction.amount;
+
+                                    // Verify amount matches
+                                    if (Math.abs(transactionAmount - total) < 1) {
+                                        // Create order with the receipt number
+                                        await createOrderFromSTKPush(
+                                            orderId,
+                                            customerName,
+                                            customerPhone,
+                                            customerEmail,
+                                            total,
+                                            deliveryOption,
+                                            deliveryAddress,
+                                            subtotal,
+                                            deliveryCost,
+                                            deliveryOptionText,
+                                            receiptNumber
+                                        );
+                                        return; // Exit polling
+                                    }
+                                }
+                            }
+                        } catch (checkError) {
+                            console.error('Error checking transaction:', checkError);
                         }
                     }
 
-                    // Verify M-Pesa code (now checking against the saved order)
-                    const verificationResult = await verifyMpesaCodeBeforePayment(validMpesaCode, total, mpesaCodeInput, orderId);
-                    if (!verificationResult.valid) {
-                        // Verification failed
-                        return;
-                    }
-
-                    // Subtract quantity from products
-                    cart.forEach(cartItem => {
-                        const product = products.find(p => p.id === cartItem.id);
-                        if (product) {
-                            const currentQuantity = product.quantity || 0;
-                            const purchasedQuantity = cartItem.quantity;
-                            product.quantity = Math.max(0, currentQuantity - purchasedQuantity);
-                        }
-                    });
-
-                    // Save updated products
-                    await saveProducts();
-
-                    // Refresh product display
-                    displayProducts(currentCategory);
-
-                    // Generate PDF receipt
-                    generateReceiptPDF(order);
-
-                    // Store order
-                    currentOrder = order;
-
-                    // Close modals
-                    closeTillPaymentModal();
-                    closePaymentModal();
-
-                    // Send receipt to WhatsApp
-                    try {
-                        if (!currentOrderPDF) {
-                            await generateReceiptPDF(order);
-                        }
-
-                        if (useDatabase) {
-                            try {
-                                await apiService.sendReceiptToWhatsApp(order);
-                                console.log('✅ Receipt sent to WhatsApp via backend');
-                            } catch (backendError) {
-                                console.error('❌ Backend WhatsApp send failed, trying frontend method:', backendError);
-                                sendReceiptViaWhatsAppSilent();
-                            }
-                        } else {
-                            sendReceiptViaWhatsAppSilent();
-                        }
-                    } catch (whatsappError) {
-                        console.error('❌ Error sending receipt to WhatsApp:', whatsappError);
-                    }
-
-                    // Clear cart
-                    cart = [];
-                    updateCartUI();
-                    saveCart();
-
-                    showNotification('Payment verified and order placed successfully!', 'success');
-                }
-                // Expose to window
-                window.completeTillPayment = completeTillPayment;
-
-                // Process Payment
-                async function processPayment(event) {
-                    event.preventDefault();
-
-                    try {
-                        // Check if cart is empty
-                        if (!cart || cart.length === 0) {
-                            alert('Your cart is empty. Please add items to cart before proceeding to payment.');
-                            closePaymentModal();
-                            return;
-                        }
-
-                        const customerName = document.getElementById('customerName')?.value?.trim();
-                        let customerPhone = document.getElementById('customerPhone')?.value?.trim() || '';
-                        const customerEmail = document.getElementById('customerEmail')?.value?.trim() || '';
-
-                        // Get selected payment method
-                        const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked')?.value || 'till';
-
-                        // Validate required fields
-                        if (!customerName || !customerPhone) {
-                            alert('Please fill in all required fields: Name and Phone Number.');
-                            if (!customerName) document.getElementById('customerName')?.focus();
-                            else if (!customerPhone) document.getElementById('customerPhone')?.focus();
-                            return;
-                        }
-                        const deliveryOption = document.querySelector('input[name="deliveryOption"]:checked');
-                        const deliveryAddress = document.getElementById('deliveryAddress')?.value || '';
-
-                        // Validate delivery address if delivery is selected
-                        if (deliveryOption && (deliveryOption.value === 'nairobi-cbd' || deliveryOption.value === 'elsewhere')) {
-                            if (!deliveryAddress || deliveryAddress.trim() === '') {
-                                alert('Please provide delivery address/details for delivery option.');
-                                document.getElementById('deliveryAddress')?.focus();
-                                return;
-                            }
-                        }
-
-                        const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-                        const deliveryCost = getDeliveryCost();
-                        const total = subtotal + deliveryCost;
-
-                        // Force payment method to 'till' (Manual M-Pesa)
-                        // We removed STK Push option, so this is the only path
-
-
-                        // Handle Till Number payment (existing flow)
-                        // Get all M-Pesa codes (first + additional)
-                        const allMpesaCodes = getAllMpesaCodes();
-
-                        // Validate that at least one M-Pesa code is provided
-                        if (allMpesaCodes.length === 0) {
-                            alert('Please enter at least one M-Pesa transaction code.');
-                            document.getElementById('mpesaCode')?.focus();
-                            return;
-                        }
-
-                        // Validate all M-Pesa codes
-                        for (const codeInfo of allMpesaCodes) {
-                            const validation = validateMpesaCode(codeInfo.code);
-                            if (!validation.valid) {
-                                alert(`Invalid M-Pesa code: ${codeInfo.code}\n\n${validation.error}`);
-                                const input = document.getElementById(codeInfo.inputId);
-                                if (input) {
-                                    input.focus();
-                                    input.style.borderColor = '#f44336';
-                                    setTimeout(() => {
-                                        input.style.borderColor = '#ddd';
-                                    }, 3000);
-                                }
-                                return;
-                            }
-                        }
-
-                        // Show loading modal
-                        showPaymentVerificationModal();
-
-                        // Check if Database is available
-                        const useDatabase = localStorage.getItem('useDatabase') === 'true';
-
-                        // Track payment progress
-                        let totalPaid = 0;
-                        const paymentCodes = [];
-                        let remainingBalance = total;
-
-                        // Verify each M-Pesa code and track amounts
-                        for (let i = 0; i < allMpesaCodes.length; i++) {
-                            const codeInfo = allMpesaCodes[i];
-                            const validMpesaCode = codeInfo.code.toUpperCase().trim();
-                            const codeInput = document.getElementById(codeInfo.inputId);
-
-                            // Verify this M-Pesa code
-                            try {
-                                // For additional codes, verify against remaining balance
-                                const verifyAmount = (i === 0) ? total : remainingBalance;
-                                const verificationResult = await verifyMpesaCodeBeforePayment(validMpesaCode, verifyAmount, codeInput);
-
-                                if (!verificationResult.valid) {
-                                    hidePaymentVerificationModal(); // Hide loading modal
-                                    return; // Stop here - verification failed
-                                }
-
-                                // Get actual amount paid from this transaction
-                                let actualAmount = verificationResult.actualAmount || verifyAmount;
-
-                                // If it's a partial payment, use the actual amount
-                                if (verificationResult.reason === 'partial_payment') {
-                                    actualAmount = verificationResult.actualAmount;
-                                }
-
-                                // Track this payment
-                                totalPaid += actualAmount;
-                                paymentCodes.push({ code: validMpesaCode, amount: actualAmount });
-                                remainingBalance = total - totalPaid;
-
-                                console.log(`💰 Payment ${i + 1}: Code ${validMpesaCode}, Amount: KSh ${actualAmount.toLocaleString('en-KE')}, Total Paid: KSh ${totalPaid.toLocaleString('en-KE')}, Remaining: KSh ${remainingBalance.toLocaleString('en-KE')}`);
-
-                                // If partial payment detected and this is the first code, show additional input
-                                if (verificationResult.reason === 'partial_payment' && i === 0 && remainingBalance > 0) {
-                                    hidePaymentVerificationModal(); // Hide loading modal
-                                    // Update payment progress
-                                    partialPaymentState.paymentCodes = paymentCodes;
-                                    updatePaymentProgress(total, totalPaid, remainingBalance);
-
-                                    // Show additional M-Pesa code input
-                                    const additionalIndex = allMpesaCodes.length; // Next index
-                                    addAdditionalMpesaCodeInput(remainingBalance, additionalIndex);
-
-                                    // Update payment amount in instructions
-                                    const paymentAmountSpan = document.getElementById('paymentAmount');
-                                    if (paymentAmountSpan) {
-                                        paymentAmountSpan.textContent = `KSh ${remainingBalance.toLocaleString('en-KE')}`;
-                                    }
-
-                                    showNotification(`Partial payment received: KSh ${actualAmount.toLocaleString('en-KE')}. Please enter M-Pesa code for remaining balance: KSh ${remainingBalance.toLocaleString('en-KE')}`, 'info');
-                                    return; // Stop here, wait for additional code
-                                }
-
-                            } catch (verifyError) {
-                                console.error('Error verifying M-Pesa code:', verifyError);
-
-                                // Even if verification fails, check localStorage for duplicates
-                                const duplicateOrder = checkDuplicateMpesaCodeLocal(validMpesaCode);
-                                if (duplicateOrder) {
-                                    const errorMessage = `⚠️ This M-Pesa code has already been used!\n\n` +
-                                        `Order ID: ${duplicateOrder.orderId || 'N/A'}\n` +
-                                        `Date: ${duplicateOrder.date || 'N/A'}\n` +
-                                        `Amount: KSh ${duplicateOrder.total?.toLocaleString('en-KE') || 'N/A'}\n\n` +
-                                        `Please enter the correct M-Pesa transaction code from your payment confirmation message.\n\n` +
-                                        `If you believe this is an error, please contact us:\n` +
-                                        `WhatsApp: +254 724 904 692`;
-                                    hidePaymentVerificationModal(); // Hide loading modal
-                                    alert(errorMessage);
-                                    if (codeInput) {
-                                        codeInput.focus();
-                                        codeInput.style.borderColor = '#f44336';
-                                    }
-                                    showNotification('M-Pesa code already used. Please check and try again.', 'error');
-                                    return;
-                                }
-
-                                // CRITICAL SECURITY: Block payment if verification fails
-                                // Never allow payment without proper verification
-                                hidePaymentVerificationModal(); // Hide loading modal
-                                const errorMessage = `❌ M-Pesa Verification Failed!\n\n` +
-                                    `Error: ${verifyError.message}\n\n` +
-                                    `⚠️ SECURITY: Payment cannot be accepted without proper verification.\n\n` +
-                                    `Please ensure:\n` +
-                                    `1. You have a stable internet connection\n` +
-                                    `2. You entered the correct M-Pesa transaction code\n` +
-                                    `3. The transaction was completed recently (within 24 hours)\n\n` +
-                                    `Please try again or contact us:\n` +
-                                    `WhatsApp: +254 724 904 692`;
-                                alert(errorMessage);
-                                if (codeInput) {
-                                    codeInput.focus();
-                                    codeInput.style.borderColor = '#f44336';
-                                }
-                                showNotification('M-Pesa verification failed. Payment blocked for security.', 'error');
-                                return;
-                            }
-                        }
-
-                        // Check if full payment has been made
-                        if (remainingBalance > 0) {
-                            hidePaymentVerificationModal(); // Hide loading modal
-                            // Still need more payment - show additional input
-                            partialPaymentState.paymentCodes = paymentCodes;
-                            updatePaymentProgress(total, totalPaid, remainingBalance);
-
-                            const additionalIndex = allMpesaCodes.length;
-                            addAdditionalMpesaCodeInput(remainingBalance, additionalIndex);
-
-                            // Update payment amount in instructions
-                            const paymentAmountSpan = document.getElementById('paymentAmount');
-                            if (paymentAmountSpan) {
-                                paymentAmountSpan.textContent = `KSh ${remainingBalance.toLocaleString('en-KE')}`;
-                            }
-
-                            showNotification(`Payment incomplete. Amount paid: KSh ${totalPaid.toLocaleString('en-KE')}. Please enter M-Pesa code for remaining balance: KSh ${remainingBalance.toLocaleString('en-KE')}`, 'warning');
-                            return; // Stop here, wait for additional code
-                        }
-
-                        // Full payment received - proceed with order creation
-                        console.log('✅ Full payment received! Total paid: KSh', totalPaid.toLocaleString('en-KE'));
-                        hidePaymentVerificationModal(); // Hide loading modal - verification complete
-
-                        // Get delivery option text
-                        let deliveryOptionText = 'Shop Pickup';
-                        if (deliveryOption) {
-                            switch (deliveryOption.value) {
-                                case 'pickup':
-                                    deliveryOptionText = 'Shop Pickup';
-                                    break;
-                                case 'nairobi-cbd':
-                                    deliveryOptionText = 'Delivery within Nairobi CBD (KSh 250)';
-                                    break;
-                                case 'elsewhere':
-                                    deliveryOptionText = 'Delivery Elsewhere (within Kenya) (KSh 300)';
-                                    break;
-                            }
-                        }
-
-                        // CRITICAL: Final duplicate check before creating order (race condition protection)
-                        // Check all payment codes for duplicates
-                        for (const payment of paymentCodes) {
-                            const finalDuplicateCheck = checkDuplicateMpesaCodeLocal(payment.code);
-                            if (finalDuplicateCheck) {
-                                const errorMessage = `⚠️ M-Pesa code ${payment.code} has already been used!\n\n` +
-                                    `Order ID: ${finalDuplicateCheck.orderId || 'N/A'}\n` +
-                                    `Date: ${finalDuplicateCheck.date || 'N/A'}\n` +
-                                    `Amount: KSh ${finalDuplicateCheck.total?.toLocaleString('en-KE') || 'N/A'}\n\n` +
-                                    `Please enter the correct M-Pesa transaction code from your payment confirmation message.\n\n` +
-                                    `If you believe this is an error, please contact us:\n` +
-                                    `WhatsApp: +254 724 904 692`;
-                                alert(errorMessage);
-                                const codeInput = document.getElementById(allMpesaCodes.find(c => c.code === payment.code)?.inputId || 'mpesaCode');
-                                if (codeInput) {
-                                    codeInput.focus();
-                                    codeInput.style.borderColor = '#f44336';
-                                }
-                                showNotification('M-Pesa code already used. Please check and try again.', 'error');
-                                return; // Stop here - don't generate receipt
-                            }
-                        }
-
-                        // Combine all M-Pesa codes into a single string for the order
-                        const allMpesaCodesString = paymentCodes.map(p => `${p.code} (KSh ${p.amount.toLocaleString('en-KE')})`).join(', ');
-                        const primaryMpesaCode = paymentCodes[0]?.code || '';
-
-                        // Create order object
-                        const order = {
-                            orderId: 'ORD-' + Date.now(),
-                            date: new Date().toLocaleString('en-KE'),
-                            customer: {
-                                name: customerName,
-                                phone: customerPhone,
-                                email: customerEmail
-                            },
-                            items: cart.map(item => {
-                                // Find the product to get the image
-                                const product = products.find(p => p.id === item.id);
-                                return {
-                                    name: item.name,
-                                    quantity: item.quantity,
-                                    price: item.price,
-                                    subtotal: item.price * item.quantity,
-                                    productId: item.id || '',
-                                    image: product?.image || item.image || '' // Include image in order items
-                                };
-                            }),
-                            subtotal: subtotal,
-                            delivery: {
-                                option: deliveryOption ? deliveryOption.value : 'pickup',
-                                optionText: deliveryOptionText,
-                                cost: deliveryCost,
-                                address: deliveryAddress || ''
-                            },
-                            total: total,
-                            totalPaid: totalPaid, // Track total paid (may differ from total if overpaid)
-                            paymentMethod: 'M-Pesa Till (177104)',
-                            mpesaCode: primaryMpesaCode, // Primary code for backward compatibility
-                            mpesaCodes: paymentCodes, // All payment codes with amounts
-                            mpesaCodesString: allMpesaCodesString // Human-readable string
-                        };
-
-                        // CRITICAL: Save order to localStorage FIRST (prevents duplicates immediately)
-                        saveOrderToLocalStorage(order);
-                        console.log('✅ Order saved to localStorage (prevents duplicate M-Pesa codes)');
-
-                        // Save order to Database if available
-                        if (useDatabase) {
-                            try {
-                                await apiService.createOrder(order);
-                                console.log('✅ Order saved to Database');
-                            } catch (orderError) {
-                                console.error('❌ Error saving order:', orderError);
-
-                                // Helper function to cleanup localStorage
-                                const cleanupLocalStorage = () => {
-                                    try {
-                                        const ordersJson = localStorage.getItem('orders');
-                                        if (ordersJson) {
-                                            let orders = JSON.parse(ordersJson);
-                                            orders = orders.filter(o => o.orderId !== order.orderId);
-                                            localStorage.setItem('orders', JSON.stringify(orders));
-
-                                            // Remove all payment codes from used codes
-                                            const usedCodesJson = localStorage.getItem('usedMpesaCodes');
-                                            if (usedCodesJson) {
-                                                let usedCodes = JSON.parse(usedCodesJson);
-                                                paymentCodes.forEach(payment => {
-                                                    usedCodes = usedCodes.filter(c => c !== payment.code);
-                                                });
-                                                localStorage.setItem('usedMpesaCodes', JSON.stringify(usedCodes));
-                                            }
-                                        }
-                                    } catch (cleanupError) {
-                                        console.error('Error cleaning up localStorage:', cleanupError);
-                                    }
-                                };
-
-                                // CRITICAL: Check if it's an amount mismatch error
-                                if (orderError.message && (orderError.message.includes('Amount mismatch') || orderError.message.includes('amount mismatch'))) {
-                                    cleanupLocalStorage();
-
-                                    // Parse error message to get amounts
-                                    let errorMessage = `❌ M-Pesa Transaction Amount Mismatch!\n\n`;
-                                    try {
-                                        // Try to extract amounts from error message
-                                        const amountMatch = orderError.message.match(/Expected: KSh ([\d,]+).*Found: KSh ([\d,]+)/);
-                                        if (amountMatch) {
-                                            errorMessage += `Expected Amount: KSh ${amountMatch[1]}\n`;
-                                            errorMessage += `Transaction Amount: KSh ${amountMatch[2]}\n\n`;
-                                        } else {
-                                            errorMessage += orderError.message + '\n\n';
-                                        }
-                                    } catch (parseError) {
-                                        errorMessage += orderError.message + '\n\n';
-                                    }
-
-                                    errorMessage += `The M-Pesa transaction amount does not match your order total.\n\n` +
-                                        `Please verify:\n` +
-                                        `1. You entered the correct M-Pesa transaction code\n` +
-                                        `2. You paid the correct amount (KSh ${total.toLocaleString('en-KE')})\n` +
-                                        `3. You selected the correct delivery option\n\n` +
-                                        `If you believe this is an error, please contact us:\n` +
-                                        `WhatsApp: +254 724 904 692`;
-                                    alert(errorMessage);
-                                    if (mpesaCodeInput) {
-                                        mpesaCodeInput.focus();
-                                        mpesaCodeInput.style.borderColor = '#f44336';
-                                    }
-                                    showNotification('M-Pesa transaction amount mismatch. Payment blocked.', 'error');
-                                    return; // Stop here - don't generate receipt
-                                }
-
-                                // Check if it's a date mismatch error
-                                if (orderError.message && (orderError.message.includes('Date mismatch') || orderError.message.includes('date mismatch'))) {
-                                    cleanupLocalStorage();
-
-                                    const errorMessage = `❌ M-Pesa Transaction Date Invalid!\n\n` +
-                                        `The M-Pesa transaction date is outside the valid range (24 hours).\n\n` +
-                                        `${orderError.message}\n\n` +
-                                        `Please ensure you are using a recent transaction code from your M-Pesa confirmation message.\n\n` +
-                                        `If you believe this is an error, please contact us:\n` +
-                                        `WhatsApp: +254 724 904 692`;
-                                    alert(errorMessage);
-                                    if (mpesaCodeInput) {
-                                        mpesaCodeInput.focus();
-                                        mpesaCodeInput.style.borderColor = '#f44336';
-                                    }
-                                    showNotification('M-Pesa transaction date invalid. Payment blocked.', 'error');
-                                    return; // Stop here - don't generate receipt
-                                }
-
-                                // CRITICAL SECURITY: Check if transaction not found error
-                                if (orderError.message && (orderError.message.includes('Transaction not found') || orderError.message.includes('transaction not found') || orderError.message.includes('not found in database'))) {
-                                    cleanupLocalStorage();
-
-                                    const errorMessage = `❌ M-Pesa Transaction Not Verified!\n\n` +
-                                        `${orderError.message}\n\n` +
-                                        `⚠️ SECURITY: Payment cannot be accepted until the transaction is verified through M-Pesa API.\n\n` +
-                                        `Please ensure:\n` +
-                                        `1. You completed the M-Pesa payment successfully\n` +
-                                        `2. You entered the correct M-Pesa transaction code\n` +
-                                        `3. You wait a few moments for the transaction to be received via webhook\n` +
-                                        `4. You try again after the transaction has been processed\n\n` +
-                                        `If you continue to have issues, please contact us:\n` +
-                                        `WhatsApp: +254 724 904 692\n\n` +
-                                        `This security measure prevents fake or guessed transaction codes from being accepted.`;
-                                    alert(errorMessage);
-                                    if (mpesaCodeInput) {
-                                        mpesaCodeInput.focus();
-                                        mpesaCodeInput.style.borderColor = '#f44336';
-                                    }
-                                    showNotification('Transaction not verified. Payment blocked for security.', 'error');
-                                    return; // Stop here - don't generate receipt
-                                }
-
-                                // Check if it's a duplicate code error
-                                if (orderError.message && (orderError.message.includes('Duplicate') || orderError.message.includes('already been used'))) {
-                                    cleanupLocalStorage();
-
-                                    const errorMessage = `⚠️ This M-Pesa code has already been used in Database!\n\n` +
-                                        `Please enter the correct M-Pesa transaction code from your payment confirmation message.\n\n` +
-                                        `If you believe this is an error, please contact us:\n` +
-                                        `WhatsApp: +254 724 904 692`;
-                                    alert(errorMessage);
-                                    if (mpesaCodeInput) {
-                                        mpesaCodeInput.focus();
-                                        mpesaCodeInput.style.borderColor = '#f44336';
-                                    }
-                                    showNotification('M-Pesa code already used. Please check and try again.', 'error');
-                                    return; // Stop here - don't generate receipt
-                                }
-
-                                // Check if it's a verification error
-                                if (orderError.message && (orderError.message.includes('Verification error') || orderError.message.includes('verification error'))) {
-                                    cleanupLocalStorage();
-
-                                    const errorMessage = `❌ M-Pesa Verification Error!\n\n` +
-                                        `${orderError.message}\n\n` +
-                                        `Payment cannot be accepted until verification is successful.\n\n` +
-                                        `Please try again or contact us:\n` +
-                                        `WhatsApp: +254 724 904 692`;
-                                    alert(errorMessage);
-                                    if (mpesaCodeInput) {
-                                        mpesaCodeInput.focus();
-                                        mpesaCodeInput.style.borderColor = '#f44336';
-                                    }
-                                    showNotification('Verification error. Payment blocked. Please try again.', 'error');
-                                    return; // Stop here - don't generate receipt
-                                }
-
-                                // For other errors, show warning but continue (order is already saved to localStorage)
-                                console.warn('⚠️ Order save to Database failed, but order is saved to localStorage');
-                                showNotification('Order saved locally. Database save failed. Please contact support if needed.', 'warning');
-                            }
-                        }
-
-                        // Subtract quantity from products when payment is completed
-                        cart.forEach(cartItem => {
-                            const product = products.find(p => p.id === cartItem.id);
-                            if (product) {
-                                const currentQuantity = product.quantity || 0;
-                                const purchasedQuantity = cartItem.quantity;
-                                product.quantity = Math.max(0, currentQuantity - purchasedQuantity);
-                            }
-                        });
-
-                        // Save updated products
-                        try {
-                            await saveProducts();
-                        } catch (saveError) {
-                            console.error('❌ Error saving products:', saveError);
-                            // Continue even if save fails
-                        }
-
-                        // Refresh product display to show updated quantities
-                        try {
-                            displayProducts(currentCategory);
-                        } catch (displayError) {
-                            console.error('❌ Error displaying products:', displayError);
-                            // Continue even if display fails
-                        }
-
-                        // Store order
-                        currentOrder = order;
-
-                        // Close payment modal silently
-                        closePaymentModal();
-
-                        // Automatically send receipt to WhatsApp via backend (no notification on website)
-                        try {
-                            // Generate PDF first (await to ensure it's ready)
-                            if (!currentOrderPDF) {
-                                await generateReceiptPDF(order);
-                            }
-
-                            // Send receipt to WhatsApp via backend API (automatic) - WITH PDF
-                            const useDatabase = localStorage.getItem('useDatabase') === 'true';
-                            if (useDatabase) {
-                                try {
-                                    // Call backend to send receipt to WhatsApp (including PDF)
-                                    await apiService.sendReceiptToWhatsApp(order, currentOrderPDF);
-                                    console.log('✅ Receipt and PDF sent to WhatsApp via backend');
-                                } catch (backendError) {
-                                    console.error('❌ Backend WhatsApp send failed, trying frontend method:', backendError);
-                                    // Fallback to frontend method (opens WhatsApp with pre-filled message)
-                                    sendReceiptViaWhatsAppSilent();
-                                }
-                            } else {
-                                // If Database not available, use frontend method
-                                sendReceiptViaWhatsAppSilent();
-                            }
-                        } catch (whatsappError) {
-                            console.error('❌ Error sending receipt to WhatsApp:', whatsappError);
-                            // Don't show error to user - fail silently
-                        }
-
-                        // Clear cart
-                        cart = [];
-                        updateCartUI();
-                        saveCart();
-                        toggleCart();
-
-                        // No notification shown - receipt is sent to WhatsApp automatically
-
-                    } catch (error) {
-                        // Hide loading modal in case of any unexpected error
-                        hidePaymentVerificationModal();
-                        console.error('❌ Error processing payment:', error);
-                        alert('An error occurred while processing your payment. Please try again or contact support.\n\nError: ' + error.message);
-                        showNotification('Payment processing failed. Please try again.', 'error');
-                    }
-                }
-
-                // Process STK Push (M-Pesa Prompt) payment
-                async function processSTKPushPayment(customerName, customerPhone, customerEmail, total, deliveryOption, deliveryAddress, subtotal, deliveryCost) {
-                    try {
-                        // Show loading modal
-                        showPaymentVerificationModal();
-
-                        // Check if backend is available (STK Push needs backend API, not necessarily Database)
-                        console.log('🔍 Checking backend availability for STK Push...');
-                        let backendAvailable = false;
-                        try {
-                            backendAvailable = await apiService.checkBackend();
-                            console.log('📊 Backend available:', backendAvailable);
-                        } catch (backendError) {
-                            console.error('❌ Error checking backend:', backendError);
-                            backendAvailable = false;
-                        }
-
-                        if (!backendAvailable) {
-                            hidePaymentVerificationModal();
-
-                            // Provide helpful error message based on environment
-                            const isProduction = window.location.hostname === 'trendydresses.co.ke' ||
-                                window.location.hostname === 'www.trendydresses.co.ke';
-
-                            let errorMessage = 'STK Push payment requires the backend server to be running.\n\n';
-
-                            if (isProduction) {
-                                errorMessage += 'For Production Website:\n';
-                                errorMessage += '1. SSH into your production server\n';
-                                errorMessage += '2. Navigate to backend folder: cd /path/to/backend\n';
-                                errorMessage += '3. Install dependencies: npm install\n';
-                                errorMessage += '4. Start with PM2: pm2 start npm --name "trendy-dresses-api" -- start\n';
-                                errorMessage += '5. Save PM2: pm2 save && pm2 startup\n';
-                                errorMessage += '6. Configure Nginx/Apache reverse proxy (see PRODUCTION_BACKEND_SETUP.md)\n\n';
-                                errorMessage += 'Backend URL being checked: ' + apiService.baseURL + '\n\n';
-                                errorMessage += 'See PRODUCTION_BACKEND_SETUP.md for detailed instructions.';
-                            } else {
-                                errorMessage += 'For Local Development:\n';
-                                errorMessage += '1. Navigate to backend folder\n';
-                                errorMessage += '2. Run: npm start\n';
-                                errorMessage += '3. Wait for "✅ Connected to Database successfully"\n';
-                                errorMessage += '4. Refresh this page\n\n';
-                                errorMessage += 'Backend URL: ' + apiService.baseURL;
-                            }
-
-                            alert(errorMessage);
-                            console.error('❌ Backend not available at:', apiService.baseURL);
-                            console.error('📋 See PRODUCTION_BACKEND_SETUP.md or backend/QUICK_START.md for setup instructions');
-                            return;
-                        }
-
-                        console.log('✅ Backend is available - proceeding with STK Push');
-
-                        // Generate order ID first
-                        const orderId = 'ORD-' + Date.now();
-
-                        // Get delivery option text
-                        let deliveryOptionText = 'Shop Pickup';
-                        if (deliveryOption) {
-                            switch (deliveryOption.value) {
-                                case 'pickup':
-                                    deliveryOptionText = 'Shop Pickup';
-                                    break;
-                                case 'nairobi-cbd':
-                                    deliveryOptionText = 'Delivery within Nairobi CBD (KSh 250)';
-                                    break;
-                                case 'elsewhere':
-                                    deliveryOptionText = 'Delivery Elsewhere (within Kenya) (KSh 300)';
-                                    break;
-                            }
-                        }
-
-                        // Format phone number for STK Push API (ensure it's in 254 format)
-                        let formattedPhone = customerPhone.trim();
-                        if (!formattedPhone.startsWith('254')) {
-                            // Remove leading 0 and add 254
-                            if (formattedPhone.startsWith('0')) {
-                                formattedPhone = '254' + formattedPhone.substring(1);
-                            } else if (formattedPhone.length === 9) {
-                                // 7XX format - add 254 prefix
-                                formattedPhone = '254' + formattedPhone;
-                            }
-                        }
-
-                        // Validate phone number format
-                        if (!/^2547\d{8}$/.test(formattedPhone)) {
-                            hidePaymentVerificationModal();
-                            alert('Please enter a valid M-Pesa phone number.\n\nFormat: 0724904692 or 254724904692\n\nThe number must be registered with M-Pesa.');
-                            document.getElementById('customerPhone')?.focus();
-                            return;
-                        }
-
-                        // Initiate STK Push
-                        console.log('📱 Initiating STK Push payment...');
-                        console.log('📞 Phone number:', formattedPhone.replace(/(\d{3})(\d{3})(\d{3})/, '$1***$3')); // Mask middle digits for privacy
-                        console.log('💰 Amount: KSh', total.toLocaleString('en-KE'));
-                        console.log('📦 Order ID:', orderId);
-
-                        const stkResult = await apiService.initiateSTKPush(
-                            formattedPhone, // Use formatted phone number
-                            total,
-                            orderId,
-                            `Payment for order ${orderId}`
-                        );
-
-                        if (!stkResult.success) {
-                            hidePaymentVerificationModal();
-                            alert(`Failed to initiate M-Pesa payment prompt:\n\n${stkResult.responseDescription || 'Unknown error'}\n\nPlease ensure your phone number is correct and registered with M-Pesa.`);
-                            return;
-                        }
-
-                        // Show waiting message with phone number
-                        const verificationModal = document.getElementById('paymentVerificationModal');
-                        const verificationText = verificationModal?.querySelector('p');
-                        if (verificationText) {
-                            const displayPhone = formattedPhone.replace(/(\d{3})(\d{3})(\d{3})/, '$1***$3'); // Mask for display
-                            verificationText.innerHTML = `A payment prompt has been sent to <strong>${displayPhone}</strong>.<br><br>Please check your phone and enter your M-Pesa PIN to complete the payment...`;
-                        }
-
-                        console.log('✅ STK Push initiated:', stkResult.checkoutRequestID);
-                        console.log('📱 Customer message:', stkResult.customerMessage);
-
-                        // Poll for payment completion
-                        const checkoutRequestID = stkResult.checkoutRequestID;
-                        let attempts = 0;
-                        const maxAttempts = 60; // Poll for up to 2 minutes (60 * 2 seconds)
-
-                        const pollPaymentStatus = async () => {
-                            attempts++;
-
-                            try {
-                                // Query STK Push status
-                                const statusResult = await apiService.querySTKPushStatus(checkoutRequestID);
-
-                                if (statusResult.resultCode === '0') {
-                                    // Payment successful! Check for transaction in database
-                                    console.log('✅ Payment completed via STK Push');
-
-                                    // Wait a moment for webhook to process
-                                    await new Promise(resolve => setTimeout(resolve, 2000));
-
-                                    // Check for transaction in database by checking recent transactions
-                                    if (useDatabase) {
-                                        try {
-                                            // Try to get transactions from API
-                                            const response = await fetch(`${apiService.baseURL}/mpesa/transactions?phoneNumber=${customerPhone.replace(/^0/, '254')}&limit=1`);
-                                            if (response.ok) {
-                                                const data = await response.json();
-                                                if (data.success && data.transactions && data.transactions.length > 0) {
-                                                    const transaction = data.transactions[0];
-                                                    const receiptNumber = transaction.receiptNumber;
-                                                    const transactionAmount = transaction.amount;
-
-                                                    // Verify amount matches
-                                                    if (Math.abs(transactionAmount - total) < 1) {
-                                                        // Create order with the receipt number
-                                                        await createOrderFromSTKPush(
-                                                            orderId,
-                                                            customerName,
-                                                            customerPhone,
-                                                            customerEmail,
-                                                            total,
-                                                            deliveryOption,
-                                                            deliveryAddress,
-                                                            subtotal,
-                                                            deliveryCost,
-                                                            deliveryOptionText,
-                                                            receiptNumber
-                                                        );
-                                                        return; // Exit polling
-                                                    }
-                                                }
-                                            }
-                                        } catch (checkError) {
-                                            console.error('Error checking transaction:', checkError);
-                                        }
-                                    }
-
-                                    // If we couldn't find transaction, still create order (transaction will be linked via webhook)
-                                    // Note: createOrderFromSTKPush will save to localStorage even if Database fails
-                                    await createOrderFromSTKPush(
-                                        orderId,
-                                        customerName,
-                                        customerPhone,
-                                        customerEmail,
-                                        total,
-                                        deliveryOption,
-                                        deliveryAddress,
-                                        subtotal,
-                                        deliveryCost,
-                                        deliveryOptionText,
-                                        null // Receipt number will come from webhook
-                                    );
-                                    return; // Exit polling
-                                } else if (statusResult.resultCode === '1032') {
-                                    // User cancelled or timeout - keep polling
-                                    if (attempts < maxAttempts) {
-                                        setTimeout(pollPaymentStatus, 2000);
-                                    } else {
-                                        hidePaymentVerificationModal();
-                                        alert('Payment timeout. Please try again or use Till Number payment method.');
-                                    }
-                                } else {
-                                    // Payment failed or error
-                                    hidePaymentVerificationModal();
-                                    alert(`Payment failed:\n\n${statusResult.resultDesc || 'Unknown error'}`);
-                                }
-                            } catch (error) {
-                                console.error('Error polling STK Push status:', error);
-                                if (attempts < maxAttempts) {
-                                    setTimeout(pollPaymentStatus, 2000);
-                                } else {
-                                    hidePaymentVerificationModal();
-                                    alert('Error checking payment status. Please check your M-Pesa messages or use Till Number payment method.');
-                                }
-                            }
-                        };
-
-                        // Start polling
-                        setTimeout(pollPaymentStatus, 2000); // Start after 2 seconds
-
-                    } catch (error) {
-                        hidePaymentVerificationModal();
-                        console.error('❌ Error processing STK Push payment:', error);
-                        alert(`Failed to initiate M-Pesa payment:\n\n${error.message}\n\nPlease try again or use Till Number payment method.`);
-                    }
-                }
-
-                // Create order from STK Push payment
-                async function createOrderFromSTKPush(orderId, customerName, customerPhone, customerEmail, total, deliveryOption, deliveryAddress, subtotal, deliveryCost, deliveryOptionText, mpesaCode) {
-                    try {
-                        hidePaymentVerificationModal();
-
-                        // Create order object
-                        const order = {
-                            orderId: orderId,
-                            date: new Date().toLocaleString('en-KE'),
-                            customer: {
-                                name: customerName,
-                                phone: customerPhone,
-                                email: customerEmail
-                            },
-                            items: cart.map(item => {
-                                const product = products.find(p => p.id === item.id);
-                                return {
-                                    name: item.name,
-                                    quantity: item.quantity,
-                                    price: item.price,
-                                    subtotal: item.price * item.quantity,
-                                    productId: item.id || '',
-                                    image: product?.image || item.image || ''
-                                };
-                            }),
-                            subtotal: subtotal,
-                            delivery: {
-                                option: deliveryOption ? deliveryOption.value : 'pickup',
-                                optionText: deliveryOptionText,
-                                cost: deliveryCost,
-                                address: deliveryAddress || ''
-                            },
-                            total: total,
-                            totalPaid: total,
-                            paymentMethod: 'M-Pesa STK Push',
-                            mpesaCode: mpesaCode || 'PENDING',
-                            mpesaCodes: mpesaCode ? [{ code: mpesaCode, amount: total }] : [],
-                            mpesaCodesString: mpesaCode || 'Pending'
-                        };
-
-                        // Save order to localStorage first
-                        saveOrderToLocalStorage(order);
-                        console.log('✅ Order saved to localStorage');
-
-                        // Save order to Database if available
-                        const useDatabase = localStorage.getItem('useDatabase') === 'true';
-                        if (useDatabase) {
-                            try {
-                                await apiService.createOrder(order);
-                                console.log('✅ Order saved to Database');
-                            } catch (orderError) {
-                                console.error('❌ Error saving order:', orderError);
-                                // Continue even if Database save fails
-                            }
-                        }
-
-                        // Subtract quantity from products
-                        cart.forEach(cartItem => {
-                            const product = products.find(p => p.id === cartItem.id);
-                            if (product) {
-                                const currentQuantity = product.quantity || 0;
-                                const purchasedQuantity = cartItem.quantity;
-                                product.quantity = Math.max(0, currentQuantity - purchasedQuantity);
-                            }
-                        });
-
-                        // Save updated products
-                        try {
-                            await saveProducts();
-                        } catch (saveError) {
-                            console.error('❌ Error saving products:', saveError);
-                        }
-
-                        // Refresh product display
-                        try {
-                            displayProducts(currentCategory);
-                        } catch (displayError) {
-                            console.error('❌ Error displaying products:', displayError);
-                        }
-
-                        // Generate PDF receipt
-                        try {
-                            await generateReceiptPDF(order);
-                        } catch (pdfError) {
-                            console.error('❌ Error generating PDF receipt:', pdfError);
-                        }
-
-                        // Store order
-                        currentOrder = order;
-
-                        // Close payment modal
-                        closePaymentModal();
-
-                        // Send receipt to WhatsApp
-                        try {
-                            if (!currentOrderPDF) {
-                                await generateReceiptPDF(order);
-                            }
-
-                            if (useDatabase) {
-                                try {
-                                    await apiService.sendReceiptToWhatsApp(order, currentOrderPDF);
-                                    console.log('✅ Receipt and PDF sent to WhatsApp via backend');
-                                } catch (backendError) {
-                                    console.error('❌ Backend WhatsApp send failed:', backendError);
-                                    sendReceiptViaWhatsAppSilent();
-                                }
-                            } else {
-                                sendReceiptViaWhatsAppSilent();
-                            }
-                        } catch (whatsappError) {
-                            console.error('❌ Error sending receipt to WhatsApp:', whatsappError);
-                        }
-
-                        // Clear cart
-                        cart = [];
-                        updateCartUI();
-                        saveCart();
-                        toggleCart();
-
-                    } catch (error) {
-                        console.error('❌ Error creating order from STK Push:', error);
-                        alert('Error creating order. Please contact support.');
-                    }
-                }
-
-                // Current order for receipt
-                let currentOrder = null;
-
-                // Generate PDF Receipt
-                async function generateReceiptPDF(order) {
-                    const { jsPDF } = window.jspdf;
-                    const doc = new jsPDF();
-
-                    // Company Info
-                    doc.setFontSize(20);
-                    doc.text('TRENDY DRESSES', 105, 20, { align: 'center' });
-                    doc.setFontSize(12);
-                    doc.text('Nairobi, Moi avenue, Imenti HSE Glory Exhibition Basement, Shop B4', 105, 28, { align: 'center' });
-                    doc.text('Phone: +254 724 904 692 | Email: Trendy dresses790@gmail.com', 105, 34, { align: 'center' });
-
-                    // Line
-                    doc.setDrawColor(200, 200, 200);
-                    doc.line(20, 40, 190, 40);
-
-                    // Receipt Title
-                    doc.setFontSize(16);
-                    doc.text('RECEIPT', 105, 50, { align: 'center' });
-
-                    // Payment Stamp will be added later in the center of the page
-
-                    // Order Details
-                    doc.setFontSize(10);
-                    doc.text(`Order ID: ${order.orderId}`, 20, 60);
-                    doc.text(`Date: ${order.date}`, 20, 66);
-                    doc.text(`Payment Method: ${order.paymentMethod}`, 20, 72);
-                    doc.text(`M-Pesa Code: ${order.mpesaCode}`, 20, 78);
-
-                    // Customer Info
-                    doc.text(`Customer: ${order.customer.name}`, 20, 86);
-                    doc.text(`Phone: ${order.customer.phone}`, 20, 92);
-                    if (order.customer.email) {
-                        doc.text(`Email: ${order.customer.email}`, 20, 98);
-                    }
-
-                    // Payment Stamp - Round stamp next to customer details (right side)
-                    const stampX = 150; // X position (right side, next to customer details)
-                    const stampY = 92; // Y position (aligned with customer details)
-                    const stampRadius = 18; // Radius of the circle
-
-                    // Draw filled circle background (white)
-                    doc.setFillColor(255, 255, 255); // White fill
-                    doc.setDrawColor(0, 150, 0); // Dark green border
-                    doc.setLineWidth(2.5);
-                    doc.circle(stampX, stampY, stampRadius, 'FD'); // 'FD' for fill and draw
-
-                    // Draw inner circle border for depth
-                    doc.setDrawColor(0, 200, 0); // Medium green
-                    doc.setLineWidth(1);
-                    doc.circle(stampX, stampY, stampRadius - 3, 'S'); // Inner border
-
-                    // Add shop name at the top of the stamp
-                    doc.setFontSize(7);
-                    doc.setFont(undefined, 'bold');
-                    doc.setTextColor(0, 150, 0); // Dark green text
-                    doc.text('TRENDY DRESSES', stampX, stampY - 7, { align: 'center' });
-
-                    // Add decorative line
-                    doc.setDrawColor(0, 150, 0);
-                    doc.setLineWidth(0.5);
-                    doc.line(stampX - 10, stampY - 4, stampX + 10, stampY - 4);
-
-                    // Add "PAID" text in the center (bold and prominent)
-                    doc.setFontSize(16);
-                    doc.setFont(undefined, 'bold');
-                    doc.setTextColor(0, 120, 0); // Dark green text
-                    doc.text('PAID', stampX, stampY + 1, { align: 'center' });
-
-                    // Add decorative line below PAID
-                    doc.setDrawColor(0, 150, 0);
-                    doc.setLineWidth(0.5);
-                    doc.line(stampX - 8, stampY + 4, stampX + 8, stampY + 4);
-
-                    // Add date below "PAID"
-                    doc.setFontSize(6);
-                    doc.setFont(undefined, 'normal');
-                    const stampDate = new Date().toLocaleDateString('en-KE', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric'
-                    });
-                    doc.text(stampDate, stampX, stampY + 8, { align: 'center' });
-
-                    // Reset colors and styles
-                    doc.setTextColor(0, 0, 0); // Reset to black
-                    doc.setDrawColor(200, 200, 200); // Reset to gray
-                    doc.setLineWidth(0.5); // Reset line width
-                    doc.setFillColor(255, 255, 255); // Reset fill to white
-
-                    // Line
-                    doc.line(20, 104, 190, 104);
-
-                    // Items Header
-                    doc.setFontSize(11);
-                    doc.setFont(undefined, 'bold');
-                    doc.text('Item', 20, 112);
-                    doc.text('Qty', 120, 112);
-                    doc.text('Price', 150, 112);
-                    doc.text('Subtotal', 170, 112);
-                    doc.setFont(undefined, 'normal');
-
-                    // Items with images
-                    let yPos = 120;
-                    for (const item of order.items) {
-                        doc.setFontSize(10);
-
-                        // Find product to get image - try multiple ways
-                        let itemImage = item.image || '';
-                        if (!itemImage || itemImage.trim() === '') {
-                            const product = products.find(p =>
-                                p.id === item.productId ||
-                                p._id === item.productId ||
-                                (p.name && item.name && p.name.toLowerCase() === item.name.toLowerCase())
-                            );
-                            itemImage = product?.image || '';
-                        }
-
-                        const hasImage = itemImage && itemImage.trim() !== '';
-
-                        // Add item image if available - ensure it's visible
-                        if (hasImage) {
-                            try {
-                                // Add image (35x35mm for better visibility, left side)
-                                const imgWidth = 35;
-                                const imgHeight = 35;
-                                const imgX = 20;
-                                const imgY = yPos - 30;
-
-                                // Convert base64 data URL to usable format
-                                let imageData = itemImage.trim();
-
-                                // Handle different image formats
-                                if (imageData.startsWith('data:image/')) {
-                                    // Already a data URL with format
-                                    const formatMatch = imageData.match(/data:image\/(\w+);base64,/);
-                                    const format = formatMatch ? formatMatch[1].toUpperCase() : 'JPEG';
-                                    // Extract base64 part
-                                    const base64Data = imageData.split(',')[1];
-                                    imageData = `data:image/${format.toLowerCase()};base64,${base64Data}`;
-
-                                    // Try to add image
-                                    try {
-                                        doc.addImage(imageData, format, imgX, imgY, imgWidth, imgHeight);
-                                    } catch (formatError) {
-                                        // If format fails, try JPEG
-                                        doc.addImage(imageData, 'JPEG', imgX, imgY, imgWidth, imgHeight);
-                                    }
-                                } else if (imageData.startsWith('http://') || imageData.startsWith('https://')) {
-                                    // URL - log warning but don't skip, user can see it's an image URL
-                                    console.log('⚠️ Image URL not directly supported in PDF:', item.name);
-                                    // Still show item name
-                                    doc.text(item.name.substring(0, 40), imgX + imgWidth + 5, yPos);
-                                } else {
-                                    // Assume base64 without data URL prefix - try JPEG first
-                                    imageData = 'data:image/jpeg;base64,' + imageData;
-                                    try {
-                                        doc.addImage(imageData, 'JPEG', imgX, imgY, imgWidth, imgHeight);
-                                    } catch (jpegError) {
-                                        // Try PNG
-                                        imageData = 'data:image/png;base64,' + itemImage;
-                                        doc.addImage(imageData, 'PNG', imgX, imgY, imgWidth, imgHeight);
-                                    }
-                                }
-
-                                // Item name (moved to the right of image)
-                                doc.text(item.name.substring(0, 30), imgX + imgWidth + 8, yPos);
-                                yPos += 12; // Extra space for image
-                            } catch (imgError) {
-                                console.error('Error adding image to PDF for item:', item.name, imgError);
-                                console.error('Image data preview:', itemImage.substring(0, 50));
-                                // Fallback to text only
-                                doc.text(item.name.substring(0, 40), 20, yPos);
-                            }
-                        } else {
-                            // No image - just text
-                            doc.text(item.name.substring(0, 40), 20, yPos);
-                        }
-
-                        // Quantity, Price, Subtotal (shifted right if image exists)
-                        const textStartX = hasImage ? 60 : 120;
-                        doc.text(item.quantity.toString(), textStartX, yPos);
-                        doc.text(`KSh ${item.price.toLocaleString('en-KE')}`, textStartX + 30, yPos);
-                        doc.text(`KSh ${item.subtotal.toLocaleString('en-KE')}`, textStartX + 50, yPos);
-
-                        yPos += hasImage ? 40 : 6; // More space if image exists (increased for better visibility)
-
-                        // Check if we need a new page
-                        if (yPos > 250) {
-                            doc.addPage();
-                            yPos = 20;
-                        }
-                    }
-
-                    // Line
-                    doc.line(20, yPos + 2, 190, yPos + 2);
-
-                    // Subtotal and Delivery
-                    yPos += 8;
-                    doc.setFontSize(10);
-                    doc.setFont(undefined, 'normal');
-                    doc.text(`Subtotal: KSh ${(order.subtotal || order.total).toLocaleString('en-KE')}`, 150, yPos);
-
-                    // Delivery cost
-                    if (order.delivery && order.delivery.cost > 0) {
-                        yPos += 6;
-                        doc.text(`Delivery: KSh ${order.delivery.cost.toLocaleString('en-KE')}`, 150, yPos);
-                    }
-
-                    // Line before total
-                    doc.line(20, yPos + 4, 190, yPos + 4);
-
-                    // Total
-                    yPos += 8;
-                    doc.setFontSize(12);
-                    doc.setFont(undefined, 'bold');
-                    doc.text(`TOTAL: KSh ${order.total.toLocaleString('en-KE')}`, 150, yPos);
-
-                    // Delivery Information
-                    if (order.delivery) {
-                        yPos += 10;
-                        doc.setFontSize(10);
-                        doc.setFont(undefined, 'bold');
-                        doc.setTextColor(0, 0, 0);
-                        doc.text('Delivery Information:', 20, yPos);
-
-                        yPos += 6;
-                        doc.setFont(undefined, 'normal');
-                        doc.text(`Option: ${order.delivery.optionText || 'Shop Pickup'}`, 20, yPos);
-
-                        if (order.delivery.address && order.delivery.address.trim() !== '') {
-                            yPos += 6;
-                            // Split address into multiple lines if it's too long
-                            const addressLines = doc.splitTextToSize(`Address: ${order.delivery.address}`, 170);
-                            doc.text(addressLines, 20, yPos);
-                            yPos += (addressLines.length - 1) * 6;
-                        }
-                    }
-
-                    // Delivery Message
-                    yPos += 8;
-                    doc.setFontSize(10);
-                    doc.setFont(undefined, 'bold');
-                    doc.setTextColor(0, 100, 0); // Green color
-                    if (order.delivery && order.delivery.option !== 'pickup') {
-                        doc.text('Parcel will be delivered within 24hrs', 105, yPos, { align: 'center' });
+                    // If we couldn't find transaction, still create order (transaction will be linked via webhook)
+                    // Note: createOrderFromSTKPush will save to localStorage even if Database fails
+                    await createOrderFromSTKPush(
+                        orderId,
+                        customerName,
+                        customerPhone,
+                        customerEmail,
+                        total,
+                        deliveryOption,
+                        deliveryAddress,
+                        subtotal,
+                        deliveryCost,
+                        deliveryOptionText,
+                        null // Receipt number will come from webhook
+                    );
+                    return; // Exit polling
+                } else if (statusResult.resultCode === '1032') {
+                    // User cancelled or timeout - keep polling
+                    if (attempts < maxAttempts) {
+                        setTimeout(pollPaymentStatus, 2000);
                     } else {
-                        doc.text('Ready for pickup at our shop', 105, yPos, { align: 'center' });
+                        hidePaymentVerificationModal();
+                        alert('Payment timeout. Please try again or use Till Number payment method.');
                     }
-                    doc.setTextColor(0, 0, 0); // Reset to black
-
-                    // Footer
-                    doc.setFontSize(9);
-                    doc.setFont(undefined, 'normal');
-                    doc.text('Thank you for your purchase!', 105, 270, { align: 'center' });
-                    doc.text('For inquiries, contact us via WhatsApp: +254 724 904 692', 105, 276, { align: 'center' });
-
-                    // Save PDF
-                    const pdfBlob = doc.output('blob');
-                    currentOrderPDF = pdfBlob;
-
-                    // Auto download
-                    doc.save(`Receipt_${order.orderId}.pdf`);
+                } else {
+                    // Payment failed or error
+                    hidePaymentVerificationModal();
+                    alert(`Payment failed:\n\n${statusResult.resultDesc || 'Unknown error'}`);
                 }
-
-                let currentOrderPDF = null;
-
-                // Open Receipt Modal
-                function openReceiptModal() {
-                    const modal = document.getElementById('receiptModal');
-                    const overlay = document.getElementById('receiptOverlay');
-                    modal.classList.add('show');
-                    overlay.classList.add('show');
-                    overlay.style.display = 'block';
+            } catch (error) {
+                console.error('Error polling STK Push status:', error);
+                if (attempts < maxAttempts) {
+                    setTimeout(pollPaymentStatus, 2000);
+                } else {
+                    hidePaymentVerificationModal();
+                    alert('Error checking payment status. Please check your M-Pesa messages or use Till Number payment method.');
                 }
+            }
+        };
 
-                // Close Receipt Modal
-                function closeReceiptModal() {
-                    const modal = document.getElementById('receiptModal');
-                    const overlay = document.getElementById('receiptOverlay');
-                    modal.classList.remove('show');
-                    overlay.classList.remove('show');
-                    overlay.style.display = 'none';
+        // Start polling
+        setTimeout(pollPaymentStatus, 2000); // Start after 2 seconds
+
+    } catch (error) {
+        hidePaymentVerificationModal();
+        console.error('❌ Error processing STK Push payment:', error);
+        alert(`Failed to initiate M-Pesa payment:\n\n${error.message}\n\nPlease try again or use Till Number payment method.`);
+    }
+}
+
+// Create order from STK Push payment
+async function createOrderFromSTKPush(orderId, customerName, customerPhone, customerEmail, total, deliveryOption, deliveryAddress, subtotal, deliveryCost, deliveryOptionText, mpesaCode) {
+    try {
+        hidePaymentVerificationModal();
+
+        // Create order object
+        const order = {
+            orderId: orderId,
+            date: new Date().toLocaleString('en-KE'),
+            customer: {
+                name: customerName,
+                phone: customerPhone,
+                email: customerEmail
+            },
+            items: cart.map(item => {
+                const product = products.find(p => p.id === item.id);
+                return {
+                    name: item.name,
+                    quantity: item.quantity,
+                    price: item.price,
+                    subtotal: item.price * item.quantity,
+                    productId: item.id || '',
+                    image: product?.image || item.image || ''
+                };
+            }),
+            subtotal: subtotal,
+            delivery: {
+                option: deliveryOption ? deliveryOption.value : 'pickup',
+                optionText: deliveryOptionText,
+                cost: deliveryCost,
+                address: deliveryAddress || ''
+            },
+            total: total,
+            totalPaid: total,
+            paymentMethod: 'M-Pesa STK Push',
+            mpesaCode: mpesaCode || 'PENDING',
+            mpesaCodes: mpesaCode ? [{ code: mpesaCode, amount: total }] : [],
+            mpesaCodesString: mpesaCode || 'Pending'
+        };
+
+        // Save order to localStorage first
+        saveOrderToLocalStorage(order);
+        console.log('✅ Order saved to localStorage');
+
+        // Save order to Database if available
+        const useDatabase = localStorage.getItem('useDatabase') === 'true';
+        if (useDatabase) {
+            try {
+                await apiService.createOrder(order);
+                console.log('✅ Order saved to Database');
+            } catch (orderError) {
+                console.error('❌ Error saving order:', orderError);
+                // Continue even if Database save fails
+            }
+        }
+
+        // Subtract quantity from products
+        cart.forEach(cartItem => {
+            const product = products.find(p => p.id === cartItem.id);
+            if (product) {
+                const currentQuantity = product.quantity || 0;
+                const purchasedQuantity = cartItem.quantity;
+                product.quantity = Math.max(0, currentQuantity - purchasedQuantity);
+            }
+        });
+
+        // Save updated products
+        try {
+            await saveProducts();
+        } catch (saveError) {
+            console.error('❌ Error saving products:', saveError);
+        }
+
+        // Refresh product display
+        try {
+            displayProducts(currentCategory);
+        } catch (displayError) {
+            console.error('❌ Error displaying products:', displayError);
+        }
+
+        // Generate PDF receipt
+        try {
+            await generateReceiptPDF(order);
+        } catch (pdfError) {
+            console.error('❌ Error generating PDF receipt:', pdfError);
+        }
+
+        // Store order
+        currentOrder = order;
+
+        // Close payment modal
+        closePaymentModal();
+
+        // Send receipt to WhatsApp
+        try {
+            if (!currentOrderPDF) {
+                await generateReceiptPDF(order);
+            }
+
+            if (useDatabase) {
+                try {
+                    await apiService.sendReceiptToWhatsApp(order, currentOrderPDF);
+                    console.log('✅ Receipt and PDF sent to WhatsApp via backend');
+                } catch (backendError) {
+                    console.error('❌ Backend WhatsApp send failed:', backendError);
+                    sendReceiptViaWhatsAppSilent();
                 }
+            } else {
+                sendReceiptViaWhatsAppSilent();
+            }
+        } catch (whatsappError) {
+            console.error('❌ Error sending receipt to WhatsApp:', whatsappError);
+        }
 
-                // Download Receipt
-                function downloadReceipt() {
-                    if (currentOrderPDF) {
-                        const url = URL.createObjectURL(currentOrderPDF);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = `Receipt_${currentOrder.orderId}.pdf`;
-                        a.click();
-                        URL.revokeObjectURL(url);
+        // Clear cart
+        cart = [];
+        updateCartUI();
+        saveCart();
+        toggleCart();
+
+    } catch (error) {
+        console.error('❌ Error creating order from STK Push:', error);
+        alert('Error creating order. Please contact support.');
+    }
+}
+
+// Current order for receipt
+let currentOrder = null;
+
+// Generate PDF Receipt
+async function generateReceiptPDF(order) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    // Company Info
+    doc.setFontSize(20);
+    doc.text('TRENDY DRESSES', 105, 20, { align: 'center' });
+    doc.setFontSize(12);
+    doc.text('Nairobi, Moi avenue, Imenti HSE Glory Exhibition Basement, Shop B4', 105, 28, { align: 'center' });
+    doc.text('Phone: +254 724 904 692 | Email: Trendy dresses790@gmail.com', 105, 34, { align: 'center' });
+
+    // Line
+    doc.setDrawColor(200, 200, 200);
+    doc.line(20, 40, 190, 40);
+
+    // Receipt Title
+    doc.setFontSize(16);
+    doc.text('RECEIPT', 105, 50, { align: 'center' });
+
+    // Payment Stamp will be added later in the center of the page
+
+    // Order Details
+    doc.setFontSize(10);
+    doc.text(`Order ID: ${order.orderId}`, 20, 60);
+    doc.text(`Date: ${order.date}`, 20, 66);
+    doc.text(`Payment Method: ${order.paymentMethod}`, 20, 72);
+    doc.text(`M-Pesa Code: ${order.mpesaCode}`, 20, 78);
+
+    // Customer Info
+    doc.text(`Customer: ${order.customer.name}`, 20, 86);
+    doc.text(`Phone: ${order.customer.phone}`, 20, 92);
+    if (order.customer.email) {
+        doc.text(`Email: ${order.customer.email}`, 20, 98);
+    }
+
+    // Payment Stamp - Round stamp next to customer details (right side)
+    const stampX = 150; // X position (right side, next to customer details)
+    const stampY = 92; // Y position (aligned with customer details)
+    const stampRadius = 18; // Radius of the circle
+
+    // Draw filled circle background (white)
+    doc.setFillColor(255, 255, 255); // White fill
+    doc.setDrawColor(0, 150, 0); // Dark green border
+    doc.setLineWidth(2.5);
+    doc.circle(stampX, stampY, stampRadius, 'FD'); // 'FD' for fill and draw
+
+    // Draw inner circle border for depth
+    doc.setDrawColor(0, 200, 0); // Medium green
+    doc.setLineWidth(1);
+    doc.circle(stampX, stampY, stampRadius - 3, 'S'); // Inner border
+
+    // Add shop name at the top of the stamp
+    doc.setFontSize(7);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(0, 150, 0); // Dark green text
+    doc.text('TRENDY DRESSES', stampX, stampY - 7, { align: 'center' });
+
+    // Add decorative line
+    doc.setDrawColor(0, 150, 0);
+    doc.setLineWidth(0.5);
+    doc.line(stampX - 10, stampY - 4, stampX + 10, stampY - 4);
+
+    // Add "PAID" text in the center (bold and prominent)
+    doc.setFontSize(16);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(0, 120, 0); // Dark green text
+    doc.text('PAID', stampX, stampY + 1, { align: 'center' });
+
+    // Add decorative line below PAID
+    doc.setDrawColor(0, 150, 0);
+    doc.setLineWidth(0.5);
+    doc.line(stampX - 8, stampY + 4, stampX + 8, stampY + 4);
+
+    // Add date below "PAID"
+    doc.setFontSize(6);
+    doc.setFont(undefined, 'normal');
+    const stampDate = new Date().toLocaleDateString('en-KE', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+    });
+    doc.text(stampDate, stampX, stampY + 8, { align: 'center' });
+
+    // Reset colors and styles
+    doc.setTextColor(0, 0, 0); // Reset to black
+    doc.setDrawColor(200, 200, 200); // Reset to gray
+    doc.setLineWidth(0.5); // Reset line width
+    doc.setFillColor(255, 255, 255); // Reset fill to white
+
+    // Line
+    doc.line(20, 104, 190, 104);
+
+    // Items Header
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'bold');
+    doc.text('Item', 20, 112);
+    doc.text('Qty', 120, 112);
+    doc.text('Price', 150, 112);
+    doc.text('Subtotal', 170, 112);
+    doc.setFont(undefined, 'normal');
+
+    // Items with images
+    let yPos = 120;
+    for (const item of order.items) {
+        doc.setFontSize(10);
+
+        // Find product to get image - try multiple ways
+        let itemImage = item.image || '';
+        if (!itemImage || itemImage.trim() === '') {
+            const product = products.find(p =>
+                p.id === item.productId ||
+                p._id === item.productId ||
+                (p.name && item.name && p.name.toLowerCase() === item.name.toLowerCase())
+            );
+            itemImage = product?.image || '';
+        }
+
+        const hasImage = itemImage && itemImage.trim() !== '';
+
+        // Add item image if available - ensure it's visible
+        if (hasImage) {
+            try {
+                // Add image (35x35mm for better visibility, left side)
+                const imgWidth = 35;
+                const imgHeight = 35;
+                const imgX = 20;
+                const imgY = yPos - 30;
+
+                // Convert base64 data URL to usable format
+                let imageData = itemImage.trim();
+
+                // Handle different image formats
+                if (imageData.startsWith('data:image/')) {
+                    // Already a data URL with format
+                    const formatMatch = imageData.match(/data:image\/(\w+);base64,/);
+                    const format = formatMatch ? formatMatch[1].toUpperCase() : 'JPEG';
+                    // Extract base64 part
+                    const base64Data = imageData.split(',')[1];
+                    imageData = `data:image/${format.toLowerCase()};base64,${base64Data}`;
+
+                    // Try to add image
+                    try {
+                        doc.addImage(imageData, format, imgX, imgY, imgWidth, imgHeight);
+                    } catch (formatError) {
+                        // If format fails, try JPEG
+                        doc.addImage(imageData, 'JPEG', imgX, imgY, imgWidth, imgHeight);
+                    }
+                } else if (imageData.startsWith('http://') || imageData.startsWith('https://')) {
+                    // URL - log warning but don't skip, user can see it's an image URL
+                    console.log('⚠️ Image URL not directly supported in PDF:', item.name);
+                    // Still show item name
+                    doc.text(item.name.substring(0, 40), imgX + imgWidth + 5, yPos);
+                } else {
+                    // Assume base64 without data URL prefix - try JPEG first
+                    imageData = 'data:image/jpeg;base64,' + imageData;
+                    try {
+                        doc.addImage(imageData, 'JPEG', imgX, imgY, imgWidth, imgHeight);
+                    } catch (jpegError) {
+                        // Try PNG
+                        imageData = 'data:image/png;base64,' + itemImage;
+                        doc.addImage(imageData, 'PNG', imgX, imgY, imgWidth, imgHeight);
                     }
                 }
 
-                // Send Receipt via WhatsApp (with notification)
-                function sendReceiptViaWhatsApp() {
-                    if (!currentOrder) return;
+                // Item name (moved to the right of image)
+                doc.text(item.name.substring(0, 30), imgX + imgWidth + 8, yPos);
+                yPos += 12; // Extra space for image
+            } catch (imgError) {
+                console.error('Error adding image to PDF for item:', item.name, imgError);
+                console.error('Image data preview:', itemImage.substring(0, 50));
+                // Fallback to text only
+                doc.text(item.name.substring(0, 40), 20, yPos);
+            }
+        } else {
+            // No image - just text
+            doc.text(item.name.substring(0, 40), 20, yPos);
+        }
 
-                    // Create message with order details
-                    const message = `Hello! I've completed my purchase at Trendy Dresses.
+        // Quantity, Price, Subtotal (shifted right if image exists)
+        const textStartX = hasImage ? 60 : 120;
+        doc.text(item.quantity.toString(), textStartX, yPos);
+        doc.text(`KSh ${item.price.toLocaleString('en-KE')}`, textStartX + 30, yPos);
+        doc.text(`KSh ${item.subtotal.toLocaleString('en-KE')}`, textStartX + 50, yPos);
+
+        yPos += hasImage ? 40 : 6; // More space if image exists (increased for better visibility)
+
+        // Check if we need a new page
+        if (yPos > 250) {
+            doc.addPage();
+            yPos = 20;
+        }
+    }
+
+    // Line
+    doc.line(20, yPos + 2, 190, yPos + 2);
+
+    // Subtotal and Delivery
+    yPos += 8;
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Subtotal: KSh ${(order.subtotal || order.total).toLocaleString('en-KE')}`, 150, yPos);
+
+    // Delivery cost
+    if (order.delivery && order.delivery.cost > 0) {
+        yPos += 6;
+        doc.text(`Delivery: KSh ${order.delivery.cost.toLocaleString('en-KE')}`, 150, yPos);
+    }
+
+    // Line before total
+    doc.line(20, yPos + 4, 190, yPos + 4);
+
+    // Total
+    yPos += 8;
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.text(`TOTAL: KSh ${order.total.toLocaleString('en-KE')}`, 150, yPos);
+
+    // Delivery Information
+    if (order.delivery) {
+        yPos += 10;
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(0, 0, 0);
+        doc.text('Delivery Information:', 20, yPos);
+
+        yPos += 6;
+        doc.setFont(undefined, 'normal');
+        doc.text(`Option: ${order.delivery.optionText || 'Shop Pickup'}`, 20, yPos);
+
+        if (order.delivery.address && order.delivery.address.trim() !== '') {
+            yPos += 6;
+            // Split address into multiple lines if it's too long
+            const addressLines = doc.splitTextToSize(`Address: ${order.delivery.address}`, 170);
+            doc.text(addressLines, 20, yPos);
+            yPos += (addressLines.length - 1) * 6;
+        }
+    }
+
+    // Delivery Message
+    yPos += 8;
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(0, 100, 0); // Green color
+    if (order.delivery && order.delivery.option !== 'pickup') {
+        doc.text('Parcel will be delivered within 24hrs', 105, yPos, { align: 'center' });
+    } else {
+        doc.text('Ready for pickup at our shop', 105, yPos, { align: 'center' });
+    }
+    doc.setTextColor(0, 0, 0); // Reset to black
+
+    // Footer
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'normal');
+    doc.text('Thank you for your purchase!', 105, 270, { align: 'center' });
+    doc.text('For inquiries, contact us via WhatsApp: +254 724 904 692', 105, 276, { align: 'center' });
+
+    // Save PDF
+    const pdfBlob = doc.output('blob');
+    currentOrderPDF = pdfBlob;
+
+    // Auto download
+    doc.save(`Receipt_${order.orderId}.pdf`);
+}
+
+let currentOrderPDF = null;
+
+// Open Receipt Modal
+function openReceiptModal() {
+    const modal = document.getElementById('receiptModal');
+    const overlay = document.getElementById('receiptOverlay');
+    modal.classList.add('show');
+    overlay.classList.add('show');
+    overlay.style.display = 'block';
+}
+
+// Close Receipt Modal
+function closeReceiptModal() {
+    const modal = document.getElementById('receiptModal');
+    const overlay = document.getElementById('receiptOverlay');
+    modal.classList.remove('show');
+    overlay.classList.remove('show');
+    overlay.style.display = 'none';
+}
+
+// Download Receipt
+function downloadReceipt() {
+    if (currentOrderPDF) {
+        const url = URL.createObjectURL(currentOrderPDF);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Receipt_${currentOrder.orderId}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+}
+
+// Send Receipt via WhatsApp (with notification)
+function sendReceiptViaWhatsApp() {
+    if (!currentOrder) return;
+
+    // Create message with order details
+    const message = `Hello! I've completed my purchase at Trendy Dresses.
 
 Order ID: ${currentOrder.orderId}
 Date: ${currentOrder.date}
@@ -4832,28 +4802,28 @@ M-Pesa Code: ${currentOrder.mpesaCode}
 
 Please find the receipt attached. Thank you!`;
 
-                    // Encode message for WhatsApp
-                    const encodedMessage = encodeURIComponent(message);
-                    const whatsappNumber = websiteContent.contactPhone;
+    // Encode message for WhatsApp
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappNumber = websiteContent.contactPhone;
 
-                    // Open WhatsApp with message
-                    const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`;
-                    window.open(whatsappUrl, '_blank');
+    // Open WhatsApp with message
+    const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`;
+    window.open(whatsappUrl, '_blank');
 
-                    // Also download the PDF
-                    downloadReceipt();
+    // Also download the PDF
+    downloadReceipt();
 
-                    showNotification('Receipt sent via WhatsApp! Please attach the downloaded PDF.');
-                }
+    showNotification('Receipt sent via WhatsApp! Please attach the downloaded PDF.');
+}
 
-                // Send Receipt via WhatsApp Silently (no notification on website)
-                // This is a fallback method that opens WhatsApp with pre-filled message
-                // The backend method is preferred for automatic sending
-                function sendReceiptViaWhatsAppSilent() {
-                    if (!currentOrder) return;
+// Send Receipt via WhatsApp Silently (no notification on website)
+// This is a fallback method that opens WhatsApp with pre-filled message
+// The backend method is preferred for automatic sending
+function sendReceiptViaWhatsAppSilent() {
+    if (!currentOrder) return;
 
-                    // Create message with order details
-                    const message = `*NEW ORDER RECEIVED* 📦
+    // Create message with order details
+    const message = `*NEW ORDER RECEIVED* 📦
 
 Order ID: ${currentOrder.orderId}
 Date: ${currentOrder.date}
@@ -4872,78 +4842,78 @@ M-Pesa Code: ${currentOrder.mpesaCode}
 
 ${currentOrder.delivery && currentOrder.delivery.option !== 'pickup' ? `*Delivery Address:*\n${currentOrder.delivery.address}\n\n` : ''}Receipt PDF attached. ✅`;
 
-                    // Encode message for WhatsApp
-                    const encodedMessage = encodeURIComponent(message);
-                    const whatsappNumber = websiteContent.contactPhone;
+    // Encode message for WhatsApp
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappNumber = websiteContent.contactPhone;
 
-                    // Open WhatsApp with message (this opens WhatsApp with pre-filled message)
-                    // Note: User still needs to click "Send" - this is a limitation of WhatsApp Web API
-                    const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`;
+    // Open WhatsApp with message (this opens WhatsApp with pre-filled message)
+    // Note: User still needs to click "Send" - this is a limitation of WhatsApp Web API
+    const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`;
 
-                    // Try to open in same window first (better for mobile), fallback to new tab
-                    try {
-                        window.location.href = whatsappUrl;
-                    } catch (e) {
-                        window.open(whatsappUrl, '_blank');
-                    }
+    // Try to open in same window first (better for mobile), fallback to new tab
+    try {
+        window.location.href = whatsappUrl;
+    } catch (e) {
+        window.open(whatsappUrl, '_blank');
+    }
 
-                    // Also auto-download the PDF in the background
-                    downloadReceipt();
+    // Also auto-download the PDF in the background
+    downloadReceipt();
 
-                    // No notification shown - receipt is sent automatically
-                    console.log('✅ Receipt opened in WhatsApp (user needs to click Send)');
-                }
+    // No notification shown - receipt is sent automatically
+    console.log('✅ Receipt opened in WhatsApp (user needs to click Send)');
+}
 
-                // Toggle Mobile Menu
-                function toggleMobileMenu() {
-                    const navMenu = document.querySelector('.nav-menu');
-                    navMenu.classList.toggle('active');
-                }
+// Toggle Mobile Menu
+function toggleMobileMenu() {
+    const navMenu = document.querySelector('.nav-menu');
+    navMenu.classList.toggle('active');
+}
 
-                // ============================================
-                // localStorage Usage:
-                // ONLY for UI-related temporary data:
-                // - Cart (temporary shopping cart)
-                // - Admin credentials (session data)
-                // - UI preferences (filters, theme, etc.)
-                // 
-                // NOT for core app data:
-                // - Products → Database API (permanent storage)
-                // - Orders → Database API (permanent storage)
-                // ============================================
+// ============================================
+// localStorage Usage:
+// ONLY for UI-related temporary data:
+// - Cart (temporary shopping cart)
+// - Admin credentials (session data)
+// - UI preferences (filters, theme, etc.)
+// 
+// NOT for core app data:
+// - Products → Database API (permanent storage)
+// - Orders → Database API (permanent storage)
+// ============================================
 
-                // Save Cart to LocalStorage (UI-related data only)
-                function saveCart() {
-                    localStorage.setItem('cart', JSON.stringify(cart));
-                }
+// Save Cart to LocalStorage (UI-related data only)
+function saveCart() {
+    localStorage.setItem('cart', JSON.stringify(cart));
+}
 
-                // Load Cart from LocalStorage (UI-related data only)
-                function loadCart() {
-                    const savedCart = localStorage.getItem('cart');
-                    if (savedCart) {
-                        try {
-                            cart = JSON.parse(savedCart);
-                            updateCartUI();
-                        } catch (error) {
-                            console.error('❌ Error parsing cart from localStorage:', error);
-                            cart = [];
-                        }
-                    }
-                }
+// Load Cart from LocalStorage (UI-related data only)
+function loadCart() {
+    const savedCart = localStorage.getItem('cart');
+    if (savedCart) {
+        try {
+            cart = JSON.parse(savedCart);
+            updateCartUI();
+        } catch (error) {
+            console.error('❌ Error parsing cart from localStorage:', error);
+            cart = [];
+        }
+    }
+}
 
-                // Show Notification
-                function showNotification(message, type = 'success') {
-                    // Create notification element
-                    const notification = document.createElement('div');
-                    let bgColor = 'var(--success-color)'; // Default green
-                    if (type === 'error') {
-                        bgColor = '#f44336'; // Red
-                    } else if (type === 'warning') {
-                        bgColor = '#ff9800'; // Orange
-                    } else if (type === 'info') {
-                        bgColor = '#2196F3'; // Blue
-                    }
-                    notification.style.cssText = `
+// Show Notification
+function showNotification(message, type = 'success') {
+    // Create notification element
+    const notification = document.createElement('div');
+    let bgColor = 'var(--success-color)'; // Default green
+    if (type === 'error') {
+        bgColor = '#f44336'; // Red
+    } else if (type === 'warning') {
+        bgColor = '#ff9800'; // Orange
+    } else if (type === 'info') {
+        bgColor = '#2196F3'; // Blue
+    }
+    notification.style.cssText = `
         position: fixed;
         top: 100px;
         right: 20px;
@@ -4955,33 +4925,33 @@ ${currentOrder.delivery && currentOrder.delivery.option !== 'pickup' ? `*Deliver
         z-index: 3000;
         animation: slideIn 0.3s;
     `;
-                    notification.textContent = message;
+    notification.textContent = message;
 
-                    document.body.appendChild(notification);
+    document.body.appendChild(notification);
 
-                    setTimeout(() => {
-                        notification.style.animation = 'slideOut 0.3s';
-                        setTimeout(() => {
-                            document.body.removeChild(notification);
-                        }, 300);
-                    }, 2000);
-                }
+    setTimeout(() => {
+        notification.style.animation = 'slideOut 0.3s';
+        setTimeout(() => {
+            document.body.removeChild(notification);
+        }, 300);
+    }, 2000);
+}
 
-                // Show Cart Added Pop-up Modal
-                function showCartAddedModal(product) {
-                    const modal = document.getElementById('cartAddedModal');
-                    const overlay = document.getElementById('cartAddedOverlay');
-                    const messageDiv = document.getElementById('cartAddedMessage');
+// Show Cart Added Pop-up Modal
+function showCartAddedModal(product) {
+    const modal = document.getElementById('cartAddedModal');
+    const overlay = document.getElementById('cartAddedOverlay');
+    const messageDiv = document.getElementById('cartAddedMessage');
 
-                    if (!modal || !overlay || !messageDiv) {
-                        // Fallback to notification if modal elements not found
-                        showNotification(`${product.name} (Size: ${getSizeDisplay(product.size)}) added to cart!`);
-                        return;
-                    }
+    if (!modal || !overlay || !messageDiv) {
+        // Fallback to notification if modal elements not found
+        showNotification(`${product.name} (Size: ${getSizeDisplay(product.size)}) added to cart!`);
+        return;
+    }
 
-                    // Set message
-                    const finalPrice = getFinalPrice(product);
-                    messageDiv.innerHTML = `
+    // Set message
+    const finalPrice = getFinalPrice(product);
+    messageDiv.innerHTML = `
         <div style="font-weight: bold; color: var(--dark-color); margin-bottom: 8px;">${product.name}</div>
         <div style="color: #666;">Size: <strong>${getSizeDisplay(product.size)}</strong></div>
         <div style="color: var(--primary-color); font-weight: bold; margin-top: 8px; font-size: 1.2rem;">
@@ -4989,34 +4959,34 @@ ${currentOrder.delivery && currentOrder.delivery.option !== 'pickup' ? `*Deliver
         </div>
     `;
 
-                    // Show modal
-                    modal.classList.add('show');
-                    overlay.classList.add('show');
-                    overlay.style.display = 'block';
+    // Show modal
+    modal.classList.add('show');
+    overlay.classList.add('show');
+    overlay.style.display = 'block';
 
-                    // Auto-close after 3 seconds
-                    setTimeout(() => {
-                        closeCartAddedModal();
-                    }, 3000);
-                }
+    // Auto-close after 3 seconds
+    setTimeout(() => {
+        closeCartAddedModal();
+    }, 3000);
+}
 
-                // Close Cart Added Modal
-                function closeCartAddedModal() {
-                    const modal = document.getElementById('cartAddedModal');
-                    const overlay = document.getElementById('cartAddedOverlay');
+// Close Cart Added Modal
+function closeCartAddedModal() {
+    const modal = document.getElementById('cartAddedModal');
+    const overlay = document.getElementById('cartAddedOverlay');
 
-                    if (modal) {
-                        modal.classList.remove('show');
-                    }
-                    if (overlay) {
-                        overlay.classList.remove('show');
-                        overlay.style.display = 'none';
-                    }
-                }
+    if (modal) {
+        modal.classList.remove('show');
+    }
+    if (overlay) {
+        overlay.classList.remove('show');
+        overlay.style.display = 'none';
+    }
+}
 
-                // Add animation styles
-                const style = document.createElement('style');
-                style.textContent = `
+// Add animation styles
+const style = document.createElement('style');
+style.textContent = `
     @keyframes slideIn {
         from {
             transform: translateX(400px);
@@ -5038,205 +5008,205 @@ ${currentOrder.delivery && currentOrder.delivery.option !== 'pickup' ? `*Deliver
         }
     }
 `;
-                document.head.appendChild(style);
+document.head.appendChild(style);
 
-                // Admin Functions
-                function openLoginModal() {
-                    const modal = document.getElementById('loginModal');
-                    const overlay = document.getElementById('modalOverlay');
-                    modal.classList.add('show');
-                    overlay.classList.add('show');
-                }
+// Admin Functions
+function openLoginModal() {
+    const modal = document.getElementById('loginModal');
+    const overlay = document.getElementById('modalOverlay');
+    modal.classList.add('show');
+    overlay.classList.add('show');
+}
 
-                function closeLoginModal() {
-                    const modal = document.getElementById('loginModal');
-                    const overlay = document.getElementById('modalOverlay');
-                    modal.classList.remove('show');
-                    overlay.classList.remove('show');
-                    document.getElementById('loginForm').reset();
-                }
+function closeLoginModal() {
+    const modal = document.getElementById('loginModal');
+    const overlay = document.getElementById('modalOverlay');
+    modal.classList.remove('show');
+    overlay.classList.remove('show');
+    document.getElementById('loginForm').reset();
+}
 
-                async function handleLogin(event) {
-                    event.preventDefault();
-                    const username = document.getElementById('username').value;
-                    const password = document.getElementById('password').value;
-                    const loginBtn = document.querySelector('#loginForm button[type="submit"]');
-                    const originalBtnText = loginBtn.textContent;
+async function handleLogin(event) {
+    event.preventDefault();
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    const loginBtn = document.querySelector('#loginForm button[type="submit"]');
+    const originalBtnText = loginBtn.textContent;
 
-                    try {
-                        loginBtn.textContent = 'Logging in...';
-                        loginBtn.disabled = true;
+    try {
+        loginBtn.textContent = 'Logging in...';
+        loginBtn.disabled = true;
 
-                        const result = await apiService.login(username, password);
+        const result = await apiService.login(username, password);
 
-                        if (result.success) {
-                            isAdmin = true;
-                            // No longer storing isAdmin in localStorage for security
-                            // Session cookie handles persistence
-                            await checkAdminStatus();
-                            closeLoginModal();
-                            showNotification('Login successful!');
-                        } else {
-                            alert(result.message || 'Login failed');
-                        }
-                    } catch (error) {
-                        console.error('Login error:', error);
-                        alert('Login failed: ' + error.message);
-                    } finally {
-                        loginBtn.textContent = originalBtnText;
-                        loginBtn.disabled = false;
-                    }
-                }
+        if (result.success) {
+            isAdmin = true;
+            // No longer storing isAdmin in localStorage for security
+            // Session cookie handles persistence
+            await checkAdminStatus();
+            closeLoginModal();
+            showNotification('Login successful!');
+        } else {
+            alert(result.message || 'Login failed');
+        }
+    } catch (error) {
+        console.error('Login error:', error);
+        alert('Login failed: ' + error.message);
+    } finally {
+        loginBtn.textContent = originalBtnText;
+        loginBtn.disabled = false;
+    }
+}
 
-                async function checkAdminStatus() {
-                    try {
-                        const status = await apiService.checkAuth();
-                        isAdmin = status.authenticated;
-                    } catch (error) {
-                        console.error('Error checking admin status:', error);
-                        isAdmin = false;
-                    }
+async function checkAdminStatus() {
+    try {
+        const status = await apiService.checkAuth();
+        isAdmin = status.authenticated;
+    } catch (error) {
+        console.error('Error checking admin status:', error);
+        isAdmin = false;
+    }
 
-                    const loginBtn = document.getElementById('loginBtn');
-                    const adminBtn = document.getElementById('adminBtn');
+    const loginBtn = document.getElementById('loginBtn');
+    const adminBtn = document.getElementById('adminBtn');
 
-                    if (isAdmin) {
-                        if (loginBtn) loginBtn.style.display = 'none';
-                        if (adminBtn) adminBtn.style.display = 'flex';
-                    } else {
-                        if (loginBtn) loginBtn.style.display = 'flex';
-                        if (adminBtn) adminBtn.style.display = 'none';
-                    }
+    if (isAdmin) {
+        if (loginBtn) loginBtn.style.display = 'none';
+        if (adminBtn) adminBtn.style.display = 'flex';
+    } else {
+        if (loginBtn) loginBtn.style.display = 'flex';
+        if (adminBtn) adminBtn.style.display = 'none';
+    }
 
-                    // Refresh product display to show/hide product count
-                    // Only if displayProducts is defined
-                    if (typeof displayProducts === 'function') {
-                        displayProducts(currentCategory);
-                    }
-                }
+    // Refresh product display to show/hide product count
+    // Only if displayProducts is defined
+    if (typeof displayProducts === 'function') {
+        displayProducts(currentCategory);
+    }
+}
 
-                async function logout() {
-                    try {
-                        await apiService.logout();
-                        isAdmin = false;
-                        // localStorage.removeItem('isAdmin'); // No longer used
-                        await checkAdminStatus();
-                        closeAdminPanel();
-                        showNotification('Logged out successfully!');
-                    } catch (error) {
-                        console.error('Logout error:', error);
-                        showNotification('Error logging out', 'error');
-                    }
-                }
+async function logout() {
+    try {
+        await apiService.logout();
+        isAdmin = false;
+        // localStorage.removeItem('isAdmin'); // No longer used
+        await checkAdminStatus();
+        closeAdminPanel();
+        showNotification('Logged out successfully!');
+    } catch (error) {
+        console.error('Logout error:', error);
+        showNotification('Error logging out', 'error');
+    }
+}
 
-                function openAdminPanel() {
-                    const panel = document.getElementById('adminPanel');
-                    const overlay = document.getElementById('adminOverlay');
-                    panel.classList.add('open');
-                    overlay.style.display = 'block';
-                    // Clear search bar when opening admin panel
-                    const searchInput = document.getElementById('adminProductSearch');
-                    if (searchInput) {
-                        searchInput.value = '';
-                    }
-                    loadAdminProducts();
-                    loadAdminContent();
-                }
+function openAdminPanel() {
+    const panel = document.getElementById('adminPanel');
+    const overlay = document.getElementById('adminOverlay');
+    panel.classList.add('open');
+    overlay.style.display = 'block';
+    // Clear search bar when opening admin panel
+    const searchInput = document.getElementById('adminProductSearch');
+    if (searchInput) {
+        searchInput.value = '';
+    }
+    loadAdminProducts();
+    loadAdminContent();
+}
 
-                function closeAdminPanel() {
-                    const panel = document.getElementById('adminPanel');
-                    const overlay = document.getElementById('adminOverlay');
-                    panel.classList.remove('open');
-                    overlay.style.display = 'none';
-                }
+function closeAdminPanel() {
+    const panel = document.getElementById('adminPanel');
+    const overlay = document.getElementById('adminOverlay');
+    panel.classList.remove('open');
+    overlay.style.display = 'none';
+}
 
-                function switchAdminTab(tabName) {
-                    // Hide all tabs
-                    document.querySelectorAll('.admin-tab-content').forEach(tab => {
-                        tab.classList.remove('active');
-                    });
-                    document.querySelectorAll('.admin-tab').forEach(btn => {
-                        btn.classList.remove('active');
-                    });
+function switchAdminTab(tabName) {
+    // Hide all tabs
+    document.querySelectorAll('.admin-tab-content').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    document.querySelectorAll('.admin-tab').forEach(btn => {
+        btn.classList.remove('active');
+    });
 
-                    // Show selected tab
-                    document.getElementById(tabName + 'Tab').classList.add('active');
-                    const clickedBtn = event.target.closest('.admin-tab');
-                    if (clickedBtn) {
-                        clickedBtn.classList.add('active');
-                    }
+    // Show selected tab
+    document.getElementById(tabName + 'Tab').classList.add('active');
+    const clickedBtn = event.target.closest('.admin-tab');
+    if (clickedBtn) {
+        clickedBtn.classList.add('active');
+    }
 
-                    // Load orders if orders tab is selected
-                    if (tabName === 'orders') {
-                        loadAdminOrders();
-                    } else if (tabName === 'completed') {
-                        loadCompletedOrders();
-                    }
-                }
+    // Load orders if orders tab is selected
+    if (tabName === 'orders') {
+        loadAdminOrders();
+    } else if (tabName === 'completed') {
+        loadCompletedOrders();
+    }
+}
 
-                // Product Management
-                function loadAdminProducts(searchQuery = '') {
-                    const productsList = document.getElementById('adminProductsList');
-                    const searchResults = document.getElementById('adminSearchResults');
-                    const totalCountElement = document.getElementById('adminTotalCount');
+// Product Management
+function loadAdminProducts(searchQuery = '') {
+    const productsList = document.getElementById('adminProductsList');
+    const searchResults = document.getElementById('adminSearchResults');
+    const totalCountElement = document.getElementById('adminTotalCount');
 
-                    // Update total product count (always show all products count)
-                    if (totalCountElement) {
-                        totalCountElement.textContent = products.length;
-                    }
+    // Update total product count (always show all products count)
+    if (totalCountElement) {
+        totalCountElement.textContent = products.length;
+    }
 
-                    // Filter products based on search query - shows ALL products if no search
-                    let filteredProducts = products; // Start with ALL products
-                    if (searchQuery && searchQuery.trim()) {
-                        const query = searchQuery.toLowerCase().trim();
-                        filteredProducts = products.filter(product => {
-                            const name = product.name.toLowerCase();
-                            const category = product.category.toLowerCase();
-                            const size = (product.size || '').toLowerCase();
-                            const price = product.price.toString();
-                            const discount = (product.discount || 0).toString();
-                            const quantity = (product.quantity || 0).toString();
+    // Filter products based on search query - shows ALL products if no search
+    let filteredProducts = products; // Start with ALL products
+    if (searchQuery && searchQuery.trim()) {
+        const query = searchQuery.toLowerCase().trim();
+        filteredProducts = products.filter(product => {
+            const name = product.name.toLowerCase();
+            const category = product.category.toLowerCase();
+            const size = (product.size || '').toLowerCase();
+            const price = product.price.toString();
+            const discount = (product.discount || 0).toString();
+            const quantity = (product.quantity || 0).toString();
 
-                            return name.includes(query) ||
-                                category.includes(query) ||
-                                size.includes(query) ||
-                                price.includes(query) ||
-                                discount.includes(query) ||
-                                quantity.includes(query);
-                        });
+            return name.includes(query) ||
+                category.includes(query) ||
+                size.includes(query) ||
+                price.includes(query) ||
+                discount.includes(query) ||
+                quantity.includes(query);
+        });
 
-                        // Show search results count
-                        if (searchResults) {
-                            if (filteredProducts.length === 0) {
-                                searchResults.innerHTML = `<i class="fas fa-info-circle"></i> No products found matching "${searchQuery}"`;
-                                searchResults.style.color = '#f44336';
-                            } else {
-                                searchResults.innerHTML = `<i class="fas fa-check-circle"></i> Found ${filteredProducts.length} product(s) matching "${searchQuery}" (out of ${products.length} total)`;
-                                searchResults.style.color = '#4caf50';
-                            }
-                        }
-                    } else {
-                        // Clear search results when no search query - show all products
-                        if (searchResults) {
-                            searchResults.innerHTML = '';
-                        }
-                    }
+        // Show search results count
+        if (searchResults) {
+            if (filteredProducts.length === 0) {
+                searchResults.innerHTML = `<i class="fas fa-info-circle"></i> No products found matching "${searchQuery}"`;
+                searchResults.style.color = '#f44336';
+            } else {
+                searchResults.innerHTML = `<i class="fas fa-check-circle"></i> Found ${filteredProducts.length} product(s) matching "${searchQuery}" (out of ${products.length} total)`;
+                searchResults.style.color = '#4caf50';
+            }
+        }
+    } else {
+        // Clear search results when no search query - show all products
+        if (searchResults) {
+            searchResults.innerHTML = '';
+        }
+    }
 
-                    // Display ALL filtered products - no limits, no pagination
-                    if (filteredProducts.length === 0) {
-                        productsList.innerHTML = '<p style="text-align: center; padding: 40px; color: #666;">No products found.</p>';
-                        return;
-                    }
+    // Display ALL filtered products - no limits, no pagination
+    if (filteredProducts.length === 0) {
+        productsList.innerHTML = '<p style="text-align: center; padding: 40px; color: #666;">No products found.</p>';
+        return;
+    }
 
-                    // Display ALL products - no limits, no pagination, shows everything
-                    productsList.innerHTML = filteredProducts.map(product => {
-                        const discount = product.discount || 0;
-                        const finalPrice = getFinalPrice(product);
-                        const hasDiscount = discount > 0;
-                        const quantity = product.quantity || 0;
-                        const isSoldOut = quantity <= 0;
+    // Display ALL products - no limits, no pagination, shows everything
+    productsList.innerHTML = filteredProducts.map(product => {
+        const discount = product.discount || 0;
+        const finalPrice = getFinalPrice(product);
+        const hasDiscount = discount > 0;
+        const quantity = product.quantity || 0;
+        const isSoldOut = quantity <= 0;
 
-                        return `
+        return `
         <div class="admin-product-item">
             <div class="admin-product-info">
                 <div class="admin-product-name">${product.name}</div>
@@ -5289,2293 +5259,2294 @@ ${currentOrder.delivery && currentOrder.delivery.option !== 'pickup' ? `*Deliver
             </div>
         </div>
         `;
-                    }).join('');
+    }).join('');
+}
+
+// Search admin products
+function searchAdminProducts(query) {
+    loadAdminProducts(query);
+}
+
+function openAddProductModal() {
+    document.getElementById('productModalTitle').textContent = 'Add Product';
+    document.getElementById('productId').value = '';
+    document.getElementById('productImage').value = '';
+    document.getElementById('productDiscount').value = '0';
+    document.getElementById('productQuantity').value = '1';
+    const productImageFile = document.getElementById('productImageFile');
+    if (productImageFile) {
+        productImageFile.value = '';
+    }
+    document.getElementById('productForm').reset();
+    // Reset form fields after reset
+    document.getElementById('productImage').value = '';
+    document.getElementById('productDiscount').value = '0';
+    document.getElementById('productQuantity').value = '1';
+    previewProductImage(''); // Clear preview
+
+    const modal = document.getElementById('productModal');
+    const overlay = document.getElementById('modalOverlay');
+    modal.classList.add('show');
+    overlay.classList.add('show');
+}
+
+function closeModal() {
+    // Close product modal
+    const productModal = document.getElementById('productModal');
+    const loginModal = document.getElementById('loginModal');
+    const overlay = document.getElementById('modalOverlay');
+
+    if (productModal) {
+        productModal.classList.remove('show');
+    }
+    if (loginModal) {
+        loginModal.classList.remove('show');
+    }
+    if (overlay) {
+        overlay.classList.remove('show');
+    }
+
+    // Reset product form if it exists
+    const productForm = document.getElementById('productForm');
+    if (productForm) {
+        productForm.reset();
+    }
+    const productImageFile = document.getElementById('productImageFile');
+    if (productImageFile) {
+        productImageFile.value = '';
+    }
+    const productImage = document.getElementById('productImage');
+    if (productImage) {
+        productImage.value = '';
+        previewProductImage('');
+    }
+
+    // Reset login form if it exists
+    const loginForm = document.getElementById('loginForm');
+    if (loginForm) {
+        loginForm.reset();
+    }
+}
+
+function closeProductModal() {
+    closeModal();
+}
+
+function closeLoginModal() {
+    closeModal();
+}
+
+function editProduct(productId) {
+    try {
+        console.log('✏️ editProduct called with ID:', productId, 'Type:', typeof productId);
+        console.log('📦 Current products count:', products.length);
+        console.log('📦 Product IDs:', products.map(p => ({ id: p.id, _id: p._id, name: p.name })));
+
+        // Handle both Database ObjectId (24 char string), numeric IDs, and string IDs (e.g. prod_...)
+        let id = productId;
+        if (typeof productId === 'string' && (productId.length === 24 && /^[0-9a-fA-F]{24}$/.test(productId) || productId.startsWith('prod_'))) {
+            // Database ObjectId or prod_ ID - use as is
+            id = productId;
+            console.log('✅ Detected Database ObjectId or prod_ ID:', id);
+        } else {
+            // Try to parse as number
+            const parsedId = typeof productId === 'string' ? parseInt(productId) : productId;
+            if (!isNaN(parsedId) && parsedId.toString() === productId.toString()) {
+                id = parsedId;
+                console.log('✅ Parsed numeric ID:', id);
+            } else if (typeof productId === 'string' && productId.length > 0) {
+                // Fallback: treat as string ID if it's a non-empty string
+                id = productId;
+                console.log('✅ Detected string ID:', id);
+            } else {
+                console.error('❌ Invalid product ID for edit:', productId);
+                showNotification('Error: Invalid product ID', 'error');
+                return;
+            }
+        }
+
+        // Find product - handle both Database ObjectId and numeric IDs
+        const product = products.find(p => {
+            // Check both id and _id fields
+            const pId = p.id || p._id;
+            const pIdStr = String(pId);
+
+            if (typeof id === 'string' && (id.length === 24 || id.startsWith('prod_'))) {
+                // Database ObjectId or prod_ ID comparison
+                return (pIdStr === id) || (String(p._id) === id) || (String(p.id) === id);
+            } else {
+                // Numeric ID comparison
+                const productIdNum = typeof pId === 'string' ? parseInt(pId) : pId;
+                return productIdNum === id;
+            }
+        });
+
+        if (!product) {
+            console.error('❌ Product not found for edit. ID:', id);
+            console.log('Available products:', products.map(p => ({
+                id: p.id,
+                _id: p._id,
+                idType: typeof p.id,
+                name: p.name
+            })));
+            showNotification('Product not found! Check console for details.', 'error');
+            return;
+        }
+
+        console.log('✅ Product found:', product.name, 'ID:', product.id || product._id);
+
+        // Get form elements
+        const modalTitle = document.getElementById('productModalTitle');
+        const productIdInput = document.getElementById('productId');
+        const productNameInput = document.getElementById('productName');
+        const productCategoryInput = document.getElementById('productCategory');
+        const productPriceInput = document.getElementById('productPrice');
+        const productDiscountInput = document.getElementById('productDiscount');
+        const productQuantityInput = document.getElementById('productQuantity');
+        const productSizeInput = document.getElementById('productSize');
+        const imageInput = document.getElementById('productImage');
+        const imageFileInput = document.getElementById('productImageFile');
+
+        if (!modalTitle || !productIdInput || !productNameInput) {
+            console.error('❌ Required form elements not found');
+            showNotification('Error: Form elements not found', 'error');
+            return;
+        }
+
+        // Populate form fields
+        modalTitle.textContent = 'Edit Product';
+        productIdInput.value = product.id || product._id || '';
+        productNameInput.value = product.name || '';
+        productCategoryInput.value = product.category || 'dresses';
+        productPriceInput.value = product.price || 0;
+        productDiscountInput.value = product.discount || 0;
+        productQuantityInput.value = product.quantity || 0;
+        productSizeInput.value = product.size || '';
+
+        const productImage = product.image || '';
+        if (imageInput) {
+            imageInput.value = productImage;
+        }
+        if (imageFileInput) {
+            imageFileInput.value = ''; // Reset file input
+        }
+        previewProductImage(productImage);
+
+        // Show modal
+        const modal = document.getElementById('productModal');
+        const overlay = document.getElementById('modalOverlay');
+        if (modal && overlay) {
+            modal.classList.add('show');
+            overlay.classList.add('show');
+            console.log('✅ Modal opened successfully');
+        } else {
+            console.error('❌ Modal elements not found:', { modal: !!modal, overlay: !!overlay });
+            showNotification('Error: Modal not found', 'error');
+        }
+    } catch (error) {
+        console.error('❌ Error in editProduct:', error);
+        console.error('Error stack:', error.stack);
+        showNotification('Error loading product for editing: ' + error.message, 'error');
+    }
+}
+
+// Adjust product quantity (+ or -)
+async function adjustQuantity(productId, change) {
+    // Handle both Database ObjectId (24 char string), numeric IDs, and string IDs (e.g. prod_...)
+    let id = productId;
+    if (typeof productId === 'string' && (productId.length === 24 && /^[0-9a-fA-F]{24}$/.test(productId) || productId.startsWith('prod_'))) {
+        // Database ObjectId or prod_ ID - use as is
+        id = productId;
+    } else {
+        // Try to parse as number
+        const parsedId = typeof productId === 'string' ? parseInt(productId) : productId;
+        if (!isNaN(parsedId) && parsedId.toString() === productId.toString()) {
+            id = parsedId;
+        } else if (typeof productId === 'string' && productId.length > 0) {
+            // Fallback: treat as string ID if it's a non-empty string
+            id = productId;
+        } else {
+            console.error('❌ Invalid product ID for quantity adjustment:', productId);
+            showNotification('Error: Invalid product ID', 'error');
+            return;
+        }
+    }
+
+    // Find product - handle both Database ObjectId and numeric IDs
+    const product = products.find(p => {
+        // Check both id and _id fields
+        const pId = p.id || p._id;
+        const pIdStr = String(pId);
+
+        if (typeof id === 'string' && (id.length === 24 || id.startsWith('prod_'))) {
+            // Database ObjectId or prod_ ID comparison
+            return (pIdStr === id) || (String(p._id) === id) || (String(p.id) === id);
+        } else {
+            // Numeric ID comparison
+            const productIdNum = typeof pId === 'string' ? parseInt(pId) : pId;
+            return productIdNum === id;
+        }
+    });
+
+    if (!product) {
+        console.error('❌ Product not found for adjustQuantity. ID:', id);
+        showNotification('Product not found!', 'error');
+        return;
+    }
+
+    const currentQty = parseInt(product.quantity) || 0;
+    const newQty = Math.max(0, currentQty + change);
+    const useDatabase = localStorage.getItem('useDatabase') === 'true';
+
+    // Update via Database API if available
+    if (useDatabase) {
+        try {
+            // Use the actual product ID (could be _id or id)
+            const productIdForAPI = product._id || product.id || id;
+            await apiService.updateQuantity(productIdForAPI, newQty);
+            console.log('✅ Quantity updated via Database API');
+        } catch (error) {
+            console.error('❌ Error updating quantity via Database API:', error);
+            showNotification('Error updating stock: ' + error.message, 'error');
+            return;
+        }
+    }
+
+    product.quantity = newQty;
+
+    // Update the input field immediately (use original productId for input field ID)
+    const qtyInput = document.getElementById(`qty-${productId}`);
+    if (qtyInput) {
+        qtyInput.value = newQty;
+    }
+
+    // Save to localStorage as backup
+    if (!useDatabase) {
+        await saveProducts();
+    } else {
+        // Update local cache if needed
+        saveProductsToLocalCache();
+    }
+
+    // Update displays
+    displayProducts(currentCategory);
+    const searchInput = document.getElementById('adminProductSearch');
+    const searchQuery = searchInput ? searchInput.value : '';
+    // Don't reload everything, just update the UI to prevent jumping
+    // loadAdminProducts(searchQuery); 
+
+    const action = change > 0 ? 'added' : 'removed';
+    const amount = Math.abs(change);
+    showNotification(`Stock updated: ${amount} item(s) ${action}. New stock: ${newQty}`, 'success');
+
+    console.log(`✅ Quantity adjusted for product ${id}: ${currentQty} → ${newQty}`);
+}
+
+async function setQuantity(productId, qtyValue) {
+    const qty = parseInt(qtyValue);
+    if (isNaN(qty) || qty < 0) return;
+
+    console.log('🔄 setQuantity called with ID:', productId, 'Qty:', qty);
+
+    // Handle both Database ObjectId (24 char string), numeric IDs, and string IDs (e.g. prod_...)
+    let id = productId;
+    if (typeof productId === 'string' && (productId.length === 24 && /^[0-9a-fA-F]{24}$/.test(productId) || productId.startsWith('prod_'))) {
+        // Database ObjectId or prod_ ID - use as is
+        id = productId;
+    } else {
+        // Try to parse as number
+        const parsedId = typeof productId === 'string' ? parseInt(productId) : productId;
+        if (!isNaN(parsedId) && parsedId.toString() === productId.toString()) {
+            id = parsedId;
+        } else if (typeof productId === 'string' && productId.length > 0) {
+            // Fallback: treat as string ID if it's a non-empty string
+            id = productId;
+        } else {
+            console.error('❌ Invalid product ID for set quantity:', productId);
+            return;
+        }
+    }
+
+    // Find product - handle both Database ObjectId and numeric IDs
+    const product = products.find(p => {
+        // Check both id and _id fields
+        const pId = p.id || p._id;
+        const pIdStr = String(pId);
+
+        if (typeof id === 'string' && (id.length === 24 || id.startsWith('prod_'))) {
+            // Database ObjectId or prod_ ID comparison
+            return (pIdStr === id) || (String(p._id) === id) || (String(p.id) === id);
+        } else {
+            // Numeric ID comparison
+            const productIdNum = typeof pId === 'string' ? parseInt(pId) : pId;
+            return productIdNum === id;
+        }
+    });
+
+    if (!product) {
+        console.error('❌ Product not found for setQuantity. ID:', id);
+        return;
+    }
+
+    const oldQty = parseInt(product.quantity) || 0;
+    if (oldQty === qty) return; // No change
+
+    const useDatabase = localStorage.getItem('useDatabase') === 'true';
+
+    // Update via Database API if available
+    if (useDatabase) {
+        try {
+            // Use the actual product ID (could be _id or id)
+            const productIdForAPI = product._id || product.id || id;
+            await apiService.updateQuantity(productIdForAPI, qty);
+            console.log('✅ Quantity updated via Database API');
+        } catch (error) {
+            console.error('❌ Error updating quantity via Database API:', error);
+            showNotification('Error updating stock: ' + error.message, 'error');
+            // Revert input value
+            const qtyInput = document.getElementById(`qty-${productId}`);
+            if (qtyInput) {
+                qtyInput.value = oldQty;
+            }
+            return;
+        }
+    }
+
+    product.quantity = qty;
+
+    // Save to localStorage as backup
+    if (!useDatabase) {
+        await saveProducts();
+    } else {
+        saveProductsToLocalCache();
+    }
+
+    // Update displays
+    displayProducts(currentCategory);
+
+    const change = qty - oldQty;
+    showNotification(`Stock set to ${qty} (${change > 0 ? '+' : ''}${change} from previous)`, 'success');
+    console.log(`✅ Quantity set for product ${id}: ${oldQty} → ${qty}`);
+}
+
+function saveProductsToLocalCache() {
+    try {
+        // When using Database, save lightweight version to avoid quota issues
+        const lightweightProducts = products.map(p => ({
+            id: p.id,
+            name: p.name,
+            category: p.category,
+            price: p.price,
+            discount: p.discount || 0,
+            quantity: p.quantity || 0,
+            size: p.size || 'M',
+            image: '' // Don't save images to localStorage
+        }));
+        localStorage.setItem('products', JSON.stringify(lightweightProducts));
+    } catch (error) {
+        console.warn('Could not update localStorage cache:', error);
+    }
+}
+
+function deleteProduct(productId, event) {
+    // Prevent any event propagation issues
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    console.log('🗑️ deleteProduct function called with:', productId, typeof productId);
+
+    // Handle async operation properly when called from onclick
+    (async () => {
+        try {
+            // Handle both Database ObjectId (24 char string), numeric IDs, and string IDs (e.g. prod_...)
+            let id = productId;
+            if (typeof productId === 'string' && (productId.length === 24 && /^[0-9a-fA-F]{24}$/.test(productId) || productId.startsWith('prod_'))) {
+                // Database ObjectId or prod_ ID - use as is
+                id = productId;
+            } else {
+                // Try to parse as number
+                const parsedId = typeof productId === 'string' ? parseInt(productId) : productId;
+                if (!isNaN(parsedId) && parsedId.toString() === productId.toString()) {
+                    id = parsedId;
+                } else if (typeof productId === 'string' && productId.length > 0) {
+                    // Fallback: treat as string ID if it's a non-empty string
+                    id = productId;
+                } else {
+                    console.error('❌ Invalid product ID:', productId);
+                    alert('Error: Invalid product ID: ' + productId);
+                    showNotification('Error: Invalid product ID', 'error');
+                    return;
+                }
+            }
+
+            console.log('🗑️ Using ID:', id);
+
+            // Find product first to show its name in confirmation and get index
+            const index = products.findIndex(p => {
+                // Handle both Database ObjectId and numeric IDs
+                if (typeof id === 'string' && (id.length === 24 || id.startsWith('prod_'))) {
+                    // Database ObjectId or prod_ ID comparison
+                    return (p.id === id) || (p._id === id);
+                } else {
+                    // Numeric ID comparison
+                    const productIdNum = typeof p.id === 'string' ? parseInt(p.id) : p.id;
+                    return productIdNum === id;
+                }
+            });
+
+            if (index === -1) {
+                showNotification('Product not found!', 'error');
+                console.error('❌ Product not found with ID:', id);
+                console.log('Available products:', products.map(p => ({ id: p.id, name: p.name })));
+                return;
+            }
+
+            // Get product name and full product for confirmation and restore
+            const productName = products[index].name;
+            const productToDelete = { ...products[index] }; // Copy for potential restore
+
+            console.log('🗑️ Product found at index:', index, 'Name:', productName);
+            console.log('Current products count:', products.length);
+
+            // Store deletion info globally for the confirmation modal
+            window.pendingDelete = {
+                id: id,
+                index: index,
+                name: productName,
+                product: productToDelete
+            };
+
+            // Show custom confirmation modal instead of browser confirm
+            showDeleteConfirmationModal(productName);
+
+            // Don't proceed with deletion yet - wait for user to confirm in modal
+            return;
+        } catch (error) {
+            console.error('❌ Error in deleteProduct:', error);
+            showNotification('Error deleting product: ' + error.message, 'error');
+        }
+    })();
+}
+
+// Show custom delete confirmation modal
+function showDeleteConfirmationModal(productName) {
+    const modal = document.getElementById('deleteConfirmModal');
+    const overlay = document.getElementById('deleteConfirmOverlay');
+    const message = document.getElementById('deleteConfirmMessage');
+
+    if (modal && overlay && message) {
+        message.textContent = `Are you sure you want to delete "${productName}"?`;
+
+        // Show overlay
+        overlay.style.display = 'block';
+
+        // Show modal with proper animation
+        modal.style.display = 'block';
+        // Add show class for animation (opacity and scale)
+        setTimeout(() => {
+            modal.classList.add('show');
+        }, 10);
+
+        document.body.style.overflow = 'hidden';
+        console.log('✅ Delete confirmation modal shown');
+    } else {
+        console.error('❌ Delete confirmation modal elements not found');
+        // Fallback to browser confirm
+        if (confirm(`Delete "${productName}"? This cannot be undone.`)) {
+            confirmDelete();
+        }
+    }
+}
+
+// Close delete confirmation modal
+function cancelDelete() {
+    const modal = document.getElementById('deleteConfirmModal');
+    const overlay = document.getElementById('deleteConfirmOverlay');
+
+    // Remove show class first for animation
+    if (modal) {
+        modal.classList.remove('show');
+        // Hide after animation
+        setTimeout(() => {
+            modal.style.display = 'none';
+        }, 300);
+    }
+
+    if (overlay) overlay.style.display = 'none';
+    document.body.style.overflow = '';
+
+    // Clear pending delete
+    window.pendingDelete = null;
+    console.log('❌ Delete cancelled by user');
+    showNotification('Delete cancelled - product kept', 'info');
+}
+
+// Confirm and proceed with deletion
+async function confirmDelete() {
+    if (!window.pendingDelete) {
+        console.error('❌ No pending delete found');
+        showNotification('Error: No product selected for deletion', 'error');
+        cancelDelete();
+        return;
+    }
+
+    const { id, index, name: productName, product: productToDelete } = window.pendingDelete;
+
+    // Close modal first
+    cancelDelete();
+
+    console.log('✅ User confirmed deletion - proceeding with delete');
+    console.log('🗑️ Deleting product:', productName, productToDelete);
+
+    try {
+        // Remove product from array immediately (optimistic update)
+        products.splice(index, 1);
+        console.log('✅ Product removed from array. New count:', products.length);
+
+        // Delete from ALL storage locations (Database, localStorage, IndexedDB)
+        const deleteResult = await deleteProductFromAllStorage(id);
+
+        if (deleteResult.success) {
+            console.log('✅ Product deleted from storage locations');
+
+            // Check if Database is connected before syncing
+            let shouldSyncToDatabase = false;
+            try {
+                const backendAvailable = await apiService.checkBackend();
+                if (backendAvailable) {
+                    const dbStatus = await apiService.checkDatabaseStatus();
+                    shouldSyncToDatabase = (dbStatus.readyState === 1);
+                }
+            } catch (error) {
+                console.log('ℹ️ Could not check Database status - will skip Database sync');
+            }
+
+            // Sync remaining products to all storage locations to ensure consistency
+            // This saves remaining products to localStorage/IndexedDB (and Database if connected)
+            console.log('🔄 Syncing remaining products to all storage locations...');
+            const syncResult = await syncProductsToAllStorage(products, {
+                preserveImages: true,
+                skipDatabase: !shouldSyncToDatabase // Skip Database if not connected
+            });
+
+            if (syncResult.success) {
+                console.log('✅ Remaining products synced to storage locations');
+
+                // Update products array with synced products (in case Database IDs changed)
+                if (syncResult.products && syncResult.products.length > 0) {
+                    // Update products array with synced products (preserve order and add Database IDs)
+                    syncResult.products.forEach((syncedProduct, idx) => {
+                        if (idx < products.length) {
+                            // Update existing product with synced data (especially Database ID)
+                            const currentProduct = products[idx];
+                            products[idx] = {
+                                ...currentProduct,
+                                id: syncedProduct.id || currentProduct.id,
+                                _id: syncedProduct.id || currentProduct._id || currentProduct.id
+                            };
+                        }
+                    });
                 }
 
-                // Search admin products
-                function searchAdminProducts(query) {
-                    loadAdminProducts(query);
+                // CRITICAL: Ensure products are saved to localStorage/IndexedDB after sync
+                // (Sync should have done this, but we verify to ensure persistence)
+                try {
+                    const productsJson = JSON.stringify(products);
+                    localStorage.setItem('products', productsJson);
+                    console.log(`✅ Verified ${products.length} products saved to localStorage (after deletion)`);
+
+                    // Also save to IndexedDB
+                    await storageManager.init();
+                    if (storageManager.useIndexedDB && storageManager.db) {
+                        await storageManager.saveProducts(products);
+                        console.log(`✅ Verified ${products.length} products saved to IndexedDB (after deletion)`);
+                    }
+                } catch (error) {
+                    console.error('❌ Error verifying products after deletion:', error);
+                }
+            } else {
+                console.warn('⚠️ Failed to sync remaining products to some storage locations');
+                // Still save to localStorage/IndexedDB directly as backup
+                try {
+                    const productsJson = JSON.stringify(products);
+                    localStorage.setItem('products', productsJson);
+                    console.log(`✅ Saved ${products.length} products directly to localStorage (backup after deletion)`);
+                } catch (error) {
+                    console.error('❌ Error saving products to localStorage:', error);
+                }
+            }
+
+            // Reload products from Database if available (to get latest state and ensure sync)
+            let productsReloaded = false;
+            try {
+                const backendAvailable = await apiService.checkBackend();
+                if (backendAvailable) {
+                    console.log('🔄 Reloading products from Database after deletion...');
+                    await loadProducts();
+                    productsReloaded = true;
+                    console.log('✅ Products reloaded from Database. Product count:', products.length);
+                } else {
+                    console.log('ℹ️ Backend not available - using local products array');
+                }
+            } catch (reloadError) {
+                console.warn('⚠️ Could not reload from Database (using local data):', reloadError.message);
+                // Continue with local products
+            }
+
+            // Update UI with remaining products immediately (no delay needed)
+            console.log(`✅ Products array has ${products.length} products (after deletion)`);
+            console.log('🔄 Refreshing product display...');
+            currentCategory = 'all';
+            displayProducts('all');
+            console.log('✅ Product display refreshed');
+
+            // Update active filter button
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.getAttribute('data-category') === 'all') {
+                    btn.classList.add('active');
+                }
+            });
+
+            // Preserve search query if there is one and refresh admin products list
+            const searchInput = document.getElementById('adminProductSearch');
+            const searchQuery = searchInput ? searchInput.value : '';
+            console.log('🔄 Refreshing admin products list...');
+            loadAdminProducts(searchQuery);
+            console.log('✅ Admin products list refreshed');
+
+            console.log('✅ Product deleted successfully from all storage locations');
+            showNotification('Product deleted successfully from all storage locations!', 'success');
+
+            // Note: We intentionally don't reload from Database here because:
+            // 1. Database wasn't synced during deletion (database wasn't connected)
+            // 2. Database still has the deleted products
+            // 3. When Database connects and we sync remaining products, deleted products will be removed automatically
+        } else {
+            console.error('❌ Failed to delete product from any storage location');
+            showNotification('Error: Failed to delete product from any storage location', 'error');
+
+            // Restore product to array if deletion failed
+            products.splice(index, 0, productToDelete);
+            console.log('⚠️ Product restored to array due to deletion failure');
+        }
+
+        // Clear pending delete
+        window.pendingDelete = null;
+    } catch (error) {
+        console.error('❌ Error in confirmDelete:', error);
+        showNotification('Error deleting product: ' + error.message, 'error');
+
+        // Restore product to array if deletion failed
+        if (window.pendingDelete) {
+            const { index, product: productToDelete } = window.pendingDelete;
+            products.splice(index, 0, productToDelete);
+            console.log('⚠️ Product restored to array due to error');
+        }
+
+        // Clear pending delete on error
+        window.pendingDelete = null;
+    }
+}
+
+async function saveProducts() {
+    try {
+        const productsToSave = [...products];
+
+        console.log('💾 [saveProducts] Starting sync to all storage locations... Products count:', productsToSave.length);
+
+        // Use unified sync function to save to all storage locations
+        const syncResult = await syncProductsToAllStorage(productsToSave, { preserveImages: true });
+
+        if (syncResult.success) {
+            // Update products array with synced products (in case Database IDs changed)
+            if (syncResult.products && syncResult.products.length > 0) {
+                // Update products array with synced products (preserve order and add Database IDs)
+                syncResult.products.forEach((syncedProduct, index) => {
+                    if (index < products.length) {
+                        // Update existing product with synced data (especially Database ID)
+                        const currentProduct = products[index];
+                        products[index] = {
+                            ...currentProduct,
+                            id: syncedProduct.id || currentProduct.id,
+                            _id: syncedProduct.id || currentProduct._id || currentProduct.id
+                        };
+                    }
+                });
+            }
+
+            console.log('✅ [saveProducts] Products synced to all storage locations successfully');
+            return true;
+        } else {
+            console.error('❌ [saveProducts] Failed to sync to any storage location');
+            return false;
+        }
+    } catch (error) {
+        console.error('❌ [saveProducts] Unexpected error:', error);
+        return false;
+    }
+}
+
+async function loadProducts() {
+    try {
+        let loadedProducts = [];
+        let loadSource = 'none';
+
+        // Check if Database backend is available AND database is actually connected
+        let useDatabase = false;
+        let databaseConnected = false;
+
+        try {
+            console.log('🔍 Checking Database backend availability...');
+            const backendAvailable = await apiService.checkBackend();
+
+            if (backendAvailable) {
+                console.log('🔍 Backend is available - checking Database connection...');
+                try {
+                    const dbStatus = await apiService.checkDatabaseStatus();
+                    databaseConnected = dbStatus && dbStatus.readyState === 1;
+
+                    if (databaseConnected) {
+                        useDatabase = true;
+                        localStorage.setItem('useDatabase', 'true');
+                        console.log('✅ Database is connected - will use Database');
+                        console.log(`   Database: ${dbStatus.name || 'trendy-dresses'}`);
+                        console.log(`   Host: ${dbStatus.host || 'connected'}`);
+                    } else {
+                        const statusText = dbStatus?.readyStateText || 'unknown';
+                        const readyState = dbStatus?.readyState || 0;
+                        console.warn(`⚠️ Database backend available but database not connected`);
+                        console.warn(`   Status: ${statusText} (ReadyState: ${readyState})`);
+                        console.warn(`   Will use fallback storage (localStorage/IndexedDB)`);
+                        useDatabase = false;
+                        localStorage.setItem('useDatabase', 'false');
+                    }
+                } catch (dbError) {
+                    console.warn('⚠️ Error checking Database connection status:', dbError.message);
+                    useDatabase = false;
+                    localStorage.setItem('useDatabase', 'false');
+                }
+            } else {
+                console.log('ℹ️ Backend not available - will use fallback storage');
+                useDatabase = false;
+                localStorage.setItem('useDatabase', 'false');
+            }
+        } catch (checkError) {
+            console.warn('⚠️ Error during Database availability check:', checkError.message);
+            useDatabase = false;
+            localStorage.setItem('useDatabase', 'false');
+        }
+
+        // Check localStorage/IndexedDB first to see what we have locally
+        let localProducts = [];
+        let localProductCount = 0;
+        try {
+            // Check localStorage
+            const savedProducts = localStorage.getItem('products');
+            if (savedProducts) {
+                try {
+                    localProducts = JSON.parse(savedProducts);
+                    localProductCount = localProducts.length;
+                    console.log(`📦 Found ${localProductCount} products in localStorage`);
+                } catch (error) {
+                    console.error('❌ Error parsing localStorage products:', error);
+                }
+            }
+
+            // Check IndexedDB
+            await storageManager.init();
+            if (storageManager.useIndexedDB && storageManager.db) {
+                const indexedProducts = await storageManager.loadProducts();
+                if (indexedProducts && indexedProducts.length > 0) {
+                    if (indexedProducts.length > localProductCount) {
+                        localProducts = indexedProducts;
+                        localProductCount = indexedProducts.length;
+                        console.log(`📦 Found ${localProductCount} products in IndexedDB (using IndexedDB)`);
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('❌ Error checking local storage:', error);
+        }
+
+        // PRIORITY: Database is PERMANENT, CENTRALIZED storage - primary source of truth
+        if (useDatabase && databaseConnected) {
+            // Update localStorage preference to Database
+            localStorage.setItem('useDatabase', 'true');
+            localStorage.setItem('preferredStorage', 'database');
+
+            try {
+                // Step 1: Load products from Database (PERMANENT, CENTRALIZED storage) - WITHOUT images for faster loading
+                const dbProducts = await apiService.getProducts('all', false);
+                console.log(`📦 Loaded ${dbProducts.length} products from Database (permanent, centralized storage)`);
+
+                // Step 1.5: Cache Database data to IndexedDB for offline access
+                try {
+                    await storageManager.init();
+                    if (storageManager.useIndexedDB && storageManager.db) {
+                        await storageManager.syncFromDatabase(dbProducts);
+                        console.log(`✅ Cached Database data to IndexedDB for offline access`);
+                    }
+                } catch (cacheError) {
+                    console.warn('⚠️ Could not cache to IndexedDB:', cacheError.message);
+                    // Continue - caching is optional
                 }
 
-                function openAddProductModal() {
-                    document.getElementById('productModalTitle').textContent = 'Add Product';
-                    document.getElementById('productId').value = '';
-                    document.getElementById('productImage').value = '';
-                    document.getElementById('productDiscount').value = '0';
-                    document.getElementById('productQuantity').value = '1';
-                    const productImageFile = document.getElementById('productImageFile');
-                    if (productImageFile) {
-                        productImageFile.value = '';
-                    }
-                    document.getElementById('productForm').reset();
-                    // Reset form fields after reset
-                    document.getElementById('productImage').value = '';
-                    document.getElementById('productDiscount').value = '0';
-                    document.getElementById('productQuantity').value = '1';
-                    previewProductImage(''); // Clear preview
-
-                    const modal = document.getElementById('productModal');
-                    const overlay = document.getElementById('modalOverlay');
-                    modal.classList.add('show');
-                    overlay.classList.add('show');
+                // Step 1.6: Load images for products that have them (lazy load)
+                // This is done asynchronously after initial display
+                if (dbProducts.length > 0) {
+                    console.log('🖼️ Loading product images in background...');
+                    loadProductImagesLazy(dbProducts).catch(err => {
+                        console.warn('⚠️ Some product images failed to load:', err.message);
+                    });
                 }
 
-                function closeModal() {
-                    // Close product modal
-                    const productModal = document.getElementById('productModal');
-                    const loginModal = document.getElementById('loginModal');
-                    const overlay = document.getElementById('modalOverlay');
-
-                    if (productModal) {
-                        productModal.classList.remove('show');
-                    }
-                    if (loginModal) {
-                        loginModal.classList.remove('show');
-                    }
-                    if (overlay) {
-                        overlay.classList.remove('show');
-                    }
-
-                    // Reset product form if it exists
-                    const productForm = document.getElementById('productForm');
-                    if (productForm) {
-                        productForm.reset();
-                    }
-                    const productImageFile = document.getElementById('productImageFile');
-                    if (productImageFile) {
-                        productImageFile.value = '';
-                    }
-                    const productImage = document.getElementById('productImage');
-                    if (productImage) {
-                        productImage.value = '';
-                        previewProductImage('');
-                    }
-
-                    // Reset login form if it exists
-                    const loginForm = document.getElementById('loginForm');
-                    if (loginForm) {
-                        loginForm.reset();
-                    }
-                }
-
-                function closeProductModal() {
-                    closeModal();
-                }
-
-                function closeLoginModal() {
-                    closeModal();
-                }
-
-                function editProduct(productId) {
+                // Step 2: If we have local products, sync them to Database (Database is authoritative)
+                if (localProductCount > 0 && localProducts.length > 0) {
+                    console.log(`🔄 Found ${localProductCount} products in local cache - syncing to Database (authoritative)...`);
                     try {
-                        console.log('✏️ editProduct called with ID:', productId, 'Type:', typeof productId);
-                        console.log('📦 Current products count:', products.length);
-                        console.log('📦 Product IDs:', products.map(p => ({ id: p.id, _id: p._id, name: p.name })));
+                        await syncProductsToAllStorage(localProducts, { preserveImages: true });
+                        console.log(`✅ Synced ${localProductCount} local products to Database (permanent storage)`);
 
-                        // Handle both Database ObjectId (24 char string), numeric IDs, and string IDs (e.g. prod_...)
-                        let id = productId;
-                        if (typeof productId === 'string' && (productId.length === 24 && /^[0-9a-fA-F]{24}$/.test(productId) || productId.startsWith('prod_'))) {
-                            // Database ObjectId or prod_ ID - use as is
-                            id = productId;
-                            console.log('✅ Detected Database ObjectId or prod_ ID:', id);
-                        } else {
-                            // Try to parse as number
-                            const parsedId = typeof productId === 'string' ? parseInt(productId) : productId;
-                            if (!isNaN(parsedId) && parsedId.toString() === productId.toString()) {
-                                id = parsedId;
-                                console.log('✅ Parsed numeric ID:', id);
-                            } else if (typeof productId === 'string' && productId.length > 0) {
-                                // Fallback: treat as string ID if it's a non-empty string
-                                id = productId;
-                                console.log('✅ Detected string ID:', id);
-                            } else {
-                                console.error('❌ Invalid product ID for edit:', productId);
-                                showNotification('Error: Invalid product ID', 'error');
-                                return;
-                            }
-                        }
+                        // Reload from Database after sync to get the latest data (without images for speed)
+                        const updatedMongoProducts = await apiService.getProducts('all', false);
+                        loadedProducts = updatedMongoProducts.map(p => ({
+                            ...p,
+                            id: p._id || p.id,
+                            image: p.image || '' // Will be empty, loaded lazily
+                        }));
+                        loadSource = 'Database (permanent, centralized)';
+                        console.log(`📦 Using ${loadedProducts.length} products from Database (authoritative)`);
 
-                        // Find product - handle both Database ObjectId and numeric IDs
-                        const product = products.find(p => {
-                            // Check both id and _id fields
-                            const pId = p.id || p._id;
-                            const pIdStr = String(pId);
-
-                            if (typeof id === 'string' && (id.length === 24 || id.startsWith('prod_'))) {
-                                // Database ObjectId or prod_ ID comparison
-                                return (pIdStr === id) || (String(p._id) === id) || (String(p.id) === id);
-                            } else {
-                                // Numeric ID comparison
-                                const productIdNum = typeof pId === 'string' ? parseInt(pId) : pId;
-                                return productIdNum === id;
-                            }
-                        });
-
-                        if (!product) {
-                            console.error('❌ Product not found for edit. ID:', id);
-                            console.log('Available products:', products.map(p => ({
-                                id: p.id,
-                                _id: p._id,
-                                idType: typeof p.id,
-                                name: p.name
-                            })));
-                            showNotification('Product not found! Check console for details.', 'error');
-                            return;
-                        }
-
-                        console.log('✅ Product found:', product.name, 'ID:', product.id || product._id);
-
-                        // Get form elements
-                        const modalTitle = document.getElementById('productModalTitle');
-                        const productIdInput = document.getElementById('productId');
-                        const productNameInput = document.getElementById('productName');
-                        const productCategoryInput = document.getElementById('productCategory');
-                        const productPriceInput = document.getElementById('productPrice');
-                        const productDiscountInput = document.getElementById('productDiscount');
-                        const productQuantityInput = document.getElementById('productQuantity');
-                        const productSizeInput = document.getElementById('productSize');
-                        const imageInput = document.getElementById('productImage');
-                        const imageFileInput = document.getElementById('productImageFile');
-
-                        if (!modalTitle || !productIdInput || !productNameInput) {
-                            console.error('❌ Required form elements not found');
-                            showNotification('Error: Form elements not found', 'error');
-                            return;
-                        }
-
-                        // Populate form fields
-                        modalTitle.textContent = 'Edit Product';
-                        productIdInput.value = product.id || product._id || '';
-                        productNameInput.value = product.name || '';
-                        productCategoryInput.value = product.category || 'dresses';
-                        productPriceInput.value = product.price || 0;
-                        productDiscountInput.value = product.discount || 0;
-                        productQuantityInput.value = product.quantity || 0;
-                        productSizeInput.value = product.size || '';
-
-                        const productImage = product.image || '';
-                        if (imageInput) {
-                            imageInput.value = productImage;
-                        }
-                        if (imageFileInput) {
-                            imageFileInput.value = ''; // Reset file input
-                        }
-                        previewProductImage(productImage);
-
-                        // Show modal
-                        const modal = document.getElementById('productModal');
-                        const overlay = document.getElementById('modalOverlay');
-                        if (modal && overlay) {
-                            modal.classList.add('show');
-                            overlay.classList.add('show');
-                            console.log('✅ Modal opened successfully');
-                        } else {
-                            console.error('❌ Modal elements not found:', { modal: !!modal, overlay: !!overlay });
-                            showNotification('Error: Modal not found', 'error');
-                        }
-                    } catch (error) {
-                        console.error('❌ Error in editProduct:', error);
-                        console.error('Error stack:', error.stack);
-                        showNotification('Error loading product for editing: ' + error.message, 'error');
-                    }
-
-                    // Adjust product quantity (+ or -)
-                    async function adjustQuantity(productId, change) {
-                        // Handle both Database ObjectId (24 char string), numeric IDs, and string IDs (e.g. prod_...)
-                        let id = productId;
-                        if (typeof productId === 'string' && (productId.length === 24 && /^[0-9a-fA-F]{24}$/.test(productId) || productId.startsWith('prod_'))) {
-                            // Database ObjectId or prod_ ID - use as is
-                            id = productId;
-                        } else {
-                            // Try to parse as number
-                            const parsedId = typeof productId === 'string' ? parseInt(productId) : productId;
-                            if (!isNaN(parsedId) && parsedId.toString() === productId.toString()) {
-                                id = parsedId;
-                            } else if (typeof productId === 'string' && productId.length > 0) {
-                                // Fallback: treat as string ID if it's a non-empty string
-                                id = productId;
-                            } else {
-                                console.error('❌ Invalid product ID for quantity adjustment:', productId);
-                                showNotification('Error: Invalid product ID', 'error');
-                                return;
-                            }
-                        }
-
-                        // Find product - handle both Database ObjectId and numeric IDs
-                        const product = products.find(p => {
-                            // Check both id and _id fields
-                            const pId = p.id || p._id;
-                            const pIdStr = String(pId);
-
-                            if (typeof id === 'string' && (id.length === 24 || id.startsWith('prod_'))) {
-                                // Database ObjectId or prod_ ID comparison
-                                return (pIdStr === id) || (String(p._id) === id) || (String(p.id) === id);
-                            } else {
-                                // Numeric ID comparison
-                                const productIdNum = typeof pId === 'string' ? parseInt(pId) : pId;
-                                return productIdNum === id;
-                            }
-                        });
-
-                        if (!product) {
-                            console.error('❌ Product not found for adjustQuantity. ID:', id);
-                            showNotification('Product not found!', 'error');
-                            return;
-                        }
-
-                        const currentQty = parseInt(product.quantity) || 0;
-                        const newQty = Math.max(0, currentQty + change);
-                        const useDatabase = localStorage.getItem('useDatabase') === 'true';
-
-                        // Update via Database API if available
-                        if (useDatabase) {
-                            try {
-                                // Use the actual product ID (could be _id or id)
-                                const productIdForAPI = product._id || product.id || id;
-                                await apiService.updateQuantity(productIdForAPI, newQty);
-                                console.log('✅ Quantity updated via Database API');
-                            } catch (error) {
-                                console.error('❌ Error updating quantity via Database API:', error);
-                                showNotification('Error updating stock: ' + error.message, 'error');
-                                return;
-                            }
-                        }
-
-                        product.quantity = newQty;
-
-                        // Update the input field immediately (use original productId for input field ID)
-                        const qtyInput = document.getElementById(`qty-${productId}`);
-                        if (qtyInput) {
-                            qtyInput.value = newQty;
-                        }
-
-                        // Save to localStorage as backup
-                        if (!useDatabase) {
-                            await saveProducts();
-                        } else {
-                            // Update local cache if needed
-                            saveProductsToLocalCache();
-                        }
-
-                        // Update displays
-                        displayProducts(currentCategory);
-                        const searchInput = document.getElementById('adminProductSearch');
-                        const searchQuery = searchInput ? searchInput.value : '';
-                        // Don't reload everything, just update the UI to prevent jumping
-                        // loadAdminProducts(searchQuery); 
-
-                        const action = change > 0 ? 'added' : 'removed';
-                        const amount = Math.abs(change);
-                        showNotification(`Stock updated: ${amount} item(s) ${action}. New stock: ${newQty}`, 'success');
-
-                        console.log(`✅ Quantity adjusted for product ${id}: ${currentQty} → ${newQty}`);
-                    }
-
-                    async function setQuantity(productId, qtyValue) {
-                        const qty = parseInt(qtyValue);
-                        if (isNaN(qty) || qty < 0) return;
-
-                        console.log('🔄 setQuantity called with ID:', productId, 'Qty:', qty);
-
-                        // Handle both Database ObjectId (24 char string), numeric IDs, and string IDs (e.g. prod_...)
-                        let id = productId;
-                        if (typeof productId === 'string' && (productId.length === 24 && /^[0-9a-fA-F]{24}$/.test(productId) || productId.startsWith('prod_'))) {
-                            // Database ObjectId or prod_ ID - use as is
-                            id = productId;
-                        } else {
-                            // Try to parse as number
-                            const parsedId = typeof productId === 'string' ? parseInt(productId) : productId;
-                            if (!isNaN(parsedId) && parsedId.toString() === productId.toString()) {
-                                id = parsedId;
-                            } else if (typeof productId === 'string' && productId.length > 0) {
-                                // Fallback: treat as string ID if it's a non-empty string
-                                id = productId;
-                            } else {
-                                console.error('❌ Invalid product ID for set quantity:', productId);
-                                return;
-                            }
-                        }
-
-                        // Find product - handle both Database ObjectId and numeric IDs
-                        const product = products.find(p => {
-                            // Check both id and _id fields
-                            const pId = p.id || p._id;
-                            const pIdStr = String(pId);
-
-                            if (typeof id === 'string' && (id.length === 24 || id.startsWith('prod_'))) {
-                                // Database ObjectId or prod_ ID comparison
-                                return (pIdStr === id) || (String(p._id) === id) || (String(p.id) === id);
-                            } else {
-                                // Numeric ID comparison
-                                const productIdNum = typeof pId === 'string' ? parseInt(pId) : pId;
-                                return productIdNum === id;
-                            }
-                        });
-
-                        if (!product) {
-                            console.error('❌ Product not found for setQuantity. ID:', id);
-                            return;
-                        }
-
-                        const oldQty = parseInt(product.quantity) || 0;
-                        if (oldQty === qty) return; // No change
-
-                        const useDatabase = localStorage.getItem('useDatabase') === 'true';
-
-                        // Update via Database API if available
-                        if (useDatabase) {
-                            try {
-                                // Use the actual product ID (could be _id or id)
-                                const productIdForAPI = product._id || product.id || id;
-                                await apiService.updateQuantity(productIdForAPI, qty);
-                                console.log('✅ Quantity updated via Database API');
-                            } catch (error) {
-                                console.error('❌ Error updating quantity via Database API:', error);
-                                showNotification('Error updating stock: ' + error.message, 'error');
-                                // Revert input value
-                                const qtyInput = document.getElementById(`qty-${productId}`);
-                                if (qtyInput) {
-                                    qtyInput.value = oldQty;
-                                }
-                                return;
-                            }
-                        }
-
-                        product.quantity = qty;
-
-                        // Save to localStorage as backup
-                        if (!useDatabase) {
-                            await saveProducts();
-                        } else {
-                            saveProductsToLocalCache();
-                        }
-
-                        // Update displays
-                        displayProducts(currentCategory);
-
-                        const change = qty - oldQty;
-                        showNotification(`Stock set to ${qty} (${change > 0 ? '+' : ''}${change} from previous)`, 'success');
-                        console.log(`✅ Quantity set for product ${id}: ${oldQty} → ${qty}`);
-                    }
-
-                    function saveProductsToLocalCache() {
+                        // Update IndexedDB cache with latest Database data
                         try {
-                            // When using Database, save lightweight version to avoid quota issues
-                            const lightweightProducts = products.map(p => ({
-                                id: p.id,
-                                name: p.name,
-                                category: p.category,
-                                price: p.price,
-                                discount: p.discount || 0,
-                                quantity: p.quantity || 0,
-                                size: p.size || 'M',
-                                image: '' // Don't save images to localStorage
+                            await storageManager.syncFromDatabase(updatedMongoProducts);
+                        } catch (cacheError) {
+                            console.warn('⚠️ Could not update IndexedDB cache:', cacheError.message);
+                        }
+
+                        // Load images in background
+                        loadProductImagesLazy(loadedProducts).catch(err => {
+                            console.warn('⚠️ Some product images failed to load:', err.message);
+                        });
+                    } catch (syncError) {
+                        console.error('❌ Error syncing to Database:', syncError);
+                        // If sync fails, still use Database products (they're the source of truth)
+                        loadedProducts = dbProducts.map(p => ({
+                            ...p,
+                            id: p._id || p.id,
+                            image: p.image || ''
+                        }));
+                        loadSource = 'Database (permanent, centralized)';
+                    }
+                } else {
+                    // No local products - use Database directly (primary source)
+                    loadedProducts = dbProducts.map(p => ({
+                        ...p,
+                        id: p._id || p.id,
+                        image: p.image || '' // Will be empty, loaded lazily
+                    }));
+                    loadSource = 'Database (permanent, centralized)';
+                    console.log(`📦 Using ${loadedProducts.length} products from Database (permanent, centralized storage)`);
+
+                    // Load images in background for products that have them
+                    loadProductImagesLazy(loadedProducts).catch(err => {
+                        console.warn('⚠️ Some product images failed to load:', err.message);
+                    });
+                }
+
+            } catch (error) {
+                // Database failed - check if it's a transient error or permanent failure
+                const errorMsg = error.message || error.toString() || '';
+                const errorName = error.name || '';
+
+                const isExpectedError =
+                    errorName === 'AbortError' ||
+                    errorName === 'TypeError' ||
+                    errorMsg.includes('aborted') ||
+                    errorMsg.includes('Aborted') ||
+                    errorMsg.includes('fetch') ||
+                    errorMsg.includes('network') ||
+                    errorMsg.includes('Network') ||
+                    errorMsg.includes('Database not connected') ||
+                    errorMsg.includes('Database connection') ||
+                    errorMsg.includes('backend not available') ||
+                    errorMsg.includes('Failed to fetch');
+
+                if (!isExpectedError) {
+                    console.error('❌ Database API load error:', errorMsg);
+                    console.error('❌ Error details:', error);
+                } else {
+                    // Expected error (timeout, network issue) - don't log as error
+                    if (errorName === 'AbortError' || errorMsg.includes('timed out') || errorMsg.includes('aborted')) {
+                        console.warn(`⚠️ Database request timed out (15s) - this may be due to slow network or backend response`);
+                        console.warn(`   The request will fall back to localStorage/IndexedDB for now`);
+                        console.warn(`   If this persists, check: 1) Backend is running, 2) Network connection, 3) Database Atlas connection`);
+                    } else {
+                        console.warn(`⚠️ Database request failed: ${errorMsg}`);
+                    }
+                }
+
+                // Log fallback message
+                console.log('ℹ️ Failed to load from Database - will load from localStorage/IndexedDB');
+
+                // Mark Database as unavailable for this session
+                useDatabase = false;
+                localStorage.setItem('useDatabase', 'false');
+
+                // Will fall through to localStorage/IndexedDB fallback below
+            }
+        }
+
+        // FALLBACK: Use IndexedDB cache ONLY if Database is not available (OFFLINE mode)
+        // NOTE: localStorage is NOT used for products - only for UI data (cart, preferences)
+        // Database is the ONLY source of truth for core app data
+        if (loadedProducts.length === 0) {
+            if (useDatabase && databaseConnected) {
+                // Database was available but failed to load products - show error
+                console.error('❌ Database was connected but failed to load products');
+                console.error('   This is an error - products should load from Database');
+                console.error('   Check backend logs and Database connection');
+            } else {
+                // Database not available - use IndexedDB cache for offline mode ONLY
+                console.warn('⚠️ Database not available - using IndexedDB cache (OFFLINE MODE)');
+                console.warn('   Note: Database (MariaDB) is permanent, centralized storage.');
+                console.warn('   localStorage is NOT used for products - only for UI data (cart, preferences)');
+
+                // Use IndexedDB cache if available (offline mode)
+                try {
+                    await storageManager.init();
+                    if (storageManager.useIndexedDB && storageManager.db) {
+                        const indexedProducts = await storageManager.loadProducts();
+                        if (indexedProducts && indexedProducts.length > 0) {
+                            loadedProducts = indexedProducts.map(p => ({
+                                ...p,
+                                id: p.id || p._id,
+                                image: p.image || ''
                             }));
-                            localStorage.setItem('products', JSON.stringify(lightweightProducts));
-                        } catch (error) {
-                            console.warn('Could not update localStorage cache:', error);
+                            loadSource = 'IndexedDB cache (offline mode)';
+                            console.log(`📦 Using ${loadedProducts.length} products from IndexedDB cache (offline mode)`);
+                            console.log(`   ⚠️ This is cached data. Reconnect to Database for latest data.`);
                         }
                     }
-
-                    function deleteProduct(productId, event) {
-                        // Prevent any event propagation issues
-                        if (event) {
-                            event.preventDefault();
-                            event.stopPropagation();
-                        }
-
-                        console.log('🗑️ deleteProduct function called with:', productId, typeof productId);
-
-                        // Handle async operation properly when called from onclick
-                        (async () => {
-                            try {
-                                // Handle both Database ObjectId (24 char string), numeric IDs, and string IDs (e.g. prod_...)
-                                let id = productId;
-                                if (typeof productId === 'string' && (productId.length === 24 && /^[0-9a-fA-F]{24}$/.test(productId) || productId.startsWith('prod_'))) {
-                                    // Database ObjectId or prod_ ID - use as is
-                                    id = productId;
-                                } else {
-                                    // Try to parse as number
-                                    const parsedId = typeof productId === 'string' ? parseInt(productId) : productId;
-                                    if (!isNaN(parsedId) && parsedId.toString() === productId.toString()) {
-                                        id = parsedId;
-                                    } else if (typeof productId === 'string' && productId.length > 0) {
-                                        // Fallback: treat as string ID if it's a non-empty string
-                                        id = productId;
-                                    } else {
-                                        console.error('❌ Invalid product ID:', productId);
-                                        alert('Error: Invalid product ID: ' + productId);
-                                        showNotification('Error: Invalid product ID', 'error');
-                                        return;
-                                    }
-                                }
-
-                                console.log('🗑️ Using ID:', id);
-
-                                // Find product first to show its name in confirmation and get index
-                                const index = products.findIndex(p => {
-                                    // Handle both Database ObjectId and numeric IDs
-                                    if (typeof id === 'string' && (id.length === 24 || id.startsWith('prod_'))) {
-                                        // Database ObjectId or prod_ ID comparison
-                                        return (p.id === id) || (p._id === id);
-                                    } else {
-                                        // Numeric ID comparison
-                                        const productIdNum = typeof p.id === 'string' ? parseInt(p.id) : p.id;
-                                        return productIdNum === id;
-                                    }
-                                });
-
-                                if (index === -1) {
-                                    showNotification('Product not found!', 'error');
-                                    console.error('❌ Product not found with ID:', id);
-                                    console.log('Available products:', products.map(p => ({ id: p.id, name: p.name })));
-                                    return;
-                                }
-
-                                // Get product name and full product for confirmation and restore
-                                const productName = products[index].name;
-                                const productToDelete = { ...products[index] }; // Copy for potential restore
-
-                                console.log('🗑️ Product found at index:', index, 'Name:', productName);
-                                console.log('Current products count:', products.length);
-
-                                // Store deletion info globally for the confirmation modal
-                                window.pendingDelete = {
-                                    id: id,
-                                    index: index,
-                                    name: productName,
-                                    product: productToDelete
-                                };
-
-                                // Show custom confirmation modal instead of browser confirm
-                                showDeleteConfirmationModal(productName);
-
-                                // Don't proceed with deletion yet - wait for user to confirm in modal
-                                return;
-                            } catch (error) {
-                                console.error('❌ Error in deleteProduct:', error);
-                                showNotification('Error deleting product: ' + error.message, 'error');
-                            }
-                        })();
-                    }
-
-                    // Show custom delete confirmation modal
-                    function showDeleteConfirmationModal(productName) {
-                        const modal = document.getElementById('deleteConfirmModal');
-                        const overlay = document.getElementById('deleteConfirmOverlay');
-                        const message = document.getElementById('deleteConfirmMessage');
-
-                        if (modal && overlay && message) {
-                            message.textContent = `Are you sure you want to delete "${productName}"?`;
-
-                            // Show overlay
-                            overlay.style.display = 'block';
-
-                            // Show modal with proper animation
-                            modal.style.display = 'block';
-                            // Add show class for animation (opacity and scale)
-                            setTimeout(() => {
-                                modal.classList.add('show');
-                            }, 10);
-
-                            document.body.style.overflow = 'hidden';
-                            console.log('✅ Delete confirmation modal shown');
-                        } else {
-                            console.error('❌ Delete confirmation modal elements not found');
-                            // Fallback to browser confirm
-                            if (confirm(`Delete "${productName}"? This cannot be undone.`)) {
-                                confirmDelete();
-                            }
-                        }
-                    }
-
-                    // Close delete confirmation modal
-                    function cancelDelete() {
-                        const modal = document.getElementById('deleteConfirmModal');
-                        const overlay = document.getElementById('deleteConfirmOverlay');
-
-                        // Remove show class first for animation
-                        if (modal) {
-                            modal.classList.remove('show');
-                            // Hide after animation
-                            setTimeout(() => {
-                                modal.style.display = 'none';
-                            }, 300);
-                        }
-
-                        if (overlay) overlay.style.display = 'none';
-                        document.body.style.overflow = '';
-
-                        // Clear pending delete
-                        window.pendingDelete = null;
-                        console.log('❌ Delete cancelled by user');
-                        showNotification('Delete cancelled - product kept', 'info');
-                    }
-
-                    // Confirm and proceed with deletion
-                    async function confirmDelete() {
-                        if (!window.pendingDelete) {
-                            console.error('❌ No pending delete found');
-                            showNotification('Error: No product selected for deletion', 'error');
-                            cancelDelete();
-                            return;
-                        }
-
-                        const { id, index, name: productName, product: productToDelete } = window.pendingDelete;
-
-                        // Close modal first
-                        cancelDelete();
-
-                        console.log('✅ User confirmed deletion - proceeding with delete');
-                        console.log('🗑️ Deleting product:', productName, productToDelete);
-
-                        try {
-                            // Remove product from array immediately (optimistic update)
-                            products.splice(index, 1);
-                            console.log('✅ Product removed from array. New count:', products.length);
-
-                            // Delete from ALL storage locations (Database, localStorage, IndexedDB)
-                            const deleteResult = await deleteProductFromAllStorage(id);
-
-                            if (deleteResult.success) {
-                                console.log('✅ Product deleted from storage locations');
-
-                                // Check if Database is connected before syncing
-                                let shouldSyncToDatabase = false;
-                                try {
-                                    const backendAvailable = await apiService.checkBackend();
-                                    if (backendAvailable) {
-                                        const dbStatus = await apiService.checkDatabaseStatus();
-                                        shouldSyncToDatabase = (dbStatus.readyState === 1);
-                                    }
-                                } catch (error) {
-                                    console.log('ℹ️ Could not check Database status - will skip Database sync');
-                                }
-
-                                // Sync remaining products to all storage locations to ensure consistency
-                                // This saves remaining products to localStorage/IndexedDB (and Database if connected)
-                                console.log('🔄 Syncing remaining products to all storage locations...');
-                                const syncResult = await syncProductsToAllStorage(products, {
-                                    preserveImages: true,
-                                    skipDatabase: !shouldSyncToDatabase // Skip Database if not connected
-                                });
-
-                                if (syncResult.success) {
-                                    console.log('✅ Remaining products synced to storage locations');
-
-                                    // Update products array with synced products (in case Database IDs changed)
-                                    if (syncResult.products && syncResult.products.length > 0) {
-                                        // Update products array with synced products (preserve order and add Database IDs)
-                                        syncResult.products.forEach((syncedProduct, idx) => {
-                                            if (idx < products.length) {
-                                                // Update existing product with synced data (especially Database ID)
-                                                const currentProduct = products[idx];
-                                                products[idx] = {
-                                                    ...currentProduct,
-                                                    id: syncedProduct.id || currentProduct.id,
-                                                    _id: syncedProduct.id || currentProduct._id || currentProduct.id
-                                                };
-                                            }
-                                        });
-                                    }
-
-                                    // CRITICAL: Ensure products are saved to localStorage/IndexedDB after sync
-                                    // (Sync should have done this, but we verify to ensure persistence)
-                                    try {
-                                        const productsJson = JSON.stringify(products);
-                                        localStorage.setItem('products', productsJson);
-                                        console.log(`✅ Verified ${products.length} products saved to localStorage (after deletion)`);
-
-                                        // Also save to IndexedDB
-                                        await storageManager.init();
-                                        if (storageManager.useIndexedDB && storageManager.db) {
-                                            await storageManager.saveProducts(products);
-                                            console.log(`✅ Verified ${products.length} products saved to IndexedDB (after deletion)`);
-                                        }
-                                    } catch (error) {
-                                        console.error('❌ Error verifying products after deletion:', error);
-                                    }
-                                } else {
-                                    console.warn('⚠️ Failed to sync remaining products to some storage locations');
-                                    // Still save to localStorage/IndexedDB directly as backup
-                                    try {
-                                        const productsJson = JSON.stringify(products);
-                                        localStorage.setItem('products', productsJson);
-                                        console.log(`✅ Saved ${products.length} products directly to localStorage (backup after deletion)`);
-                                    } catch (error) {
-                                        console.error('❌ Error saving products to localStorage:', error);
-                                    }
-                                }
-
-                                // Reload products from Database if available (to get latest state and ensure sync)
-                                let productsReloaded = false;
-                                try {
-                                    const backendAvailable = await apiService.checkBackend();
-                                    if (backendAvailable) {
-                                        console.log('🔄 Reloading products from Database after deletion...');
-                                        await loadProducts();
-                                        productsReloaded = true;
-                                        console.log('✅ Products reloaded from Database. Product count:', products.length);
-                                    } else {
-                                        console.log('ℹ️ Backend not available - using local products array');
-                                    }
-                                } catch (reloadError) {
-                                    console.warn('⚠️ Could not reload from Database (using local data):', reloadError.message);
-                                    // Continue with local products
-                                }
-
-                                // Update UI with remaining products immediately (no delay needed)
-                                console.log(`✅ Products array has ${products.length} products (after deletion)`);
-                                console.log('🔄 Refreshing product display...');
-                                currentCategory = 'all';
-                                displayProducts('all');
-                                console.log('✅ Product display refreshed');
-
-                                // Update active filter button
-                                document.querySelectorAll('.filter-btn').forEach(btn => {
-                                    btn.classList.remove('active');
-                                    if (btn.getAttribute('data-category') === 'all') {
-                                        btn.classList.add('active');
-                                    }
-                                });
-
-                                // Preserve search query if there is one and refresh admin products list
-                                const searchInput = document.getElementById('adminProductSearch');
-                                const searchQuery = searchInput ? searchInput.value : '';
-                                console.log('🔄 Refreshing admin products list...');
-                                loadAdminProducts(searchQuery);
-                                console.log('✅ Admin products list refreshed');
-
-                                console.log('✅ Product deleted successfully from all storage locations');
-                                showNotification('Product deleted successfully from all storage locations!', 'success');
-
-                                // Note: We intentionally don't reload from Database here because:
-                                // 1. Database wasn't synced during deletion (database wasn't connected)
-                                // 2. Database still has the deleted products
-                                // 3. When Database connects and we sync remaining products, deleted products will be removed automatically
-                            } else {
-                                console.error('❌ Failed to delete product from any storage location');
-                                showNotification('Error: Failed to delete product from any storage location', 'error');
-
-                                // Restore product to array if deletion failed
-                                products.splice(index, 0, productToDelete);
-                                console.log('⚠️ Product restored to array due to deletion failure');
-                            }
-
-                            // Clear pending delete
-                            window.pendingDelete = null;
-                        } catch (error) {
-                            console.error('❌ Error in confirmDelete:', error);
-                            showNotification('Error deleting product: ' + error.message, 'error');
-
-                            // Restore product to array if deletion failed
-                            if (window.pendingDelete) {
-                                const { index, product: productToDelete } = window.pendingDelete;
-                                products.splice(index, 0, productToDelete);
-                                console.log('⚠️ Product restored to array due to error');
-                            }
-
-                            // Clear pending delete on error
-                            window.pendingDelete = null;
-                        }
-                    }
-
-                    async function saveProducts() {
-                        try {
-                            const productsToSave = [...products];
-
-                            console.log('💾 [saveProducts] Starting sync to all storage locations... Products count:', productsToSave.length);
-
-                            // Use unified sync function to save to all storage locations
-                            const syncResult = await syncProductsToAllStorage(productsToSave, { preserveImages: true });
-
-                            if (syncResult.success) {
-                                // Update products array with synced products (in case Database IDs changed)
-                                if (syncResult.products && syncResult.products.length > 0) {
-                                    // Update products array with synced products (preserve order and add Database IDs)
-                                    syncResult.products.forEach((syncedProduct, index) => {
-                                        if (index < products.length) {
-                                            // Update existing product with synced data (especially Database ID)
-                                            const currentProduct = products[index];
-                                            products[index] = {
-                                                ...currentProduct,
-                                                id: syncedProduct.id || currentProduct.id,
-                                                _id: syncedProduct.id || currentProduct._id || currentProduct.id
-                                            };
-                                        }
-                                    });
-                                }
-
-                                console.log('✅ [saveProducts] Products synced to all storage locations successfully');
-                                return true;
-                            } else {
-                                console.error('❌ [saveProducts] Failed to sync to any storage location');
-                                return false;
-                            }
-                        } catch (error) {
-                            console.error('❌ [saveProducts] Unexpected error:', error);
-                            return false;
-                        }
-                    }
-
-                    async function loadProducts() {
-                        try {
-                            let loadedProducts = [];
-                            let loadSource = 'none';
-
-                            // Check if Database backend is available AND database is actually connected
-                            let useDatabase = false;
-                            let databaseConnected = false;
-
-                            try {
-                                console.log('🔍 Checking Database backend availability...');
-                                const backendAvailable = await apiService.checkBackend();
-
-                                if (backendAvailable) {
-                                    console.log('🔍 Backend is available - checking Database connection...');
-                                    try {
-                                        const dbStatus = await apiService.checkDatabaseStatus();
-                                        databaseConnected = dbStatus && dbStatus.readyState === 1;
-
-                                        if (databaseConnected) {
-                                            useDatabase = true;
-                                            localStorage.setItem('useDatabase', 'true');
-                                            console.log('✅ Database is connected - will use Database');
-                                            console.log(`   Database: ${dbStatus.name || 'trendy-dresses'}`);
-                                            console.log(`   Host: ${dbStatus.host || 'connected'}`);
-                                        } else {
-                                            const statusText = dbStatus?.readyStateText || 'unknown';
-                                            const readyState = dbStatus?.readyState || 0;
-                                            console.warn(`⚠️ Database backend available but database not connected`);
-                                            console.warn(`   Status: ${statusText} (ReadyState: ${readyState})`);
-                                            console.warn(`   Will use fallback storage (localStorage/IndexedDB)`);
-                                            useDatabase = false;
-                                            localStorage.setItem('useDatabase', 'false');
-                                        }
-                                    } catch (dbError) {
-                                        console.warn('⚠️ Error checking Database connection status:', dbError.message);
-                                        useDatabase = false;
-                                        localStorage.setItem('useDatabase', 'false');
-                                    }
-                                } else {
-                                    console.log('ℹ️ Backend not available - will use fallback storage');
-                                    useDatabase = false;
-                                    localStorage.setItem('useDatabase', 'false');
-                                }
-                            } catch (checkError) {
-                                console.warn('⚠️ Error during Database availability check:', checkError.message);
-                                useDatabase = false;
-                                localStorage.setItem('useDatabase', 'false');
-                            }
-
-                            // Check localStorage/IndexedDB first to see what we have locally
-                            let localProducts = [];
-                            let localProductCount = 0;
-                            try {
-                                // Check localStorage
-                                const savedProducts = localStorage.getItem('products');
-                                if (savedProducts) {
-                                    try {
-                                        localProducts = JSON.parse(savedProducts);
-                                        localProductCount = localProducts.length;
-                                        console.log(`📦 Found ${localProductCount} products in localStorage`);
-                                    } catch (error) {
-                                        console.error('❌ Error parsing localStorage products:', error);
-                                    }
-                                }
-
-                                // Check IndexedDB
-                                await storageManager.init();
-                                if (storageManager.useIndexedDB && storageManager.db) {
-                                    const indexedProducts = await storageManager.loadProducts();
-                                    if (indexedProducts && indexedProducts.length > 0) {
-                                        if (indexedProducts.length > localProductCount) {
-                                            localProducts = indexedProducts;
-                                            localProductCount = indexedProducts.length;
-                                            console.log(`📦 Found ${localProductCount} products in IndexedDB (using IndexedDB)`);
-                                        }
-                                    }
-                                }
-                            } catch (error) {
-                                console.error('❌ Error checking local storage:', error);
-                            }
-
-                            // PRIORITY: Database is PERMANENT, CENTRALIZED storage - primary source of truth
-                            if (useDatabase && databaseConnected) {
-                                // Update localStorage preference to Database
-                                localStorage.setItem('useDatabase', 'true');
-                                localStorage.setItem('preferredStorage', 'database');
-
-                                try {
-                                    // Step 1: Load products from Database (PERMANENT, CENTRALIZED storage) - WITHOUT images for faster loading
-                                    const dbProducts = await apiService.getProducts('all', false);
-                                    console.log(`📦 Loaded ${dbProducts.length} products from Database (permanent, centralized storage)`);
-
-                                    // Step 1.5: Cache Database data to IndexedDB for offline access
-                                    try {
-                                        await storageManager.init();
-                                        if (storageManager.useIndexedDB && storageManager.db) {
-                                            await storageManager.syncFromDatabase(dbProducts);
-                                            console.log(`✅ Cached Database data to IndexedDB for offline access`);
-                                        }
-                                    } catch (cacheError) {
-                                        console.warn('⚠️ Could not cache to IndexedDB:', cacheError.message);
-                                        // Continue - caching is optional
-                                    }
-
-                                    // Step 1.6: Load images for products that have them (lazy load)
-                                    // This is done asynchronously after initial display
-                                    if (dbProducts.length > 0) {
-                                        console.log('🖼️ Loading product images in background...');
-                                        loadProductImagesLazy(dbProducts).catch(err => {
-                                            console.warn('⚠️ Some product images failed to load:', err.message);
-                                        });
-                                    }
-
-                                    // Step 2: If we have local products, sync them to Database (Database is authoritative)
-                                    if (localProductCount > 0 && localProducts.length > 0) {
-                                        console.log(`🔄 Found ${localProductCount} products in local cache - syncing to Database (authoritative)...`);
-                                        try {
-                                            await syncProductsToAllStorage(localProducts, { preserveImages: true });
-                                            console.log(`✅ Synced ${localProductCount} local products to Database (permanent storage)`);
-
-                                            // Reload from Database after sync to get the latest data (without images for speed)
-                                            const updatedMongoProducts = await apiService.getProducts('all', false);
-                                            loadedProducts = updatedMongoProducts.map(p => ({
-                                                ...p,
-                                                id: p._id || p.id,
-                                                image: p.image || '' // Will be empty, loaded lazily
-                                            }));
-                                            loadSource = 'Database (permanent, centralized)';
-                                            console.log(`📦 Using ${loadedProducts.length} products from Database (authoritative)`);
-
-                                            // Update IndexedDB cache with latest Database data
-                                            try {
-                                                await storageManager.syncFromDatabase(updatedMongoProducts);
-                                            } catch (cacheError) {
-                                                console.warn('⚠️ Could not update IndexedDB cache:', cacheError.message);
-                                            }
-
-                                            // Load images in background
-                                            loadProductImagesLazy(loadedProducts).catch(err => {
-                                                console.warn('⚠️ Some product images failed to load:', err.message);
-                                            });
-                                        } catch (syncError) {
-                                            console.error('❌ Error syncing to Database:', syncError);
-                                            // If sync fails, still use Database products (they're the source of truth)
-                                            loadedProducts = dbProducts.map(p => ({
-                                                ...p,
-                                                id: p._id || p.id,
-                                                image: p.image || ''
-                                            }));
-                                            loadSource = 'Database (permanent, centralized)';
-                                        }
-                                    } else {
-                                        // No local products - use Database directly (primary source)
-                                        loadedProducts = dbProducts.map(p => ({
-                                            ...p,
-                                            id: p._id || p.id,
-                                            image: p.image || '' // Will be empty, loaded lazily
-                                        }));
-                                        loadSource = 'Database (permanent, centralized)';
-                                        console.log(`📦 Using ${loadedProducts.length} products from Database (permanent, centralized storage)`);
-
-                                        // Load images in background for products that have them
-                                        loadProductImagesLazy(loadedProducts).catch(err => {
-                                            console.warn('⚠️ Some product images failed to load:', err.message);
-                                        });
-                                    }
-
-                                } catch (error) {
-                                    // Database failed - check if it's a transient error or permanent failure
-                                    const errorMsg = error.message || error.toString() || '';
-                                    const errorName = error.name || '';
-
-                                    const isExpectedError =
-                                        errorName === 'AbortError' ||
-                                        errorName === 'TypeError' ||
-                                        errorMsg.includes('aborted') ||
-                                        errorMsg.includes('Aborted') ||
-                                        errorMsg.includes('fetch') ||
-                                        errorMsg.includes('network') ||
-                                        errorMsg.includes('Network') ||
-                                        errorMsg.includes('Database not connected') ||
-                                        errorMsg.includes('Database connection') ||
-                                        errorMsg.includes('backend not available') ||
-                                        errorMsg.includes('Failed to fetch');
-
-                                    if (!isExpectedError) {
-                                        console.error('❌ Database API load error:', errorMsg);
-                                        console.error('❌ Error details:', error);
-                                    } else {
-                                        // Expected error (timeout, network issue) - don't log as error
-                                        if (errorName === 'AbortError' || errorMsg.includes('timed out') || errorMsg.includes('aborted')) {
-                                            console.warn(`⚠️ Database request timed out (15s) - this may be due to slow network or backend response`);
-                                            console.warn(`   The request will fall back to localStorage/IndexedDB for now`);
-                                            console.warn(`   If this persists, check: 1) Backend is running, 2) Network connection, 3) Database Atlas connection`);
-                                        } else {
-                                            console.warn(`⚠️ Database request failed: ${errorMsg}`);
-                                        }
-                                    }
-
-                                    // Log fallback message
-                                    console.log('ℹ️ Failed to load from Database - will load from localStorage/IndexedDB');
-
-                                    // Mark Database as unavailable for this session
-                                    useDatabase = false;
-                                    localStorage.setItem('useDatabase', 'false');
-
-                                    // Will fall through to localStorage/IndexedDB fallback below
-                                }
-                            }
-
-                            // FALLBACK: Use IndexedDB cache ONLY if Database is not available (OFFLINE mode)
-                            // NOTE: localStorage is NOT used for products - only for UI data (cart, preferences)
-                            // Database is the ONLY source of truth for core app data
-                            if (loadedProducts.length === 0) {
-                                if (useDatabase && databaseConnected) {
-                                    // Database was available but failed to load products - show error
-                                    console.error('❌ Database was connected but failed to load products');
-                                    console.error('   This is an error - products should load from Database');
-                                    console.error('   Check backend logs and Database connection');
-                                } else {
-                                    // Database not available - use IndexedDB cache for offline mode ONLY
-                                    console.warn('⚠️ Database not available - using IndexedDB cache (OFFLINE MODE)');
-                                    console.warn('   Note: Database (MariaDB) is permanent, centralized storage.');
-                                    console.warn('   localStorage is NOT used for products - only for UI data (cart, preferences)');
-
-                                    // Use IndexedDB cache if available (offline mode)
-                                    try {
-                                        await storageManager.init();
-                                        if (storageManager.useIndexedDB && storageManager.db) {
-                                            const indexedProducts = await storageManager.loadProducts();
-                                            if (indexedProducts && indexedProducts.length > 0) {
-                                                loadedProducts = indexedProducts.map(p => ({
-                                                    ...p,
-                                                    id: p.id || p._id,
-                                                    image: p.image || ''
-                                                }));
-                                                loadSource = 'IndexedDB cache (offline mode)';
-                                                console.log(`📦 Using ${loadedProducts.length} products from IndexedDB cache (offline mode)`);
-                                                console.log(`   ⚠️ This is cached data. Reconnect to Database for latest data.`);
-                                            }
-                                        }
-                                    } catch (error) {
-                                        console.error('❌ Error loading from IndexedDB cache:', error);
-                                    }
-
-                                    // DO NOT use localStorage for products - it's only for UI data
-                                    if (loadedProducts.length === 0) {
-                                        console.error('❌ No products available - Database is not connected and no cache found');
-                                        console.error('   Please ensure backend server is running and Database is connected');
-                                    }
-                                }
-                            }
-
-                            if (loadedProducts.length > 0) {
-                                // Clear the default products array completely
-                                products.length = 0;
-                                console.log('🧹 Cleared default products array');
-
-                                // Ensure all products have required fields for backward compatibility
-                                loadedProducts.forEach(product => {
-                                    // Preserve existing image if it exists, don't overwrite with empty string
-                                    if (!product.hasOwnProperty('image') || product.image === null || product.image === undefined) {
-                                        product.image = '';
-                                    }
-                                    // Don't overwrite existing image with empty string - preserve what's there
-                                    if (!product.hasOwnProperty('size')) {
-                                        product.size = 'M'; // Default size
-                                    }
-                                    if (!product.hasOwnProperty('discount')) {
-                                        product.discount = 0; // Default discount
-                                    }
-                                    if (!product.hasOwnProperty('quantity')) {
-                                        product.quantity = 1; // Default quantity
-                                    }
-                                });
-
-                                // Log image statistics
-                                const productsWithImages = loadedProducts.filter(p => {
-                                    const img = p.image || '';
-                                    return img && img.trim().length > 0 &&
-                                        (img.startsWith('data:image/') || img.startsWith('http://') || img.startsWith('https://'));
-                                }).length;
-                                if (productsWithImages === 0 && loadedProducts.length > 0) {
-                                    console.log(`ℹ️ Image status: ${productsWithImages}/${loadedProducts.length} products have images. Products without images will show a gradient background with icon.`);
-                                    console.log(`💡 To add images: Login as admin → Edit product → Upload image`);
-                                } else {
-                                    console.log(`📊 Image statistics: ${productsWithImages}/${loadedProducts.length} products have images`);
-                                }
-
-                                // Replace products array with loaded products
-                                products.push(...loadedProducts);
-                                console.log(`✅ Total products loaded: ${products.length} (from ${loadSource})`);
-                                console.log(`✅ Products array now contains:`, products.map(p => ({ id: p.id, name: p.name })));
-
-                                // Verify the products array was properly replaced
-                                if (products.length !== loadedProducts.length) {
-                                    console.error('❌ CRITICAL: Products array length mismatch!', products.length, 'vs', loadedProducts.length);
-                                }
-
-                                // Note: IndexedDB recovery disabled - Database is preferred storage method
-                                // If Database backend is available, products should be loaded from Database, not IndexedDB
-                            } else {
-                                // No products found in storage
-                                console.log('⚠️ No products found in storage');
-                                console.log('⚠️ Current products array has', products.length, 'items');
-
-                                // CRITICAL FIX: If products array is empty, reinitialize with default products
-                                if (products.length === 0) {
-                                    console.log('✅ Products array is empty - reinitializing with default products...');
-                                    // Reinitialize default products
-                                    products.length = 0;
-                                    products.push(
-                                        { id: 13, name: 'Floral Summer Dress', category: 'dresses', price: 6000, icon: '👗', image: '', size: 'M', discount: 0, quantity: 1 },
-                                        { id: 14, name: 'Little Black Dress', category: 'dresses', price: 6500, icon: '👗', image: '', size: 'S', discount: 0, quantity: 1 },
-                                        { id: 15, name: 'Maxi Evening Dress', category: 'dresses', price: 7500, icon: '👗', image: '', size: 'L', discount: 0, quantity: 1 },
-                                        { id: 16, name: 'Casual Midi Dress', category: 'dresses', price: 5000, icon: '👗', image: '', size: 'M', discount: 0, quantity: 1 },
-                                        { id: 17, name: 'A-Line Dress', category: 'dresses', price: 5500, icon: '👗', image: '', size: 'S', discount: 0, quantity: 1 },
-                                        { id: 18, name: 'Wrap Dress', category: 'dresses', price: 5800, icon: '👗', image: '', size: 'M', discount: 0, quantity: 1 },
-                                        { id: 19, name: 'Classic Tracksuit Set', category: 'tracksuits', price: 7000, icon: '👟', image: '', size: 'L', discount: 0, quantity: 1 },
-                                        { id: 20, name: 'Sporty Tracksuit', category: 'tracksuits', price: 6500, icon: '👟', image: '', size: 'M', discount: 0, quantity: 1 },
-                                        { id: 21, name: 'Premium Tracksuit', category: 'tracksuits', price: 8500, icon: '👟', image: '', size: 'XL', discount: 0, quantity: 1 },
-                                        { id: 22, name: 'Casual Tracksuit', category: 'tracksuits', price: 6000, icon: '👟', image: '', size: 'M', discount: 0, quantity: 1 },
-                                        { id: 23, name: 'Designer Tracksuit', category: 'tracksuits', price: 9500, icon: '👟', image: '', size: 'L', discount: 0, quantity: 1 },
-                                        { id: 24, name: 'Athletic Tracksuit', category: 'tracksuits', price: 7500, icon: '👟', image: '', size: 'M', discount: 0, quantity: 1 }
-                                    );
-                                    console.log('✅ Default products reinitialized:', products.length, 'products');
-                                    // Save to storage
-                                    await saveProducts();
-                                    localStorage.setItem('productsInitialized', 'true');
-                                    console.log('✅ Default products saved to storage');
-                                    return; // Exit early after reinitializing
-                                }
-
-                                // Check if this is truly the first load by checking for a flag
-                                const hasBeenInitialized = localStorage.getItem('productsInitialized');
-                                console.log('⚠️ Has been initialized?', hasBeenInitialized);
-
-                                // If products exist in memory but not in storage, save them
-                                if (products.length > 0) {
-                                    // Check if we have the default 12 products (initial state - dresses and tracksuits only)
-                                    const isFirstLoad = products.length === 12 &&
-                                        products[0]?.id === 13 &&
-                                        products[0]?.name === 'Floral Summer Dress' &&
-                                        products[11]?.id === 24;
-
-                                    if (isFirstLoad && hasBeenInitialized !== 'true') {
-                                        console.log('✅ First time load detected - saving initial default products...');
-                                        await saveProducts();
-                                        // Mark as initialized so we don't overwrite user products on future loads
-                                        localStorage.setItem('productsInitialized', 'true');
-                                        console.log('✅ Initial products saved. You can now add your own products.');
-                                    } else if (hasBeenInitialized === 'true') {
-                                        // Storage was cleared but products exist in memory - keep them
-                                        console.warn('⚠️ Storage was cleared but products exist in memory. Keeping current products.');
-                                        // Optionally save them back to storage
-                                        await saveProducts();
-                                    } else {
-                                        // Products array has been modified (user added products) but storage is empty
-                                        // This shouldn't happen normally, but save what we have
-                                        console.warn('⚠️ Products in memory (', products.length, ') but storage is empty. Saving current products...');
-                                        await saveProducts();
-                                        localStorage.setItem('productsInitialized', 'true');
-                                    }
-                                }
-                            }
-                        } catch (error) {
-                            console.error('❌ Error loading products:', error);
-                            // Keep existing products array if load fails
-                        }
-                    }
-
-                    // Helper function to clear localStorage if needed (can be called from console)
-                    function clearStorage() {
-                        if (confirm('This will clear all stored data including products, cart, and settings. Are you sure?')) {
-                            localStorage.clear();
-                            location.reload();
-                        }
-                    }
-
-                    // Helper function to remove images from all products to free up space
-                    async function removeAllProductImages() {
-                        if (confirm('This will remove all product images to free up storage space. Product data will be kept. Continue?')) {
-                            products.forEach(product => {
-                                product.image = '';
-                            });
-                            const saved = await saveProducts();
-                            if (saved) {
-                                showNotification('All product images removed. Storage space freed!', 'success');
-                                displayProducts(currentCategory);
-                            } else {
-                                showNotification('Failed to save. Storage may be completely full.', 'error');
-                            }
-                        }
-                    }
-
-                    // Debug function to check image status
-                    function checkImageStatus() {
-                        console.log('📊 IMAGE STATUS REPORT');
-                        console.log('====================');
-                        console.log(`Total products: ${products.length}`);
-
-                        const productsWithImages = products.filter(p => {
-                            const img = p.image || '';
-                            return img && img.trim().length > 0 &&
-                                (img.startsWith('data:image/') || img.startsWith('http://') || img.startsWith('https://'));
-                        });
-
-                        const productsWithoutImages = products.filter(p => {
-                            const img = p.image || '';
-                            return !img || img.trim().length === 0 ||
-                                (!img.startsWith('data:image/') && !img.startsWith('http://') && !img.startsWith('https://'));
-                        });
-
-                        console.log(`✅ Products WITH valid images: ${productsWithImages.length}`);
-                        productsWithImages.forEach(p => {
-                            const imgLen = (p.image || '').length;
-                            console.log(`  - "${p.name}" (ID: ${p.id}): ${imgLen} chars, starts with: ${(p.image || '').substring(0, 20)}...`);
-                        });
-
-                        console.log(`❌ Products WITHOUT images: ${productsWithoutImages.length}`);
-                        productsWithoutImages.forEach(p => {
-                            const img = p.image || '';
-                            console.log(`  - "${p.name}" (ID: ${p.id}): ${img.length > 0 ? `Invalid format: ${img.substring(0, 30)}...` : 'No image field'}`);
-                        });
-
-                        console.log('====================');
-                        console.log('💡 To reload products from Database, run: loadProducts()');
-                        console.log('💡 To refresh display, run: displayProducts("all")');
-
-                        return {
-                            total: products.length,
-                            withImages: productsWithImages.length,
-                            withoutImages: productsWithoutImages.length,
-                            productsWithImages: productsWithImages,
-                            productsWithoutImages: productsWithoutImages
-                        };
-                    }
-
-                    // Make checkImageStatus available globally
-                    window.checkImageStatus = checkImageStatus;
-
-                    // Compress existing product images that are already in base64 format
-                    function compressExistingProductImages() {
-                        if (!confirm('This will compress all existing product images to reduce storage size. This may take a moment. Continue?')) {
-                            return;
-                        }
-
-                        showNotification('Compressing images... This may take a moment.', 'success');
-
-                        let compressedCount = 0;
-                        let skippedCount = 0;
-                        const compressionPromises = [];
-
-                        products.forEach((product, index) => {
-                            if (product.image && product.image.trim() && product.image.startsWith('data:image')) {
-                                // Check if image is already compressed (small size)
-                                const sizeInKB = (product.image.length * 3) / 4 / 1024;
-
-                                // Only compress if image is larger than 200KB
-                                if (sizeInKB > 200) {
-                                    const promise = new Promise((resolve) => {
-                                        const img = new Image();
-                                        img.onload = function () {
-                                            const canvas = document.createElement('canvas');
-                                            let width = img.width;
-                                            let height = img.height;
-                                            const maxSize = 800;
-
-                                            // Calculate new dimensions
-                                            if (width > height) {
-                                                if (width > maxSize) {
-                                                    height = (height * maxSize) / width;
-                                                    width = maxSize;
-                                                }
-                                            } else {
-                                                if (height > maxSize) {
-                                                    width = (width * maxSize) / height;
-                                                    height = maxSize;
-                                                }
-                                            }
-
-                                            canvas.width = width;
-                                            canvas.height = height;
-
-                                            const ctx = canvas.getContext('2d');
-                                            ctx.drawImage(img, 0, 0, width, height);
-
-                                            // Convert to compressed base64
-                                            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
-                                            const newSizeInKB = (compressedDataUrl.length * 3) / 4 / 1024;
-
-                                            // Only update if compression actually reduced size
-                                            if (newSizeInKB < sizeInKB) {
-                                                product.image = compressedDataUrl;
-                                                compressedCount++;
-                                                console.log(`Compressed product "${product.name}": ${sizeInKB.toFixed(2)}KB -> ${newSizeInKB.toFixed(2)}KB`);
-                                            } else {
-                                                skippedCount++;
-                                            }
-                                            resolve();
-                                        };
-                                        img.onerror = function () {
-                                            skippedCount++;
-                                            resolve();
-                                        };
-                                        img.src = product.image;
-                                    });
-                                    compressionPromises.push(promise);
-                                } else {
-                                    skippedCount++;
-                                }
-                            } else {
-                                skippedCount++;
-                            }
-                        });
-
-                        // Wait for all compressions to complete
-                        Promise.all(compressionPromises).then(async () => {
-                            if (compressedCount > 0) {
-                                const saved = await saveProducts();
-                                if (saved) {
-                                    const oldSize = new Blob([JSON.stringify(products)]).size / (1024 * 1024);
-                                    showNotification(`Compressed ${compressedCount} images! Storage now: ${oldSize.toFixed(2)}MB`, 'success');
-                                    displayProducts(currentCategory);
-                                } else {
-                                    showNotification('Compression completed but failed to save. Storage may be full.', 'error');
-                                }
-                            } else {
-                                showNotification('No images needed compression or all images are already optimized.', 'success');
-                            }
-                        });
-                    }
-
-                    // Check storage usage and show warning if needed
-                    async function checkStorageUsage() {
-                        try {
-                            // Skip storage check if using Database
-                            const useDatabase = localStorage.getItem('useDatabase') === 'true';
-                            if (useDatabase) {
-                                return { size: 0, quota: Infinity, warning: false, type: 'Database' };
-                            }
-
-                            const storageInfo = await storageManager.getStorageInfo();
-                            const productsJson = JSON.stringify(products);
-                            const sizeInMB = new Blob([productsJson]).size / (1024 * 1024);
-
-                            // Check if we're using localStorage and approaching limit
-                            if (!storageManager.useIndexedDB && sizeInMB > 3.5) {
-                                console.warn(`⚠️ Storage Warning: Products data is ${sizeInMB.toFixed(2)}MB (close to 5MB localStorage limit)`);
-                                console.log('💡 Tip: IndexedDB is not available. Run compressExistingProductImages() to compress images');
-                                return { size: sizeInMB, quota: 5, warning: true, type: 'localStorage' };
-                            }
-
-                            return {
-                                size: storageInfo.used,
-                                quota: storageInfo.quota,
-                                available: storageInfo.available,
-                                percentUsed: storageInfo.percentUsed,
-                                warning: storageInfo.percentUsed > 80,
-                                type: storageInfo.type
-                            };
-                        } catch (error) {
-                            console.error('Error checking storage:', error);
-                            return { size: 0, quota: 0, warning: false, type: 'unknown' };
-                        }
-                    }
-
-                    // Content Management
-                    function loadAdminContent() {
-                        document.getElementById('heroTitle').value = websiteContent.heroTitle;
-                        document.getElementById('heroDescription').value = websiteContent.heroDescription;
-                        const heroImageInput = document.getElementById('heroImage');
-                        const heroImageFile = document.getElementById('heroImageFile');
-                        if (heroImageInput) {
-                            heroImageInput.value = websiteContent.heroImage || '';
-                            previewHeroImage(websiteContent.heroImage || '');
-                        }
-                        if (heroImageFile) {
-                            heroImageFile.value = ''; // Reset file input
-                        }
-                        document.getElementById('aboutText').value = websiteContent.aboutText;
-                        document.getElementById('contactPhone').value = websiteContent.contactPhone;
-                        document.getElementById('contactEmail').value = websiteContent.contactEmail;
-                        document.getElementById('contactAddress').value = websiteContent.contactAddress;
-
-                        // Load current username display
-                        const currentUsernameDisplay = document.getElementById('currentUsernameDisplay');
-                        if (currentUsernameDisplay) {
-                            currentUsernameDisplay.textContent = ADMIN_CREDENTIALS.username;
-                        }
-
-                        // Load website icon preview
-                        const websiteIconPreview = document.getElementById('websiteIconPreview');
-                        const websiteIconPreviewImg = document.getElementById('websiteIconPreviewImg');
-                        if (websiteContent.websiteIcon && websiteContent.websiteIcon.trim()) {
-                            if (websiteIconPreview && websiteIconPreviewImg) {
-                                websiteIconPreviewImg.src = websiteContent.websiteIcon;
-                                websiteIconPreview.style.display = 'block';
+                } catch (error) {
+                    console.error('❌ Error loading from IndexedDB cache:', error);
+                }
+
+                // DO NOT use localStorage for products - it's only for UI data
+                if (loadedProducts.length === 0) {
+                    console.error('❌ No products available - Database is not connected and no cache found');
+                    console.error('   Please ensure backend server is running and Database is connected');
+                }
+            }
+        }
+
+        if (loadedProducts.length > 0) {
+            // Clear the default products array completely
+            products.length = 0;
+            console.log('🧹 Cleared default products array');
+
+            // Ensure all products have required fields for backward compatibility
+            loadedProducts.forEach(product => {
+                // Preserve existing image if it exists, don't overwrite with empty string
+                if (!product.hasOwnProperty('image') || product.image === null || product.image === undefined) {
+                    product.image = '';
+                }
+                // Don't overwrite existing image with empty string - preserve what's there
+                if (!product.hasOwnProperty('size')) {
+                    product.size = 'M'; // Default size
+                }
+                if (!product.hasOwnProperty('discount')) {
+                    product.discount = 0; // Default discount
+                }
+                if (!product.hasOwnProperty('quantity')) {
+                    product.quantity = 1; // Default quantity
+                }
+            });
+
+            // Log image statistics
+            const productsWithImages = loadedProducts.filter(p => {
+                const img = p.image || '';
+                return img && img.trim().length > 0 &&
+                    (img.startsWith('data:image/') || img.startsWith('http://') || img.startsWith('https://'));
+            }).length;
+            if (productsWithImages === 0 && loadedProducts.length > 0) {
+                console.log(`ℹ️ Image status: ${productsWithImages}/${loadedProducts.length} products have images. Products without images will show a gradient background with icon.`);
+                console.log(`💡 To add images: Login as admin → Edit product → Upload image`);
+            } else {
+                console.log(`📊 Image statistics: ${productsWithImages}/${loadedProducts.length} products have images`);
+            }
+
+            // Replace products array with loaded products
+            products.push(...loadedProducts);
+            console.log(`✅ Total products loaded: ${products.length} (from ${loadSource})`);
+            console.log(`✅ Products array now contains:`, products.map(p => ({ id: p.id, name: p.name })));
+
+            // Verify the products array was properly replaced
+            if (products.length !== loadedProducts.length) {
+                console.error('❌ CRITICAL: Products array length mismatch!', products.length, 'vs', loadedProducts.length);
+            }
+
+            // Note: IndexedDB recovery disabled - Database is preferred storage method
+            // If Database backend is available, products should be loaded from Database, not IndexedDB
+        } else {
+            // No products found in storage
+            console.log('⚠️ No products found in storage');
+            console.log('⚠️ Current products array has', products.length, 'items');
+
+            // CRITICAL FIX: If products array is empty, reinitialize with default products
+            if (products.length === 0) {
+                console.log('✅ Products array is empty - reinitializing with default products...');
+                // Reinitialize default products
+                products.length = 0;
+                products.push(
+                    { id: 13, name: 'Floral Summer Dress', category: 'dresses', price: 6000, icon: '👗', image: '', size: 'M', discount: 0, quantity: 1 },
+                    { id: 14, name: 'Little Black Dress', category: 'dresses', price: 6500, icon: '👗', image: '', size: 'S', discount: 0, quantity: 1 },
+                    { id: 15, name: 'Maxi Evening Dress', category: 'dresses', price: 7500, icon: '👗', image: '', size: 'L', discount: 0, quantity: 1 },
+                    { id: 16, name: 'Casual Midi Dress', category: 'dresses', price: 5000, icon: '👗', image: '', size: 'M', discount: 0, quantity: 1 },
+                    { id: 17, name: 'A-Line Dress', category: 'dresses', price: 5500, icon: '👗', image: '', size: 'S', discount: 0, quantity: 1 },
+                    { id: 18, name: 'Wrap Dress', category: 'dresses', price: 5800, icon: '👗', image: '', size: 'M', discount: 0, quantity: 1 },
+                    { id: 19, name: 'Classic Tracksuit Set', category: 'tracksuits', price: 7000, icon: '👟', image: '', size: 'L', discount: 0, quantity: 1 },
+                    { id: 20, name: 'Sporty Tracksuit', category: 'tracksuits', price: 6500, icon: '👟', image: '', size: 'M', discount: 0, quantity: 1 },
+                    { id: 21, name: 'Premium Tracksuit', category: 'tracksuits', price: 8500, icon: '👟', image: '', size: 'XL', discount: 0, quantity: 1 },
+                    { id: 22, name: 'Casual Tracksuit', category: 'tracksuits', price: 6000, icon: '👟', image: '', size: 'M', discount: 0, quantity: 1 },
+                    { id: 23, name: 'Designer Tracksuit', category: 'tracksuits', price: 9500, icon: '👟', image: '', size: 'L', discount: 0, quantity: 1 },
+                    { id: 24, name: 'Athletic Tracksuit', category: 'tracksuits', price: 7500, icon: '👟', image: '', size: 'M', discount: 0, quantity: 1 }
+                );
+                console.log('✅ Default products reinitialized:', products.length, 'products');
+                // Save to storage
+                await saveProducts();
+                localStorage.setItem('productsInitialized', 'true');
+                console.log('✅ Default products saved to storage');
+                return; // Exit early after reinitializing
+            }
+
+            // Check if this is truly the first load by checking for a flag
+            const hasBeenInitialized = localStorage.getItem('productsInitialized');
+            console.log('⚠️ Has been initialized?', hasBeenInitialized);
+
+            // If products exist in memory but not in storage, save them
+            if (products.length > 0) {
+                // Check if we have the default 12 products (initial state - dresses and tracksuits only)
+                const isFirstLoad = products.length === 12 &&
+                    products[0]?.id === 13 &&
+                    products[0]?.name === 'Floral Summer Dress' &&
+                    products[11]?.id === 24;
+
+                if (isFirstLoad && hasBeenInitialized !== 'true') {
+                    console.log('✅ First time load detected - saving initial default products...');
+                    await saveProducts();
+                    // Mark as initialized so we don't overwrite user products on future loads
+                    localStorage.setItem('productsInitialized', 'true');
+                    console.log('✅ Initial products saved. You can now add your own products.');
+                } else if (hasBeenInitialized === 'true') {
+                    // Storage was cleared but products exist in memory - keep them
+                    console.warn('⚠️ Storage was cleared but products exist in memory. Keeping current products.');
+                    // Optionally save them back to storage
+                    await saveProducts();
+                } else {
+                    // Products array has been modified (user added products) but storage is empty
+                    // This shouldn't happen normally, but save what we have
+                    console.warn('⚠️ Products in memory (', products.length, ') but storage is empty. Saving current products...');
+                    await saveProducts();
+                    localStorage.setItem('productsInitialized', 'true');
+                }
+            }
+        }
+    } catch (error) {
+        console.error('❌ Error loading products:', error);
+        // Keep existing products array if load fails
+    }
+}
+
+// Helper function to clear localStorage if needed (can be called from console)
+function clearStorage() {
+    if (confirm('This will clear all stored data including products, cart, and settings. Are you sure?')) {
+        localStorage.clear();
+        location.reload();
+    }
+}
+
+// Helper function to remove images from all products to free up space
+async function removeAllProductImages() {
+    if (confirm('This will remove all product images to free up storage space. Product data will be kept. Continue?')) {
+        products.forEach(product => {
+            product.image = '';
+        });
+        const saved = await saveProducts();
+        if (saved) {
+            showNotification('All product images removed. Storage space freed!', 'success');
+            displayProducts(currentCategory);
+        } else {
+            showNotification('Failed to save. Storage may be completely full.', 'error');
+        }
+    }
+}
+
+// Debug function to check image status
+function checkImageStatus() {
+    console.log('📊 IMAGE STATUS REPORT');
+    console.log('====================');
+    console.log(`Total products: ${products.length}`);
+
+    const productsWithImages = products.filter(p => {
+        const img = p.image || '';
+        return img && img.trim().length > 0 &&
+            (img.startsWith('data:image/') || img.startsWith('http://') || img.startsWith('https://'));
+    });
+
+    const productsWithoutImages = products.filter(p => {
+        const img = p.image || '';
+        return !img || img.trim().length === 0 ||
+            (!img.startsWith('data:image/') && !img.startsWith('http://') && !img.startsWith('https://'));
+    });
+
+    console.log(`✅ Products WITH valid images: ${productsWithImages.length}`);
+    productsWithImages.forEach(p => {
+        const imgLen = (p.image || '').length;
+        console.log(`  - "${p.name}" (ID: ${p.id}): ${imgLen} chars, starts with: ${(p.image || '').substring(0, 20)}...`);
+    });
+
+    console.log(`❌ Products WITHOUT images: ${productsWithoutImages.length}`);
+    productsWithoutImages.forEach(p => {
+        const img = p.image || '';
+        console.log(`  - "${p.name}" (ID: ${p.id}): ${img.length > 0 ? `Invalid format: ${img.substring(0, 30)}...` : 'No image field'}`);
+    });
+
+    console.log('====================');
+    console.log('💡 To reload products from Database, run: loadProducts()');
+    console.log('💡 To refresh display, run: displayProducts("all")');
+
+    return {
+        total: products.length,
+        withImages: productsWithImages.length,
+        withoutImages: productsWithoutImages.length,
+        productsWithImages: productsWithImages,
+        productsWithoutImages: productsWithoutImages
+    };
+}
+
+// Make checkImageStatus available globally
+window.checkImageStatus = checkImageStatus;
+
+// Compress existing product images that are already in base64 format
+function compressExistingProductImages() {
+    if (!confirm('This will compress all existing product images to reduce storage size. This may take a moment. Continue?')) {
+        return;
+    }
+
+    showNotification('Compressing images... This may take a moment.', 'success');
+
+    let compressedCount = 0;
+    let skippedCount = 0;
+    const compressionPromises = [];
+
+    products.forEach((product, index) => {
+        if (product.image && product.image.trim() && product.image.startsWith('data:image')) {
+            // Check if image is already compressed (small size)
+            const sizeInKB = (product.image.length * 3) / 4 / 1024;
+
+            // Only compress if image is larger than 200KB
+            if (sizeInKB > 200) {
+                const promise = new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = function () {
+                        const canvas = document.createElement('canvas');
+                        let width = img.width;
+                        let height = img.height;
+                        const maxSize = 800;
+
+                        // Calculate new dimensions
+                        if (width > height) {
+                            if (width > maxSize) {
+                                height = (height * maxSize) / width;
+                                width = maxSize;
                             }
                         } else {
-                            if (websiteIconPreview) {
-                                websiteIconPreview.style.display = 'none';
+                            if (height > maxSize) {
+                                width = (width * maxSize) / height;
+                                height = maxSize;
                             }
                         }
+
+                        canvas.width = width;
+                        canvas.height = height;
+
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+
+                        // Convert to compressed base64
+                        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                        const newSizeInKB = (compressedDataUrl.length * 3) / 4 / 1024;
+
+                        // Only update if compression actually reduced size
+                        if (newSizeInKB < sizeInKB) {
+                            product.image = compressedDataUrl;
+                            compressedCount++;
+                            console.log(`Compressed product "${product.name}": ${sizeInKB.toFixed(2)}KB -> ${newSizeInKB.toFixed(2)}KB`);
+                        } else {
+                            skippedCount++;
+                        }
+                        resolve();
+                    };
+                    img.onerror = function () {
+                        skippedCount++;
+                        resolve();
+                    };
+                    img.src = product.image;
+                });
+                compressionPromises.push(promise);
+            } else {
+                skippedCount++;
+            }
+        } else {
+            skippedCount++;
+        }
+    });
+
+    // Wait for all compressions to complete
+    Promise.all(compressionPromises).then(async () => {
+        if (compressedCount > 0) {
+            const saved = await saveProducts();
+            if (saved) {
+                const oldSize = new Blob([JSON.stringify(products)]).size / (1024 * 1024);
+                showNotification(`Compressed ${compressedCount} images! Storage now: ${oldSize.toFixed(2)}MB`, 'success');
+                displayProducts(currentCategory);
+            } else {
+                showNotification('Compression completed but failed to save. Storage may be full.', 'error');
+            }
+        } else {
+            showNotification('No images needed compression or all images are already optimized.', 'success');
+        }
+    });
+}
+
+// Check storage usage and show warning if needed
+async function checkStorageUsage() {
+    try {
+        // Skip storage check if using Database
+        const useDatabase = localStorage.getItem('useDatabase') === 'true';
+        if (useDatabase) {
+            return { size: 0, quota: Infinity, warning: false, type: 'Database' };
+        }
+
+        const storageInfo = await storageManager.getStorageInfo();
+        const productsJson = JSON.stringify(products);
+        const sizeInMB = new Blob([productsJson]).size / (1024 * 1024);
+
+        // Check if we're using localStorage and approaching limit
+        if (!storageManager.useIndexedDB && sizeInMB > 3.5) {
+            console.warn(`⚠️ Storage Warning: Products data is ${sizeInMB.toFixed(2)}MB (close to 5MB localStorage limit)`);
+            console.log('💡 Tip: IndexedDB is not available. Run compressExistingProductImages() to compress images');
+            return { size: sizeInMB, quota: 5, warning: true, type: 'localStorage' };
+        }
+
+        return {
+            size: storageInfo.used,
+            quota: storageInfo.quota,
+            available: storageInfo.available,
+            percentUsed: storageInfo.percentUsed,
+            warning: storageInfo.percentUsed > 80,
+            type: storageInfo.type
+        };
+    } catch (error) {
+        console.error('Error checking storage:', error);
+        return { size: 0, quota: 0, warning: false, type: 'unknown' };
+    }
+}
+
+// Content Management
+function loadAdminContent() {
+    document.getElementById('heroTitle').value = websiteContent.heroTitle;
+    document.getElementById('heroDescription').value = websiteContent.heroDescription;
+    const heroImageInput = document.getElementById('heroImage');
+    const heroImageFile = document.getElementById('heroImageFile');
+    if (heroImageInput) {
+        heroImageInput.value = websiteContent.heroImage || '';
+        previewHeroImage(websiteContent.heroImage || '');
+    }
+    if (heroImageFile) {
+        heroImageFile.value = ''; // Reset file input
+    }
+    document.getElementById('aboutText').value = websiteContent.aboutText;
+    document.getElementById('contactPhone').value = websiteContent.contactPhone;
+    document.getElementById('contactEmail').value = websiteContent.contactEmail;
+    document.getElementById('contactAddress').value = websiteContent.contactAddress;
+
+    // Load current username display
+    const currentUsernameDisplay = document.getElementById('currentUsernameDisplay');
+    if (currentUsernameDisplay) {
+        currentUsernameDisplay.textContent = ADMIN_CREDENTIALS.username;
+    }
+
+    // Load website icon preview
+    const websiteIconPreview = document.getElementById('websiteIconPreview');
+    const websiteIconPreviewImg = document.getElementById('websiteIconPreviewImg');
+    if (websiteContent.websiteIcon && websiteContent.websiteIcon.trim()) {
+        if (websiteIconPreview && websiteIconPreviewImg) {
+            websiteIconPreviewImg.src = websiteContent.websiteIcon;
+            websiteIconPreview.style.display = 'block';
+        }
+    } else {
+        if (websiteIconPreview) {
+            websiteIconPreview.style.display = 'none';
+        }
+    }
+}
+
+function saveContent() {
+    websiteContent.heroTitle = document.getElementById('heroTitle').value;
+    websiteContent.heroDescription = document.getElementById('heroDescription').value;
+    const heroImageInput = document.getElementById('heroImage');
+    if (heroImageInput) {
+        websiteContent.heroImage = heroImageInput.value.trim();
+    }
+    websiteContent.aboutText = document.getElementById('aboutText').value;
+
+    localStorage.setItem('websiteContent', JSON.stringify(websiteContent));
+    updateWebsiteContent();
+    showNotification('Content saved successfully!');
+}
+
+function saveSettings() {
+    websiteContent.contactPhone = document.getElementById('contactPhone').value;
+    websiteContent.contactEmail = document.getElementById('contactEmail').value;
+    websiteContent.contactAddress = document.getElementById('contactAddress').value;
+
+    // Website icon is saved when uploaded, not here
+
+    localStorage.setItem('websiteContent', JSON.stringify(websiteContent));
+    updateContactDisplay();
+    updateWebsiteIcon();
+    showNotification('Settings saved successfully!');
+}
+
+function loadWebsiteContent() {
+    const savedContent = localStorage.getItem('websiteContent');
+    if (savedContent) {
+        websiteContent = { ...websiteContent, ...JSON.parse(savedContent) };
+    }
+    updateWebsiteContent();
+}
+
+function updateWebsiteContent() {
+    const heroTitle = document.querySelector('.hero-content h1');
+    const heroDescription = document.querySelector('.hero-content p');
+    const aboutText = document.querySelector('.about-text');
+    const heroSection = document.getElementById('home');
+
+    if (heroTitle) heroTitle.textContent = websiteContent.heroTitle;
+    if (heroDescription) heroDescription.textContent = websiteContent.heroDescription;
+    if (aboutText) aboutText.textContent = websiteContent.aboutText;
+
+    // Update hero background image
+    if (heroSection && websiteContent.heroImage && websiteContent.heroImage.trim()) {
+        heroSection.style.backgroundImage = `url('${websiteContent.heroImage}')`;
+        heroSection.style.backgroundSize = 'cover';
+        heroSection.style.backgroundPosition = 'center';
+        heroSection.style.backgroundRepeat = 'no-repeat';
+    } else if (heroSection) {
+        // Reset to gradient if no image
+        heroSection.style.backgroundImage = '';
+    }
+}
+
+function updateContactDisplay() {
+    const phoneDisplay = document.getElementById('contactPhoneDisplay');
+    const emailDisplay = document.getElementById('contactEmailDisplay');
+    const addressDisplay = document.getElementById('contactAddressDisplay');
+
+    // Format phone number for display
+    const phone = websiteContent.contactPhone;
+    const formattedPhone = phone.startsWith('254')
+        ? `+${phone.substring(0, 3)} ${phone.substring(3, 6)} ${phone.substring(6, 9)} ${phone.substring(9)}`
+        : phone;
+
+    // Update phone link
+    if (phoneDisplay) {
+        const phoneLink = phoneDisplay.querySelector('a');
+        if (phoneLink) {
+            phoneLink.href = `tel:${phone}`;
+            phoneLink.textContent = formattedPhone;
+        } else {
+            phoneDisplay.innerHTML = `<a href="tel:${phone}" class="contact-link">${formattedPhone}</a>`;
+        }
+    }
+
+    // Update email link
+    if (emailDisplay) {
+        const emailLink = emailDisplay.querySelector('a');
+        if (emailLink) {
+            emailLink.href = `mailto:${websiteContent.contactEmail}`;
+            emailLink.textContent = websiteContent.contactEmail;
+        } else {
+            emailDisplay.innerHTML = `<a href="mailto:${websiteContent.contactEmail}" class="contact-link">${websiteContent.contactEmail}</a>`;
+        }
+    }
+
+    // Update address link (Google Maps)
+    if (addressDisplay) {
+        const addressLink = addressDisplay.querySelector('a');
+        const encodedAddress = encodeURIComponent(websiteContent.contactAddress);
+        if (addressLink) {
+            addressLink.href = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
+            addressLink.textContent = websiteContent.contactAddress;
+        } else {
+            addressDisplay.innerHTML = `<a href="https://www.google.com/maps/search/?api=1&query=${encodedAddress}" target="_blank" class="contact-link">${websiteContent.contactAddress}</a>`;
+        }
+    }
+
+    // Update WhatsApp link
+    const whatsappLinks = document.querySelectorAll('.whatsapp-link');
+    whatsappLinks.forEach(link => {
+        link.href = `https://wa.me/${websiteContent.contactPhone}`;
+        if (link.textContent.includes('+')) {
+            link.textContent = formattedPhone;
+        }
+    });
+}
+
+// Handle image loading errors
+function handleImageError(img) {
+    img.style.display = 'none';
+    // Show placeholder if image fails to load
+    const placeholder = document.createElement('div');
+    placeholder.className = 'no-image-placeholder';
+    placeholder.innerHTML = '<i class="fas fa-image"></i><p>Image Not Available</p>';
+    img.parentElement.appendChild(placeholder);
+}
+
+// Compress image to reduce file size
+function compressImage(file, maxWidth = 800, maxHeight = 800, quality = 0.7) {
+    return new Promise((resolve, reject) => {
+        // Handle both File and Blob objects
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            const img = new Image();
+            img.onload = function () {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+
+                // Calculate new dimensions while maintaining aspect ratio
+                if (width > height) {
+                    if (width > maxWidth) {
+                        height = (height * maxWidth) / width;
+                        width = maxWidth;
                     }
-
-                    function saveContent() {
-                        websiteContent.heroTitle = document.getElementById('heroTitle').value;
-                        websiteContent.heroDescription = document.getElementById('heroDescription').value;
-                        const heroImageInput = document.getElementById('heroImage');
-                        if (heroImageInput) {
-                            websiteContent.heroImage = heroImageInput.value.trim();
-                        }
-                        websiteContent.aboutText = document.getElementById('aboutText').value;
-
-                        localStorage.setItem('websiteContent', JSON.stringify(websiteContent));
-                        updateWebsiteContent();
-                        showNotification('Content saved successfully!');
+                } else {
+                    if (height > maxHeight) {
+                        width = (width * maxHeight) / height;
+                        height = maxHeight;
                     }
+                }
 
-                    function saveSettings() {
-                        websiteContent.contactPhone = document.getElementById('contactPhone').value;
-                        websiteContent.contactEmail = document.getElementById('contactEmail').value;
-                        websiteContent.contactAddress = document.getElementById('contactAddress').value;
+                canvas.width = width;
+                canvas.height = height;
 
-                        // Website icon is saved when uploaded, not here
+                const ctx = canvas.getContext('2d');
+                // Enable image smoothing for better quality
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+                ctx.drawImage(img, 0, 0, width, height);
 
-                        localStorage.setItem('websiteContent', JSON.stringify(websiteContent));
-                        updateContactDisplay();
-                        updateWebsiteIcon();
-                        showNotification('Settings saved successfully!');
-                    }
+                // Convert to base64 with compression
+                const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+                resolve(compressedDataUrl);
+            };
+            img.onerror = reject;
+            img.src = e.target.result;
+        };
+        reader.onerror = reject;
 
-                    function loadWebsiteContent() {
-                        const savedContent = localStorage.getItem('websiteContent');
-                        if (savedContent) {
-                            websiteContent = { ...websiteContent, ...JSON.parse(savedContent) };
-                        }
-                        updateWebsiteContent();
-                    }
+        // Handle both File and Blob
+        if (file instanceof Blob) {
+            reader.readAsDataURL(file);
+        } else {
+            reader.readAsDataURL(file);
+        }
+    });
+}
 
-                    function updateWebsiteContent() {
-                        const heroTitle = document.querySelector('.hero-content h1');
-                        const heroDescription = document.querySelector('.hero-content p');
-                        const aboutText = document.querySelector('.about-text');
-                        const heroSection = document.getElementById('home');
+// Global cropper instance
+let imageCropper = null;
+let currentImageFile = null;
+let currentCropRatio = 4 / 3; // Default to 4:3
 
-                        if (heroTitle) heroTitle.textContent = websiteContent.heroTitle;
-                        if (heroDescription) heroDescription.textContent = websiteContent.heroDescription;
-                        if (aboutText) aboutText.textContent = websiteContent.aboutText;
+// Handle product image file upload
+function handleProductImageUpload(event) {
+    const file = event.target.files[0];
+    if (!file) {
+        console.error('No file selected');
+        return;
+    }
 
-                        // Update hero background image
-                        if (heroSection && websiteContent.heroImage && websiteContent.heroImage.trim()) {
-                            heroSection.style.backgroundImage = `url('${websiteContent.heroImage}')`;
-                            heroSection.style.backgroundSize = 'cover';
-                            heroSection.style.backgroundPosition = 'center';
-                            heroSection.style.backgroundRepeat = 'no-repeat';
-                        } else if (heroSection) {
-                            // Reset to gradient if no image
-                            heroSection.style.backgroundImage = '';
-                        }
-                    }
+    // Check if file is an image
+    if (!file.type.startsWith('image/')) {
+        alert('Please select an image file (JPG, PNG, GIF, etc.)');
+        event.target.value = ''; // Reset file input
+        return;
+    }
 
-                    function updateContactDisplay() {
-                        const phoneDisplay = document.getElementById('contactPhoneDisplay');
-                        const emailDisplay = document.getElementById('contactEmailDisplay');
-                        const addressDisplay = document.getElementById('contactAddressDisplay');
+    // Check file size (max 10MB before compression)
+    if (file.size > 10 * 1024 * 1024) {
+        alert('Image size should be less than 10MB. Please compress your image or choose a smaller file.');
+        event.target.value = ''; // Reset file input
+        return;
+    }
 
-                        // Format phone number for display
-                        const phone = websiteContent.contactPhone;
-                        const formattedPhone = phone.startsWith('254')
-                            ? `+${phone.substring(0, 3)} ${phone.substring(3, 6)} ${phone.substring(6, 9)} ${phone.substring(9)}`
-                            : phone;
+    // Store file for cropping
+    currentImageFile = file;
 
-                        // Update phone link
-                        if (phoneDisplay) {
-                            const phoneLink = phoneDisplay.querySelector('a');
-                            if (phoneLink) {
-                                phoneLink.href = `tel:${phone}`;
-                                phoneLink.textContent = formattedPhone;
-                            } else {
-                                phoneDisplay.innerHTML = `<a href="tel:${phone}" class="contact-link">${formattedPhone}</a>`;
-                            }
-                        }
+    // Show loading indicator
+    const uploadLabel = document.querySelector('label[for="productImageFile"]');
+    if (uploadLabel) {
+        uploadLabel.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+        uploadLabel.style.pointerEvents = 'none';
+    }
 
-                        // Update email link
-                        if (emailDisplay) {
-                            const emailLink = emailDisplay.querySelector('a');
-                            if (emailLink) {
-                                emailLink.href = `mailto:${websiteContent.contactEmail}`;
-                                emailLink.textContent = websiteContent.contactEmail;
-                            } else {
-                                emailDisplay.innerHTML = `<a href="mailto:${websiteContent.contactEmail}" class="contact-link">${websiteContent.contactEmail}</a>`;
-                            }
-                        }
+    // Read file and show cropper
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        const imageDataUrl = e.target.result;
 
-                        // Update address link (Google Maps)
-                        if (addressDisplay) {
-                            const addressLink = addressDisplay.querySelector('a');
-                            const encodedAddress = encodeURIComponent(websiteContent.contactAddress);
-                            if (addressLink) {
-                                addressLink.href = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
-                                addressLink.textContent = websiteContent.contactAddress;
-                            } else {
-                                addressDisplay.innerHTML = `<a href="https://www.google.com/maps/search/?api=1&query=${encodedAddress}" target="_blank" class="contact-link">${websiteContent.contactAddress}</a>`;
-                            }
-                        }
+        // Show cropper modal
+        openImageCropper(imageDataUrl);
 
-                        // Update WhatsApp link
-                        const whatsappLinks = document.querySelectorAll('.whatsapp-link');
-                        whatsappLinks.forEach(link => {
-                            link.href = `https://wa.me/${websiteContent.contactPhone}`;
-                            if (link.textContent.includes('+')) {
-                                link.textContent = formattedPhone;
-                            }
-                        });
-                    }
+        // Reset upload label
+        if (uploadLabel) {
+            uploadLabel.innerHTML = '<i class="fas fa-upload"></i> Browse & Upload Image';
+            uploadLabel.style.pointerEvents = 'auto';
+        }
+    };
+    reader.onerror = function () {
+        alert('Error reading image file. Please try again.');
+        event.target.value = '';
+        if (uploadLabel) {
+            uploadLabel.innerHTML = '<i class="fas fa-upload"></i> Browse & Upload Image';
+            uploadLabel.style.pointerEvents = 'auto';
+        }
+    };
+    reader.readAsDataURL(file);
+}
 
-                    // Handle image loading errors
-                    function handleImageError(img) {
-                        img.style.display = 'none';
-                        // Show placeholder if image fails to load
-                        const placeholder = document.createElement('div');
-                        placeholder.className = 'no-image-placeholder';
-                        placeholder.innerHTML = '<i class="fas fa-image"></i><p>Image Not Available</p>';
-                        img.parentElement.appendChild(placeholder);
-                    }
+// Open image cropper modal
+function openImageCropper(imageSrc) {
+    const cropperModal = document.getElementById('imageCropperModal');
+    const cropperImage = document.getElementById('cropperImage');
 
-                    // Compress image to reduce file size
-                    function compressImage(file, maxWidth = 800, maxHeight = 800, quality = 0.7) {
-                        return new Promise((resolve, reject) => {
-                            // Handle both File and Blob objects
-                            const reader = new FileReader();
-                            reader.onload = function (e) {
-                                const img = new Image();
-                                img.onload = function () {
-                                    const canvas = document.createElement('canvas');
-                                    let width = img.width;
-                                    let height = img.height;
+    if (!cropperModal || !cropperImage) {
+        console.error('Cropper elements not found');
+        alert('Error: Cropper modal not found. Please refresh the page and try again.');
+        return;
+    }
 
-                                    // Calculate new dimensions while maintaining aspect ratio
-                                    if (width > height) {
-                                        if (width > maxWidth) {
-                                            height = (height * maxWidth) / width;
-                                            width = maxWidth;
-                                        }
-                                    } else {
-                                        if (height > maxHeight) {
-                                            width = (width * maxHeight) / height;
-                                            height = maxHeight;
-                                        }
-                                    }
+    // Check if Cropper library is loaded
+    if (typeof Cropper === 'undefined') {
+        console.error('Cropper library not loaded');
+        alert('Error: Image cropper library not loaded. Please refresh the page and try again.');
+        // Fallback: use direct upload without cropping
+        const productImageInput = document.getElementById('productImage');
+        if (productImageInput) {
+            productImageInput.value = imageSrc;
+            previewProductImage(imageSrc);
+            showNotification('Image uploaded (cropper not available, using direct upload)');
+        }
+        return;
+    }
 
-                                    canvas.width = width;
-                                    canvas.height = height;
+    // Set image source
+    cropperImage.src = imageSrc;
 
-                                    const ctx = canvas.getContext('2d');
-                                    // Enable image smoothing for better quality
-                                    ctx.imageSmoothingEnabled = true;
-                                    ctx.imageSmoothingQuality = 'high';
-                                    ctx.drawImage(img, 0, 0, width, height);
+    // Show modal and overlay
+    const cropperOverlay = document.getElementById('cropperModalOverlay');
+    if (cropperOverlay) {
+        cropperOverlay.style.display = 'block';
+    }
+    cropperModal.style.display = 'block';
+    cropperModal.classList.add('show');
+    document.body.style.overflow = 'hidden';
 
-                                    // Convert to base64 with compression
-                                    const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
-                                    resolve(compressedDataUrl);
-                                };
-                                img.onerror = reject;
-                                img.src = e.target.result;
-                            };
-                            reader.onerror = reject;
+    // Initialize cropper after image loads
+    cropperImage.onload = function () {
+        try {
+            // Destroy existing cropper if any
+            if (imageCropper) {
+                imageCropper.destroy();
+                imageCropper = null;
+            }
 
-                            // Handle both File and Blob
-                            if (file instanceof Blob) {
-                                reader.readAsDataURL(file);
-                            } else {
-                                reader.readAsDataURL(file);
-                            }
-                        });
-                    }
+            // Initialize cropper with aspect ratio for consistent product cards
+            // Default to 4:3, but user can change it
+            imageCropper = new Cropper(cropperImage, {
+                aspectRatio: currentCropRatio,
+                viewMode: 1, // Restrict crop box within canvas
+                dragMode: 'move',
+                autoCropArea: 0.8,
+                restore: false,
+                guides: true,
+                center: true,
+                highlight: false,
+                cropBoxMovable: true,
+                cropBoxResizable: true,
+                toggleDragModeOnDblclick: false,
+                responsive: true,
+                minCanvasWidth: 300,
+                minCanvasHeight: 200,
+                minCropBoxWidth: 200,
+                minCropBoxHeight: 150
+            });
+        } catch (error) {
+            console.error('Error initializing cropper:', error);
+            alert('Error initializing image cropper. Using direct upload instead.');
+            // Fallback: use direct upload
+            const productImageInput = document.getElementById('productImage');
+            if (productImageInput) {
+                productImageInput.value = imageSrc;
+                previewProductImage(imageSrc);
+                showNotification('Image uploaded (cropper error, using direct upload)');
+            }
+            closeImageCropper();
+        }
+    };
 
-                    // Global cropper instance
-                    let imageCropper = null;
-                    let currentImageFile = null;
-                    let currentCropRatio = 4 / 3; // Default to 4:3
+    // Handle image load error
+    cropperImage.onerror = function () {
+        console.error('Error loading image in cropper');
+        alert('Error loading image. Please try again with a different image.');
+        closeImageCropper();
+    };
+}
 
-                    // Handle product image file upload
-                    function handleProductImageUpload(event) {
-                        const file = event.target.files[0];
-                        if (!file) {
-                            console.error('No file selected');
-                            return;
-                        }
+// Update crop ratio
+function updateCropRatio(ratio) {
+    currentCropRatio = ratio;
+    if (imageCropper) {
+        try {
+            imageCropper.setAspectRatio(ratio);
+            console.log('Crop ratio updated to:', ratio === 4 / 3 ? '4:3' : '3:4');
+        } catch (error) {
+            console.error('Error updating crop ratio:', error);
+        }
+    }
+}
 
-                        // Check if file is an image
-                        if (!file.type.startsWith('image/')) {
-                            alert('Please select an image file (JPG, PNG, GIF, etc.)');
-                            event.target.value = ''; // Reset file input
-                            return;
-                        }
+// Close image cropper
+function closeImageCropper() {
+    const cropperModal = document.getElementById('imageCropperModal');
+    const cropperOverlay = document.getElementById('cropperModalOverlay');
 
-                        // Check file size (max 10MB before compression)
-                        if (file.size > 10 * 1024 * 1024) {
-                            alert('Image size should be less than 10MB. Please compress your image or choose a smaller file.');
-                            event.target.value = ''; // Reset file input
-                            return;
-                        }
+    if (cropperOverlay) {
+        cropperOverlay.style.display = 'none';
+    }
 
-                        // Store file for cropping
-                        currentImageFile = file;
+    if (cropperModal) {
+        cropperModal.style.display = 'none';
+        cropperModal.classList.remove('show');
+        document.body.style.overflow = '';
+    }
 
-                        // Show loading indicator
-                        const uploadLabel = document.querySelector('label[for="productImageFile"]');
-                        if (uploadLabel) {
-                            uploadLabel.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
-                            uploadLabel.style.pointerEvents = 'none';
-                        }
+    // Destroy cropper
+    if (imageCropper) {
+        try {
+            imageCropper.destroy();
+        } catch (error) {
+            console.error('Error destroying cropper:', error);
+        }
+        imageCropper = null;
+    }
 
-                        // Read file and show cropper
-                        const reader = new FileReader();
-                        reader.onload = function (e) {
-                            const imageDataUrl = e.target.result;
+    // Reset file input
+    const productImageFile = document.getElementById('productImageFile');
+    if (productImageFile) {
+        productImageFile.value = '';
+    }
+    currentImageFile = null;
 
-                            // Show cropper modal
-                            openImageCropper(imageDataUrl);
+    // Reset ratio to default
+    currentCropRatio = 4 / 3;
+    const ratio43 = document.getElementById('ratio43');
+    if (ratio43) {
+        ratio43.checked = true;
+    }
+}
 
-                            // Reset upload label
-                            if (uploadLabel) {
-                                uploadLabel.innerHTML = '<i class="fas fa-upload"></i> Browse & Upload Image';
-                                uploadLabel.style.pointerEvents = 'auto';
-                            }
-                        };
-                        reader.onerror = function () {
-                            alert('Error reading image file. Please try again.');
-                            event.target.value = '';
-                            if (uploadLabel) {
-                                uploadLabel.innerHTML = '<i class="fas fa-upload"></i> Browse & Upload Image';
-                                uploadLabel.style.pointerEvents = 'auto';
-                            }
-                        };
-                        reader.readAsDataURL(file);
-                    }
+// Apply image crop
+function applyImageCrop() {
+    if (!imageCropper) {
+        alert('No image to crop. Please upload an image first.');
+        return;
+    }
 
-                    // Open image cropper modal
-                    function openImageCropper(imageSrc) {
-                        const cropperModal = document.getElementById('imageCropperModal');
-                        const cropperImage = document.getElementById('cropperImage');
+    // Show loading
+    const uploadLabel = document.querySelector('label[for="productImageFile"]');
+    if (uploadLabel) {
+        uploadLabel.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+        uploadLabel.style.pointerEvents = 'none';
+    }
 
-                        if (!cropperModal || !cropperImage) {
-                            console.error('Cropper elements not found');
-                            alert('Error: Cropper modal not found. Please refresh the page and try again.');
-                            return;
-                        }
+    let canvas;
+    try {
+        // Calculate dimensions based on selected ratio
+        let targetWidth, targetHeight;
+        if (currentCropRatio === 4 / 3) {
+            // 4:3 landscape
+            targetWidth = 1200;
+            targetHeight = 900;
+        } else {
+            // 3:4 portrait
+            targetWidth = 900;
+            targetHeight = 1200;
+        }
 
-                        // Check if Cropper library is loaded
-                        if (typeof Cropper === 'undefined') {
-                            console.error('Cropper library not loaded');
-                            alert('Error: Image cropper library not loaded. Please refresh the page and try again.');
-                            // Fallback: use direct upload without cropping
-                            const productImageInput = document.getElementById('productImage');
-                            if (productImageInput) {
-                                productImageInput.value = imageSrc;
-                                previewProductImage(imageSrc);
-                                showNotification('Image uploaded (cropper not available, using direct upload)');
-                            }
-                            return;
-                        }
+        // Get cropped canvas
+        canvas = imageCropper.getCroppedCanvas({
+            width: targetWidth,
+            height: targetHeight,
+            imageSmoothingEnabled: true,
+            imageSmoothingQuality: 'high'
+        });
 
-                        // Set image source
-                        cropperImage.src = imageSrc;
+        if (!canvas) {
+            throw new Error('Failed to get cropped canvas');
+        }
+    } catch (error) {
+        console.error('Error getting cropped canvas:', error);
+        alert('Error cropping image: ' + error.message + '. Please try again.');
+        if (uploadLabel) {
+            uploadLabel.innerHTML = '<i class="fas fa-upload"></i> Browse & Upload Image';
+            uploadLabel.style.pointerEvents = 'auto';
+        }
+        return;
+    }
 
-                        // Show modal and overlay
-                        const cropperOverlay = document.getElementById('cropperModalOverlay');
-                        if (cropperOverlay) {
-                            cropperOverlay.style.display = 'block';
-                        }
-                        cropperModal.style.display = 'block';
-                        cropperModal.classList.add('show');
-                        document.body.style.overflow = 'hidden';
+    // Convert to blob and compress
+    canvas.toBlob(function (blob) {
+        if (!blob) {
+            alert('Error processing cropped image. Please try again.');
+            if (uploadLabel) {
+                uploadLabel.innerHTML = '<i class="fas fa-upload"></i> Browse & Upload Image';
+                uploadLabel.style.pointerEvents = 'auto';
+            }
+            return;
+        }
 
-                        // Initialize cropper after image loads
-                        cropperImage.onload = function () {
-                            try {
-                                // Destroy existing cropper if any
-                                if (imageCropper) {
-                                    imageCropper.destroy();
-                                    imageCropper = null;
-                                }
+        // Compress the cropped image based on ratio
+        let compressWidth, compressHeight;
+        if (currentCropRatio === 4 / 3) {
+            compressWidth = 1000;
+            compressHeight = 750;
+        } else {
+            compressWidth = 750;
+            compressHeight = 1000;
+        }
 
-                                // Initialize cropper with aspect ratio for consistent product cards
-                                // Default to 4:3, but user can change it
-                                imageCropper = new Cropper(cropperImage, {
-                                    aspectRatio: currentCropRatio,
-                                    viewMode: 1, // Restrict crop box within canvas
-                                    dragMode: 'move',
-                                    autoCropArea: 0.8,
-                                    restore: false,
-                                    guides: true,
-                                    center: true,
-                                    highlight: false,
-                                    cropBoxMovable: true,
-                                    cropBoxResizable: true,
-                                    toggleDragModeOnDblclick: false,
-                                    responsive: true,
-                                    minCanvasWidth: 300,
-                                    minCanvasHeight: 200,
-                                    minCropBoxWidth: 200,
-                                    minCropBoxHeight: 150
-                                });
-                            } catch (error) {
-                                console.error('Error initializing cropper:', error);
-                                alert('Error initializing image cropper. Using direct upload instead.');
-                                // Fallback: use direct upload
-                                const productImageInput = document.getElementById('productImage');
-                                if (productImageInput) {
-                                    productImageInput.value = imageSrc;
-                                    previewProductImage(imageSrc);
-                                    showNotification('Image uploaded (cropper error, using direct upload)');
-                                }
-                                closeImageCropper();
-                            }
-                        };
+        // Compress the cropped image
+        compressImage(blob, compressWidth, compressHeight, 0.8)
+            .then(compressedDataUrl => {
+                // Check compressed size
+                const sizeInMB = (compressedDataUrl.length * 3) / 4 / (1024 * 1024);
+                console.log('Cropped and compressed image size:', sizeInMB.toFixed(2), 'MB');
 
-                        // Handle image load error
-                        cropperImage.onerror = function () {
-                            console.error('Error loading image in cropper');
-                            alert('Error loading image. Please try again with a different image.');
-                            closeImageCropper();
-                        };
-                    }
+                // Store as base64 data URL
+                const productImageInput = document.getElementById('productImage');
+                if (productImageInput) {
+                    // Ensure we're setting the full base64 string
+                    productImageInput.value = compressedDataUrl;
+                    console.log('✅ Cropped image saved to productImage input. Length:', compressedDataUrl.length);
+                    console.log('✅ Image preview updated');
+                    console.log('✅ Image data starts with:', compressedDataUrl.substring(0, 50));
+                    previewProductImage(compressedDataUrl);
+                    showNotification('Image cropped and processed successfully!');
 
-                    // Update crop ratio
-                    function updateCropRatio(ratio) {
-                        currentCropRatio = ratio;
-                        if (imageCropper) {
-                            try {
-                                imageCropper.setAspectRatio(ratio);
-                                console.log('Crop ratio updated to:', ratio === 4 / 3 ? '4:3' : '3:4');
-                            } catch (error) {
-                                console.error('Error updating crop ratio:', error);
-                            }
-                        }
-                    }
-
-                    // Close image cropper
-                    function closeImageCropper() {
-                        const cropperModal = document.getElementById('imageCropperModal');
-                        const cropperOverlay = document.getElementById('cropperModalOverlay');
-
-                        if (cropperOverlay) {
-                            cropperOverlay.style.display = 'none';
-                        }
-
-                        if (cropperModal) {
-                            cropperModal.style.display = 'none';
-                            cropperModal.classList.remove('show');
-                            document.body.style.overflow = '';
-                        }
-
-                        // Destroy cropper
-                        if (imageCropper) {
-                            try {
-                                imageCropper.destroy();
-                            } catch (error) {
-                                console.error('Error destroying cropper:', error);
-                            }
-                            imageCropper = null;
-                        }
-
-                        // Reset file input
-                        const productImageFile = document.getElementById('productImageFile');
-                        if (productImageFile) {
-                            productImageFile.value = '';
-                        }
-                        currentImageFile = null;
-
-                        // Reset ratio to default
-                        currentCropRatio = 4 / 3;
-                        const ratio43 = document.getElementById('ratio43');
-                        if (ratio43) {
-                            ratio43.checked = true;
-                        }
-                    }
-
-                    // Apply image crop
-                    function applyImageCrop() {
-                        if (!imageCropper) {
-                            alert('No image to crop. Please upload an image first.');
-                            return;
-                        }
-
-                        // Show loading
-                        const uploadLabel = document.querySelector('label[for="productImageFile"]');
-                        if (uploadLabel) {
-                            uploadLabel.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
-                            uploadLabel.style.pointerEvents = 'none';
-                        }
-
-                        let canvas;
-                        try {
-                            // Calculate dimensions based on selected ratio
-                            let targetWidth, targetHeight;
-                            if (currentCropRatio === 4 / 3) {
-                                // 4:3 landscape
-                                targetWidth = 1200;
-                                targetHeight = 900;
-                            } else {
-                                // 3:4 portrait
-                                targetWidth = 900;
-                                targetHeight = 1200;
-                            }
-
-                            // Get cropped canvas
-                            canvas = imageCropper.getCroppedCanvas({
-                                width: targetWidth,
-                                height: targetHeight,
-                                imageSmoothingEnabled: true,
-                                imageSmoothingQuality: 'high'
-                            });
-
-                            if (!canvas) {
-                                throw new Error('Failed to get cropped canvas');
-                            }
-                        } catch (error) {
-                            console.error('Error getting cropped canvas:', error);
-                            alert('Error cropping image: ' + error.message + '. Please try again.');
-                            if (uploadLabel) {
-                                uploadLabel.innerHTML = '<i class="fas fa-upload"></i> Browse & Upload Image';
-                                uploadLabel.style.pointerEvents = 'auto';
-                            }
-                            return;
-                        }
-
-                        // Convert to blob and compress
-                        canvas.toBlob(function (blob) {
-                            if (!blob) {
-                                alert('Error processing cropped image. Please try again.');
-                                if (uploadLabel) {
-                                    uploadLabel.innerHTML = '<i class="fas fa-upload"></i> Browse & Upload Image';
-                                    uploadLabel.style.pointerEvents = 'auto';
-                                }
-                                return;
-                            }
-
-                            // Compress the cropped image based on ratio
-                            let compressWidth, compressHeight;
-                            if (currentCropRatio === 4 / 3) {
-                                compressWidth = 1000;
-                                compressHeight = 750;
-                            } else {
-                                compressWidth = 750;
-                                compressHeight = 1000;
-                            }
-
-                            // Compress the cropped image
-                            compressImage(blob, compressWidth, compressHeight, 0.8)
-                                .then(compressedDataUrl => {
-                                    // Check compressed size
-                                    const sizeInMB = (compressedDataUrl.length * 3) / 4 / (1024 * 1024);
-                                    console.log('Cropped and compressed image size:', sizeInMB.toFixed(2), 'MB');
-
-                                    // Store as base64 data URL
-                                    const productImageInput = document.getElementById('productImage');
-                                    if (productImageInput) {
-                                        // Ensure we're setting the full base64 string
-                                        productImageInput.value = compressedDataUrl;
-                                        console.log('✅ Cropped image saved to productImage input. Length:', compressedDataUrl.length);
-                                        console.log('✅ Image preview updated');
-                                        console.log('✅ Image data starts with:', compressedDataUrl.substring(0, 50));
-                                        previewProductImage(compressedDataUrl);
-                                        showNotification('Image cropped and processed successfully!');
-
-                                        // Force update the preview to ensure it's visible
-                                        setTimeout(() => {
-                                            const previewImg = document.getElementById('previewImg');
-                                            if (previewImg && previewImg.src !== compressedDataUrl) {
-                                                previewImg.src = compressedDataUrl;
-                                                console.log('✅ Forced preview image update');
-                                            }
-                                        }, 100);
-                                    } else {
-                                        console.error('❌ productImage input element not found!');
-                                        alert('Error: Could not save cropped image. Please try again.');
-                                    }
-
-                                    // Close cropper
-                                    closeImageCropper();
-
-                                    // Reset upload label
-                                    if (uploadLabel) {
-                                        uploadLabel.innerHTML = '<i class="fas fa-upload"></i> Browse & Upload Image';
-                                        uploadLabel.style.pointerEvents = 'auto';
-                                    }
-                                })
-                                .catch(error => {
-                                    console.error('Error compressing cropped image:', error);
-                                    // Use cropped canvas directly
-                                    const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-                                    const productImageInput = document.getElementById('productImage');
-                                    if (productImageInput) {
-                                        productImageInput.value = dataUrl;
-                                        previewProductImage(dataUrl);
-                                        showNotification('Image cropped successfully!');
-                                    }
-                                    closeImageCropper();
-                                    if (uploadLabel) {
-                                        uploadLabel.innerHTML = '<i class="fas fa-upload"></i> Browse & Upload Image';
-                                        uploadLabel.style.pointerEvents = 'auto';
-                                    }
-                                });
-                        }, 'image/jpeg', 0.9);
-                    }
-
-                    // Remove product image
-                    function removeProductImage() {
-                        if (confirm('Are you sure you want to remove this product image?')) {
-                            document.getElementById('productImage').value = '';
-                            document.getElementById('productImageFile').value = '';
-                            previewProductImage('');
-                            showNotification('Product image removed');
-                        }
-                    }
-
-                    // Preview product image in admin panel
-                    function previewProductImage(imageUrl) {
-                        const previewDiv = document.getElementById('imagePreview');
+                    // Force update the preview to ensure it's visible
+                    setTimeout(() => {
                         const previewImg = document.getElementById('previewImg');
-
-                        if (previewDiv && previewImg) {
-                            if (imageUrl && imageUrl.trim()) {
-                                previewImg.src = imageUrl;
-                                previewDiv.style.display = 'block';
-                                previewImg.onerror = function () {
-                                    previewDiv.style.display = 'none';
-                                };
-                            } else {
-                                previewDiv.style.display = 'none';
-                            }
+                        if (previewImg && previewImg.src !== compressedDataUrl) {
+                            previewImg.src = compressedDataUrl;
+                            console.log('✅ Forced preview image update');
                         }
-                    }
+                    }, 100);
+                } else {
+                    console.error('❌ productImage input element not found!');
+                    alert('Error: Could not save cropped image. Please try again.');
+                }
 
-                    // Handle hero image file upload
-                    function handleHeroImageUpload(event) {
-                        const file = event.target.files[0];
-                        if (!file) return;
+                // Close cropper
+                closeImageCropper();
 
-                        // Check if file is an image
-                        if (!file.type.startsWith('image/')) {
-                            alert('Please select an image file');
-                            return;
-                        }
+                // Reset upload label
+                if (uploadLabel) {
+                    uploadLabel.innerHTML = '<i class="fas fa-upload"></i> Browse & Upload Image';
+                    uploadLabel.style.pointerEvents = 'auto';
+                }
+            })
+            .catch(error => {
+                console.error('Error compressing cropped image:', error);
+                // Use cropped canvas directly
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                const productImageInput = document.getElementById('productImage');
+                if (productImageInput) {
+                    productImageInput.value = dataUrl;
+                    previewProductImage(dataUrl);
+                    showNotification('Image cropped successfully!');
+                }
+                closeImageCropper();
+                if (uploadLabel) {
+                    uploadLabel.innerHTML = '<i class="fas fa-upload"></i> Browse & Upload Image';
+                    uploadLabel.style.pointerEvents = 'auto';
+                }
+            });
+    }, 'image/jpeg', 0.9);
+}
 
-                        // Check file size (max 5MB)
-                        if (file.size > 5 * 1024 * 1024) {
-                            alert('Image size should be less than 5MB');
-                            return;
-                        }
+// Remove product image
+function removeProductImage() {
+    if (confirm('Are you sure you want to remove this product image?')) {
+        document.getElementById('productImage').value = '';
+        document.getElementById('productImageFile').value = '';
+        previewProductImage('');
+        showNotification('Product image removed');
+    }
+}
 
-                        const reader = new FileReader();
-                        reader.onload = function (e) {
-                            const imageDataUrl = e.target.result;
-                            // Store as base64 data URL
-                            websiteContent.heroImage = imageDataUrl;
-                            document.getElementById('heroImage').value = imageDataUrl;
-                            previewHeroImage(imageDataUrl);
-                            showNotification('Hero image uploaded successfully!');
-                        };
-                        reader.onerror = function () {
-                            alert('Error reading image file');
-                        };
-                        reader.readAsDataURL(file);
-                    }
+// Preview product image in admin panel
+function previewProductImage(imageUrl) {
+    const previewDiv = document.getElementById('imagePreview');
+    const previewImg = document.getElementById('previewImg');
 
-                    // Preview hero image in admin panel
-                    function previewHeroImage(imageUrl) {
-                        const previewDiv = document.getElementById('heroImagePreview');
-                        const previewImg = document.getElementById('heroPreviewImg');
+    if (previewDiv && previewImg) {
+        if (imageUrl && imageUrl.trim()) {
+            previewImg.src = imageUrl;
+            previewDiv.style.display = 'block';
+            previewImg.onerror = function () {
+                previewDiv.style.display = 'none';
+            };
+        } else {
+            previewDiv.style.display = 'none';
+        }
+    }
+}
 
-                        if (previewDiv && previewImg) {
-                            if (imageUrl && imageUrl.trim()) {
-                                previewImg.src = imageUrl;
-                                previewDiv.style.display = 'block';
-                                previewImg.onerror = function () {
-                                    previewDiv.style.display = 'none';
-                                };
-                            } else {
-                                previewDiv.style.display = 'none';
-                            }
-                        }
-                    }
+// Handle hero image file upload
+function handleHeroImageUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
 
-                    // Remove hero image
-                    function removeHeroImage() {
-                        if (confirm('Are you sure you want to remove the hero background image?')) {
-                            websiteContent.heroImage = '';
-                            document.getElementById('heroImage').value = '';
-                            document.getElementById('heroImageFile').value = '';
-                            previewHeroImage('');
-                            updateWebsiteContent();
-                            showNotification('Hero image removed');
-                        }
-                    }
+    // Check if file is an image
+    if (!file.type.startsWith('image/')) {
+        alert('Please select an image file');
+        return;
+    }
 
-                    // Handle website icon file upload
-                    function handleWebsiteIconUpload(event) {
-                        const file = event.target.files[0];
-                        if (!file) return;
+    // Check file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+        alert('Image size should be less than 5MB');
+        return;
+    }
 
-                        // Check if file is an image
-                        if (!file.type.startsWith('image/')) {
-                            alert('Please select an image file');
-                            event.target.value = '';
-                            return;
-                        }
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        const imageDataUrl = e.target.result;
+        // Store as base64 data URL
+        websiteContent.heroImage = imageDataUrl;
+        document.getElementById('heroImage').value = imageDataUrl;
+        previewHeroImage(imageDataUrl);
+        showNotification('Hero image uploaded successfully!');
+    };
+    reader.onerror = function () {
+        alert('Error reading image file');
+    };
+    reader.readAsDataURL(file);
+}
 
-                        // Check file size (max 2MB for icons)
-                        if (file.size > 2 * 1024 * 1024) {
-                            alert('Icon size should be less than 2MB');
-                            event.target.value = '';
-                            return;
-                        }
+// Preview hero image in admin panel
+function previewHeroImage(imageUrl) {
+    const previewDiv = document.getElementById('heroImagePreview');
+    const previewImg = document.getElementById('heroPreviewImg');
 
-                        const reader = new FileReader();
-                        reader.onload = function (e) {
-                            const imageDataUrl = e.target.result;
-                            // Store as base64 data URL
-                            websiteContent.websiteIcon = imageDataUrl;
+    if (previewDiv && previewImg) {
+        if (imageUrl && imageUrl.trim()) {
+            previewImg.src = imageUrl;
+            previewDiv.style.display = 'block';
+            previewImg.onerror = function () {
+                previewDiv.style.display = 'none';
+            };
+        } else {
+            previewDiv.style.display = 'none';
+        }
+    }
+}
 
-                            // Update preview
-                            const websiteIconPreview = document.getElementById('websiteIconPreview');
-                            const websiteIconPreviewImg = document.getElementById('websiteIconPreviewImg');
-                            if (websiteIconPreview && websiteIconPreviewImg) {
-                                websiteIconPreviewImg.src = imageDataUrl;
-                                websiteIconPreview.style.display = 'block';
-                            }
+// Remove hero image
+function removeHeroImage() {
+    if (confirm('Are you sure you want to remove the hero background image?')) {
+        websiteContent.heroImage = '';
+        document.getElementById('heroImage').value = '';
+        document.getElementById('heroImageFile').value = '';
+        previewHeroImage('');
+        updateWebsiteContent();
+        showNotification('Hero image removed');
+    }
+}
 
-                            // Update favicon immediately
-                            updateWebsiteIcon();
+// Handle website icon file upload
+function handleWebsiteIconUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
 
-                            // Save to localStorage
-                            localStorage.setItem('websiteContent', JSON.stringify(websiteContent));
+    // Check if file is an image
+    if (!file.type.startsWith('image/')) {
+        alert('Please select an image file');
+        event.target.value = '';
+        return;
+    }
 
-                            showNotification('Website icon uploaded successfully!');
-                        };
-                        reader.onerror = function () {
-                            alert('Error reading icon file');
-                            event.target.value = '';
-                        };
-                        reader.readAsDataURL(file);
-                    }
+    // Check file size (max 2MB for icons)
+    if (file.size > 2 * 1024 * 1024) {
+        alert('Icon size should be less than 2MB');
+        event.target.value = '';
+        return;
+    }
 
-                    // Remove website icon
-                    function removeWebsiteIcon() {
-                        if (confirm('Are you sure you want to remove the website icon?')) {
-                            websiteContent.websiteIcon = '';
-                            const websiteIconFile = document.getElementById('websiteIconFile');
-                            if (websiteIconFile) {
-                                websiteIconFile.value = '';
-                            }
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        const imageDataUrl = e.target.result;
+        // Store as base64 data URL
+        websiteContent.websiteIcon = imageDataUrl;
 
-                            const websiteIconPreview = document.getElementById('websiteIconPreview');
-                            if (websiteIconPreview) {
-                                websiteIconPreview.style.display = 'none';
-                            }
+        // Update preview
+        const websiteIconPreview = document.getElementById('websiteIconPreview');
+        const websiteIconPreviewImg = document.getElementById('websiteIconPreviewImg');
+        if (websiteIconPreview && websiteIconPreviewImg) {
+            websiteIconPreviewImg.src = imageDataUrl;
+            websiteIconPreview.style.display = 'block';
+        }
 
-                            // Update favicon
-                            updateWebsiteIcon();
+        // Update favicon immediately
+        updateWebsiteIcon();
 
-                            // Save to localStorage
-                            localStorage.setItem('websiteContent', JSON.stringify(websiteContent));
+        // Save to localStorage
+        localStorage.setItem('websiteContent', JSON.stringify(websiteContent));
 
-                            showNotification('Website icon removed');
-                        }
-                    }
+        showNotification('Website icon uploaded successfully!');
+    };
+    reader.onerror = function () {
+        alert('Error reading icon file');
+        event.target.value = '';
+    };
+    reader.readAsDataURL(file);
+}
 
-                    // Update website icon/favicon
-                    function updateWebsiteIcon() {
-                        const favicon = document.getElementById('websiteFavicon');
-                        if (favicon && websiteContent.websiteIcon && websiteContent.websiteIcon.trim()) {
-                            favicon.href = websiteContent.websiteIcon;
-                            favicon.type = 'image/png';
-                        } else if (favicon) {
-                            // Set default favicon or remove
-                            favicon.href = 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👔</text></svg>';
-                            favicon.type = 'image/svg+xml';
-                        }
-                    }
+// Remove website icon
+function removeWebsiteIcon() {
+    if (confirm('Are you sure you want to remove the website icon?')) {
+        websiteContent.websiteIcon = '';
+        const websiteIconFile = document.getElementById('websiteIconFile');
+        if (websiteIconFile) {
+            websiteIconFile.value = '';
+        }
 
-                    // Change Admin Credentials
-                    // Change Admin Credentials
-                    async function changeAdminCredentials(event) {
-                        event.preventDefault();
+        const websiteIconPreview = document.getElementById('websiteIconPreview');
+        if (websiteIconPreview) {
+            websiteIconPreview.style.display = 'none';
+        }
 
-                        const currentPassword = document.getElementById('currentPassword').value;
-                        const newUsername = document.getElementById('newUsername').value.trim();
-                        const newPassword = document.getElementById('newPassword').value;
-                        const confirmNewPassword = document.getElementById('confirmNewPassword').value;
+        // Update favicon
+        updateWebsiteIcon();
 
-                        // Basic validation
-                        if (!currentPassword) {
-                            alert('Please enter your current password');
-                            document.getElementById('currentPassword').focus();
-                            return;
-                        }
+        // Save to localStorage
+        localStorage.setItem('websiteContent', JSON.stringify(websiteContent));
 
-                        // Check if username is being changed
-                        if (newUsername && newUsername.length > 0) {
-                            if (newUsername.length < 3) {
-                                alert('Username must be at least 3 characters long');
-                                document.getElementById('newUsername').focus();
-                                return;
-                            }
-                        }
+        showNotification('Website icon removed');
+    }
+}
 
-                        // Check if password is being changed
-                        if (newPassword && newPassword.length > 0) {
-                            if (newPassword.length < 6) {
-                                alert('Password must be at least 6 characters long');
-                                document.getElementById('newPassword').focus();
-                                return;
-                            }
+// Update website icon/favicon
+function updateWebsiteIcon() {
+    const favicon = document.getElementById('websiteFavicon');
+    if (favicon && websiteContent.websiteIcon && websiteContent.websiteIcon.trim()) {
+        favicon.href = websiteContent.websiteIcon;
+        favicon.type = 'image/png';
+    } else if (favicon) {
+        // Set default favicon or remove
+        favicon.href = 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👔</text></svg>';
+        favicon.type = 'image/svg+xml';
+    }
+}
 
-                            if (newPassword !== confirmNewPassword) {
-                                alert('New passwords do not match!');
-                                document.getElementById('confirmNewPassword').focus();
-                                return;
-                            }
-                        }
+// Change Admin Credentials
+// Change Admin Credentials
+async function changeAdminCredentials(event) {
+    event.preventDefault();
 
-                        try {
-                            // Show loading state
-                            const submitBtn = event.target.querySelector('button[type="submit"]');
-                            const originalText = submitBtn.textContent;
-                            submitBtn.textContent = 'Updating...';
-                            submitBtn.disabled = true;
+    const currentPassword = document.getElementById('currentPassword').value;
+    const newUsername = document.getElementById('newUsername').value.trim();
+    const newPassword = document.getElementById('newPassword').value;
+    const confirmNewPassword = document.getElementById('confirmNewPassword').value;
 
-                            // Call API to change credentials
-                            const result = await apiService.changeCredentials(currentPassword, newUsername, newPassword);
+    // Basic validation
+    if (!currentPassword) {
+        alert('Please enter your current password');
+        document.getElementById('currentPassword').focus();
+        return;
+    }
 
-                            // Update username display if changed
-                            if (result.username) {
-                                const currentUsernameDisplay = document.getElementById('currentUsernameDisplay');
-                                if (currentUsernameDisplay) {
-                                    currentUsernameDisplay.textContent = result.username;
-                                }
-                            }
+    // Check if username is being changed
+    if (newUsername && newUsername.length > 0) {
+        if (newUsername.length < 3) {
+            alert('Username must be at least 3 characters long');
+            document.getElementById('newUsername').focus();
+            return;
+        }
+    }
 
-                            // Reset form
-                            document.getElementById('changeCredentialsForm').reset();
-                            showNotification('Admin credentials updated successfully!');
+    // Check if password is being changed
+    if (newPassword && newPassword.length > 0) {
+        if (newPassword.length < 6) {
+            alert('Password must be at least 6 characters long');
+            document.getElementById('newPassword').focus();
+            return;
+        }
 
-                        } catch (error) {
-                            console.error('Error updating credentials:', error);
-                            alert(error.message || 'Failed to update credentials');
-                        } finally {
-                            // Restore button state
-                            const submitBtn = event.target.querySelector('button[type="submit"]');
-                            if (submitBtn) {
-                                submitBtn.textContent = 'Update Credentials';
-                                submitBtn.disabled = false;
-                            }
-                        }
-                    }
+        if (newPassword !== confirmNewPassword) {
+            alert('New passwords do not match!');
+            document.getElementById('confirmNewPassword').focus();
+            return;
+        }
+    }
 
-                    // Ensure functions are globally accessible (for onclick handlers)
-                    // Functions are already in global scope, but this ensures they're available
-                    if (typeof window !== 'undefined') {
-                        window.saveProduct = saveProduct;
-                        window.deleteProduct = deleteProduct;
-                        window.editProduct = editProduct;
-                        window.openAddProductModal = openAddProductModal;
-                        window.closeProductModal = closeProductModal;
-                        window.handleProductImageUpload = handleProductImageUpload;
-                        window.removeProductImage = removeProductImage;
-                        window.openImageCropper = openImageCropper;
-                        window.closeImageCropper = closeImageCropper;
-                        window.applyImageCrop = applyImageCrop;
-                        window.updateCropRatio = updateCropRatio;
-                        window.showDeleteConfirmationModal = showDeleteConfirmationModal;
-                        window.cancelDelete = cancelDelete;
-                        window.confirmDelete = confirmDelete;
-                        window.validateMpesaCode = validateMpesaCode;
-                        window.validateMpesaCodeInput = validateMpesaCodeInput;
-                        window.loadAdminOrders = loadAdminOrders;
-                        window.loadCompletedOrders = loadCompletedOrders;
-                        window.searchAdminOrders = searchAdminOrders;
-                        window.searchCompletedOrders = searchCompletedOrders;
-                        window.viewOrderDetails = viewOrderDetails;
-                        window.downloadOrderReceipt = downloadOrderReceipt;
-                        window.toggleDeliveryStatus = toggleDeliveryStatus;
-                        // Initialize pending delete storage
-                        window.pendingDelete = null;
-                    }
+    try {
+        // Show loading state
+        const submitBtn = event.target.querySelector('button[type="submit"]');
+        const originalText = submitBtn.textContent;
+        submitBtn.textContent = 'Updating...';
+        submitBtn.disabled = true;
 
-                    // Admin Orders Management
-                    let allAdminOrders = [];
-                    let filteredAdminOrders = [];
-                    let allCompletedOrders = [];
-                    let filteredCompletedOrders = [];
+        // Call API to change credentials
+        const result = await apiService.changeCredentials(currentPassword, newUsername, newPassword);
 
-                    async function loadAdminOrders(searchQuery = '') {
-                        // Load only non-delivered orders (active orders)
-                        await loadAdminOrdersInternal(searchQuery, false);
-                    }
+        // Update username display if changed
+        if (result.username) {
+            const currentUsernameDisplay = document.getElementById('currentUsernameDisplay');
+            if (currentUsernameDisplay) {
+                currentUsernameDisplay.textContent = result.username;
+            }
+        }
 
-                    async function loadCompletedOrders(searchQuery = '') {
-                        // Load only delivered orders (completed orders)
-                        await loadAdminOrdersInternal(searchQuery, true);
-                    }
+        // Reset form
+        document.getElementById('changeCredentialsForm').reset();
+        showNotification('Admin credentials updated successfully!');
 
-                    async function loadAdminOrdersInternal(searchQuery = '', completedOnly = false) {
-                        const ordersList = completedOnly ? document.getElementById('adminCompletedList') : document.getElementById('adminOrdersList');
-                        const searchResults = completedOnly ? document.getElementById('adminCompletedSearchResults') : document.getElementById('adminOrderSearchResults');
-                        const totalCountElement = completedOnly ? document.getElementById('adminTotalCompletedCount') : document.getElementById('adminTotalOrdersCount');
+    } catch (error) {
+        console.error('Error updating credentials:', error);
+        alert(error.message || 'Failed to update credentials');
+    } finally {
+        // Restore button state
+        const submitBtn = event.target.querySelector('button[type="submit"]');
+        if (submitBtn) {
+            submitBtn.textContent = 'Update Credentials';
+            submitBtn.disabled = false;
+        }
+    }
+}
 
-                        if (!ordersList) return;
+// Ensure functions are globally accessible (for onclick handlers)
+// Functions are already in global scope, but this ensures they're available
+if (typeof window !== 'undefined') {
+    window.saveProduct = saveProduct;
+    window.deleteProduct = deleteProduct;
+    window.editProduct = editProduct;
+    window.openAddProductModal = openAddProductModal;
+    window.closeProductModal = closeProductModal;
+    window.handleProductImageUpload = handleProductImageUpload;
+    window.removeProductImage = removeProductImage;
+    window.openImageCropper = openImageCropper;
+    window.closeImageCropper = closeImageCropper;
+    window.applyImageCrop = applyImageCrop;
+    window.updateCropRatio = updateCropRatio;
+    window.showDeleteConfirmationModal = showDeleteConfirmationModal;
+    window.cancelDelete = cancelDelete;
+    window.confirmDelete = confirmDelete;
+    window.validateMpesaCode = validateMpesaCode;
+    window.validateMpesaCodeInput = validateMpesaCodeInput;
+    window.loadAdminOrders = loadAdminOrders;
+    window.loadCompletedOrders = loadCompletedOrders;
+    window.searchAdminOrders = searchAdminOrders;
+    window.searchCompletedOrders = searchCompletedOrders;
+    window.viewOrderDetails = viewOrderDetails;
+    window.downloadOrderReceipt = downloadOrderReceipt;
+    window.toggleDeliveryStatus = toggleDeliveryStatus;
+    // Initialize pending delete storage
+    window.pendingDelete = null;
+}
 
-                        try {
-                            // Show loading
-                            ordersList.innerHTML = `
+// Admin Orders Management
+let allAdminOrders = [];
+let filteredAdminOrders = [];
+let allCompletedOrders = [];
+let filteredCompletedOrders = [];
+
+async function loadAdminOrders(searchQuery = '') {
+    // Load only non-delivered orders (active orders)
+    await loadAdminOrdersInternal(searchQuery, false);
+}
+
+async function loadCompletedOrders(searchQuery = '') {
+    // Load only delivered orders (completed orders)
+    await loadAdminOrdersInternal(searchQuery, true);
+}
+
+async function loadAdminOrdersInternal(searchQuery = '', completedOnly = false) {
+    const ordersList = completedOnly ? document.getElementById('adminCompletedList') : document.getElementById('adminOrdersList');
+    const searchResults = completedOnly ? document.getElementById('adminCompletedSearchResults') : document.getElementById('adminOrderSearchResults');
+    const totalCountElement = completedOnly ? document.getElementById('adminTotalCompletedCount') : document.getElementById('adminTotalOrdersCount');
+
+    if (!ordersList) return;
+
+    try {
+        // Show loading
+        ordersList.innerHTML = `
             <div style="text-align: center; padding: 40px 20px; color: #666;">
                 <div class="spinner" style="border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
                 <p>Loading orders...</p>
             </div>
         `;
 
-                            const useDatabase = localStorage.getItem('useDatabase') === 'true';
+        const useDatabase = localStorage.getItem('useDatabase') === 'true';
 
-                            if (useDatabase) {
-                                try {
-                                    // Load orders from Database
-                                    const orders = await apiService.getOrders();
-                                    allAdminOrders = orders || [];
-                                    console.log(`✅ Loaded ${allAdminOrders.length} orders from Database`);
-                                } catch (apiError) {
-                                    console.error('❌ Error loading orders from Database:', apiError);
-                                    allAdminOrders = [];
-                                }
-                            }
+        if (useDatabase) {
+            try {
+                // Load orders from Database
+                const orders = await apiService.getOrders();
+                allAdminOrders = orders || [];
+                console.log(`✅ Loaded ${allAdminOrders.length} orders from Database`);
+            } catch (apiError) {
+                console.error('❌ Error loading orders from Database:', apiError);
+                allAdminOrders = [];
+            }
+        }
 
-                            // Also load from localStorage as backup
-                            try {
-                                const localOrdersJson = localStorage.getItem('orders');
-                                if (localOrdersJson) {
-                                    const localOrders = JSON.parse(localOrdersJson);
-                                    // Merge with Database orders (avoid duplicates)
-                                    localOrders.forEach(localOrder => {
-                                        const exists = allAdminOrders.find(o => o.orderId === localOrder.orderId);
-                                        if (!exists) {
-                                            allAdminOrders.push(localOrder);
-                                        }
-                                    });
-                                }
-                            } catch (localError) {
-                                console.error('Error loading orders from localStorage:', localError);
-                            }
+        // Also load from localStorage as backup
+        try {
+            const localOrdersJson = localStorage.getItem('orders');
+            if (localOrdersJson) {
+                const localOrders = JSON.parse(localOrdersJson);
+                // Merge with Database orders (avoid duplicates)
+                localOrders.forEach(localOrder => {
+                    const exists = allAdminOrders.find(o => o.orderId === localOrder.orderId);
+                    if (!exists) {
+                        allAdminOrders.push(localOrder);
+                    }
+                });
+            }
+        } catch (localError) {
+            console.error('Error loading orders from localStorage:', localError);
+        }
 
-                            // Separate delivered and non-delivered orders
-                            const deliveredOrders = allAdminOrders.filter(order => {
-                                const deliveryStatus = order.delivery?.status || 'pending';
-                                return deliveryStatus === 'delivered';
-                            });
+        // Separate delivered and non-delivered orders
+        const deliveredOrders = allAdminOrders.filter(order => {
+            const deliveryStatus = order.delivery?.status || 'pending';
+            return deliveryStatus === 'delivered';
+        });
 
-                            const activeOrders = allAdminOrders.filter(order => {
-                                const deliveryStatus = order.delivery?.status || 'pending';
-                                return deliveryStatus !== 'delivered';
-                            });
+        const activeOrders = allAdminOrders.filter(order => {
+            const deliveryStatus = order.delivery?.status || 'pending';
+            return deliveryStatus !== 'delivered';
+        });
 
-                            // Update global arrays for tracking
-                            allCompletedOrders = deliveredOrders;
+        // Update global arrays for tracking
+        allCompletedOrders = deliveredOrders;
 
-                            // Use appropriate list based on completedOnly flag
-                            let ordersToDisplay = completedOnly ? deliveredOrders : activeOrders;
+        // Use appropriate list based on completedOnly flag
+        let ordersToDisplay = completedOnly ? deliveredOrders : activeOrders;
 
-                            // Sort orders by date (newest first)
-                            ordersToDisplay.sort((a, b) => {
-                                const dateA = new Date(a.createdAt || a.date || 0);
-                                const dateB = new Date(b.createdAt || b.date || 0);
-                                return dateB - dateA;
-                            });
+        // Sort orders by date (newest first)
+        ordersToDisplay.sort((a, b) => {
+            const dateA = new Date(a.createdAt || a.date || 0);
+            const dateB = new Date(b.createdAt || b.date || 0);
+            return dateB - dateA;
+        });
 
-                            // Filter orders if search query provided
-                            let filteredList = ordersToDisplay;
-                            if (searchQuery && searchQuery.trim() !== '') {
-                                const query = searchQuery.toLowerCase().trim();
-                                filteredList = ordersToDisplay.filter(order => {
-                                    const orderId = (order.orderId || '').toLowerCase();
-                                    const customerName = (order.customer?.name || '').toLowerCase();
-                                    const customerPhone = (order.customer?.phone || '').toLowerCase();
-                                    const mpesaCode = (order.mpesaCode || '').toLowerCase();
-                                    return orderId.includes(query) ||
-                                        customerName.includes(query) ||
-                                        customerPhone.includes(query) ||
-                                        mpesaCode.includes(query);
-                                });
-                            }
+        // Filter orders if search query provided
+        let filteredList = ordersToDisplay;
+        if (searchQuery && searchQuery.trim() !== '') {
+            const query = searchQuery.toLowerCase().trim();
+            filteredList = ordersToDisplay.filter(order => {
+                const orderId = (order.orderId || '').toLowerCase();
+                const customerName = (order.customer?.name || '').toLowerCase();
+                const customerPhone = (order.customer?.phone || '').toLowerCase();
+                const mpesaCode = (order.mpesaCode || '').toLowerCase();
+                return orderId.includes(query) ||
+                    customerName.includes(query) ||
+                    customerPhone.includes(query) ||
+                    mpesaCode.includes(query);
+            });
+        }
 
-                            // Update filtered arrays
-                            if (completedOnly) {
-                                filteredCompletedOrders = filteredList;
-                            } else {
-                                filteredAdminOrders = filteredList;
-                            }
+        // Update filtered arrays
+        if (completedOnly) {
+            filteredCompletedOrders = filteredList;
+        } else {
+            filteredAdminOrders = filteredList;
+        }
 
-                            // Update count
-                            if (totalCountElement) {
-                                totalCountElement.textContent = filteredList.length;
-                            }
+        // Update count
+        if (totalCountElement) {
+            totalCountElement.textContent = filteredList.length;
+        }
 
-                            // Update badge counts
-                            updateOrderBadges();
+        // Update badge counts
+        updateOrderBadges();
 
-                            // Update search results message
-                            if (searchResults) {
-                                if (searchQuery && searchQuery.trim() !== '') {
-                                    if (filteredList.length === 0) {
-                                        searchResults.textContent = `No ${completedOnly ? 'completed ' : ''}orders found matching "${searchQuery}"`;
-                                        searchResults.style.color = '#f44336';
-                                    } else {
-                                        searchResults.textContent = `Found ${filteredList.length} ${completedOnly ? 'completed ' : ''}order(s) matching "${searchQuery}"`;
-                                        searchResults.style.color = '#4caf50';
-                                    }
-                                } else {
-                                    searchResults.textContent = '';
-                                }
-                            }
+        // Update search results message
+        if (searchResults) {
+            if (searchQuery && searchQuery.trim() !== '') {
+                if (filteredList.length === 0) {
+                    searchResults.textContent = `No ${completedOnly ? 'completed ' : ''}orders found matching "${searchQuery}"`;
+                    searchResults.style.color = '#f44336';
+                } else {
+                    searchResults.textContent = `Found ${filteredList.length} ${completedOnly ? 'completed ' : ''}order(s) matching "${searchQuery}"`;
+                    searchResults.style.color = '#4caf50';
+                }
+            } else {
+                searchResults.textContent = '';
+            }
+        }
 
-                            // Display orders
-                            if (filteredList.length === 0) {
-                                ordersList.innerHTML = `
+        // Display orders
+        if (filteredList.length === 0) {
+            ordersList.innerHTML = `
                 <div style="text-align: center; padding: 40px 20px; color: #666;">
                     <i class="fas fa-receipt" style="font-size: 3rem; margin-bottom: 15px; opacity: 0.3;"></i>
                     <p style="font-size: 1.1rem; margin-bottom: 10px;">No orders found</p>
                     <p style="font-size: 0.9rem;">Orders will appear here once customers make payments.</p>
                 </div>
             `;
-                            } else {
-                                // Store completedOnly flag for use in template
-                                const isCompletedTab = completedOnly;
+        } else {
+            // Store completedOnly flag for use in template
+            const isCompletedTab = completedOnly;
 
-                                ordersList.innerHTML = filteredList.map(order => {
-                                    const orderDate = order.date || order.createdAt || new Date().toLocaleString('en-KE');
-                                    const customerName = order.customer?.name || 'N/A';
-                                    const customerPhone = order.customer?.phone || 'N/A';
-                                    const total = order.total || 0;
-                                    const paymentMethod = order.paymentMethod || 'N/A';
-                                    const mpesaCode = order.mpesaCode || 'N/A';
-                                    const verified = order.verified ? '✅ Verified' : '⚠️ Pending';
-                                    const deliveryStatus = order.delivery?.status || 'pending';
-                                    const deliveryStatusColor = deliveryStatus === 'delivered' ? '#4caf50' :
-                                        deliveryStatus === 'shipped' ? '#2196F3' :
-                                            deliveryStatus === 'processing' ? '#ff9800' : '#666';
-                                    const deliveryStatusIcon = deliveryStatus === 'delivered' ? '✅' :
-                                        deliveryStatus === 'shipped' ? '🚚' :
-                                            deliveryStatus === 'processing' ? '⏳' : '📦';
+            ordersList.innerHTML = filteredList.map(order => {
+                const orderDate = order.date || order.createdAt || new Date().toLocaleString('en-KE');
+                const customerName = order.customer?.name || 'N/A';
+                const customerPhone = order.customer?.phone || 'N/A';
+                const total = order.total || 0;
+                const paymentMethod = order.paymentMethod || 'N/A';
+                const mpesaCode = order.mpesaCode || 'N/A';
+                const verified = order.verified ? '✅ Verified' : '⚠️ Pending';
+                const deliveryStatus = order.delivery?.status || 'pending';
+                const deliveryStatusColor = deliveryStatus === 'delivered' ? '#4caf50' :
+                    deliveryStatus === 'shipped' ? '#2196F3' :
+                        deliveryStatus === 'processing' ? '#ff9800' : '#666';
+                const deliveryStatusIcon = deliveryStatus === 'delivered' ? '✅' :
+                    deliveryStatus === 'shipped' ? '🚚' :
+                        deliveryStatus === 'processing' ? '⏳' : '📦';
 
-                                    const deliveryInfo = order.delivery?.option !== 'pickup'
-                                        ? `<div style="margin-top: 8px; padding: 10px; background: #f0f7ff; border-radius: 5px; border-left: 3px solid ${deliveryStatusColor};">
+                const deliveryInfo = order.delivery?.option !== 'pickup'
+                    ? `<div style="margin-top: 8px; padding: 10px; background: #f0f7ff; border-radius: 5px; border-left: 3px solid ${deliveryStatusColor};">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
                             <strong>Delivery:</strong>
                             <span style="color: ${deliveryStatusColor}; font-weight: bold; font-size: 0.9rem;">
@@ -7585,7 +7556,7 @@ ${currentOrder.delivery && currentOrder.delivery.option !== 'pickup' ? `*Deliver
                         <div style="font-size: 0.9rem; margin-bottom: 5px;">${order.delivery?.optionText || 'N/A'}</div>
                         <div style="font-size: 0.85rem; color: #666;">📍 ${order.delivery?.address || 'N/A'}</div>
                     </div>`
-                                        : `<div style="margin-top: 8px; padding: 10px; background: #f0f7ff; border-radius: 5px; border-left: 3px solid ${deliveryStatusColor};">
+                    : `<div style="margin-top: 8px; padding: 10px; background: #f0f7ff; border-radius: 5px; border-left: 3px solid ${deliveryStatusColor};">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <strong>Delivery:</strong>
                             <span style="color: ${deliveryStatusColor}; font-weight: bold; font-size: 0.9rem;">
@@ -7595,7 +7566,7 @@ ${currentOrder.delivery && currentOrder.delivery.option !== 'pickup' ? `*Deliver
                         <div style="font-size: 0.9rem; margin-top: 5px;">Shop Pickup</div>
                     </div>`;
 
-                                    return `
+                return `
                     <div style="border: 1px solid #ddd; border-radius: 8px; padding: 20px; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                         <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
                             <div style="flex: 1;">
@@ -7685,68 +7656,68 @@ ${currentOrder.delivery && currentOrder.delivery.option !== 'pickup' ? `*Deliver
                         </div>
                     </div>
                 `;
-                                }).join('');
-                            }
-                        } catch (error) {
-                            console.error('❌ Error loading admin orders:', error);
-                            ordersList.innerHTML = `
+            }).join('');
+        }
+    } catch (error) {
+        console.error('❌ Error loading admin orders:', error);
+        ordersList.innerHTML = `
             <div style="text-align: center; padding: 40px 20px; color: #f44336;">
                 <i class="fas fa-exclamation-triangle" style="font-size: 3rem; margin-bottom: 15px;"></i>
                 <p style="font-size: 1.1rem; margin-bottom: 10px;">Error loading orders</p>
                 <p style="font-size: 0.9rem;">${error.message}</p>
             </div>
         `;
-                        }
-                    }
+    }
+}
 
-                    function searchAdminOrders(query) {
-                        loadAdminOrders(query);
-                    }
+function searchAdminOrders(query) {
+    loadAdminOrders(query);
+}
 
-                    function searchCompletedOrders(query) {
-                        loadCompletedOrders(query);
-                    }
+function searchCompletedOrders(query) {
+    loadCompletedOrders(query);
+}
 
-                    function updateOrderBadges() {
-                        // Update badges for active and completed orders
-                        const activeOrders = allAdminOrders.filter(order => {
-                            const deliveryStatus = order.delivery?.status || 'pending';
-                            return deliveryStatus !== 'delivered';
-                        }).length;
+function updateOrderBadges() {
+    // Update badges for active and completed orders
+    const activeOrders = allAdminOrders.filter(order => {
+        const deliveryStatus = order.delivery?.status || 'pending';
+        return deliveryStatus !== 'delivered';
+    }).length;
 
-                        const completedOrders = allCompletedOrders.length;
+    const completedOrders = allCompletedOrders.length;
 
-                        const ordersBadge = document.getElementById('ordersBadge');
-                        const completedBadge = document.getElementById('completedBadge');
+    const ordersBadge = document.getElementById('ordersBadge');
+    const completedBadge = document.getElementById('completedBadge');
 
-                        if (ordersBadge) {
-                            if (activeOrders > 0) {
-                                ordersBadge.textContent = activeOrders;
-                                ordersBadge.style.display = 'inline-block';
-                            } else {
-                                ordersBadge.style.display = 'none';
-                            }
-                        }
+    if (ordersBadge) {
+        if (activeOrders > 0) {
+            ordersBadge.textContent = activeOrders;
+            ordersBadge.style.display = 'inline-block';
+        } else {
+            ordersBadge.style.display = 'none';
+        }
+    }
 
-                        if (completedBadge) {
-                            if (completedOrders > 0) {
-                                completedBadge.textContent = completedOrders;
-                                completedBadge.style.display = 'inline-block';
-                            } else {
-                                completedBadge.style.display = 'none';
-                            }
-                        }
-                    }
+    if (completedBadge) {
+        if (completedOrders > 0) {
+            completedBadge.textContent = completedOrders;
+            completedBadge.style.display = 'inline-block';
+        } else {
+            completedBadge.style.display = 'none';
+        }
+    }
+}
 
-                    function viewOrderDetails(orderId) {
-                        const order = allAdminOrders.find(o => o.orderId === orderId);
-                        if (!order) {
-                            alert('Order not found');
-                            return;
-                        }
+function viewOrderDetails(orderId) {
+    const order = allAdminOrders.find(o => o.orderId === orderId);
+    if (!order) {
+        alert('Order not found');
+        return;
+    }
 
-                        // Create detailed view modal
-                        const details = `
+    // Create detailed view modal
+    const details = `
 Order ID: ${order.orderId}
 Date: ${order.date || order.createdAt || 'N/A'}
 Customer: ${order.customer?.name || 'N/A'}
@@ -7767,161 +7738,157 @@ Verified: ${order.verified ? 'Yes' : 'Pending'}
 ${order.delivery?.option !== 'pickup' ? `Delivery Address:\n${order.delivery?.address || 'N/A'}\n` : ''}
     `;
 
-                        alert(details);
-                    }
+    alert(details);
+}
 
-                    async function downloadOrderReceipt(orderId) {
-                        const order = allAdminOrders.find(o => o.orderId === orderId);
-                        if (!order) {
-                            alert('Order not found');
-                            return;
-                        }
+async function downloadOrderReceipt(orderId) {
+    const order = allAdminOrders.find(o => o.orderId === orderId);
+    if (!order) {
+        alert('Order not found');
+        return;
+    }
 
-                        try {
-                            // Generate PDF for this order
-                            await generateReceiptPDF(order);
-                            showNotification('Receipt downloaded successfully!', 'success');
-                        } catch (error) {
-                            console.error('Error generating receipt:', error);
-                            alert('Error generating receipt. Please try again.');
-                        }
-                    }
+    try {
+        // Generate PDF for this order
+        await generateReceiptPDF(order);
+        showNotification('Receipt downloaded successfully!', 'success');
+    } catch (error) {
+        console.error('Error generating receipt:', error);
+        alert('Error generating receipt. Please try again.');
+    }
+}
 
-                    async function toggleDeliveryStatus(orderId, isDelivered) {
-                        try {
-                            const order = allAdminOrders.find(o => o.orderId === orderId);
-                            if (!order) {
-                                alert('Order not found');
-                                return;
-                            }
+async function toggleDeliveryStatus(orderId, isDelivered) {
+    try {
+        const order = allAdminOrders.find(o => o.orderId === orderId);
+        if (!order) {
+            alert('Order not found');
+            return;
+        }
 
-                            const deliveryStatus = isDelivered ? 'delivered' : 'pending';
+        const deliveryStatus = isDelivered ? 'delivered' : 'pending';
 
-                            // Show loading
-                            const checkbox = document.getElementById(`deliveryCheck_${orderId}`);
-                            if (checkbox) {
-                                checkbox.disabled = true;
-                            }
+        // Show loading
+        const checkbox = document.getElementById(`deliveryCheck_${orderId}`);
+        if (checkbox) {
+            checkbox.disabled = true;
+        }
 
-                            const useDatabase = localStorage.getItem('useDatabase') === 'true';
+        const useDatabase = localStorage.getItem('useDatabase') === 'true';
 
-                            if (useDatabase) {
-                                try {
-                                    // Update in Database
-                                    await apiService.updateDeliveryStatus(orderId, deliveryStatus);
-                                    console.log(`✅ Delivery status updated for order ${orderId}: ${deliveryStatus}`);
-                                } catch (apiError) {
-                                    console.error('Error updating delivery status:', apiError);
-                                    // Revert checkbox
-                                    if (checkbox) {
-                                        checkbox.checked = !isDelivered;
-                                    }
-                                    alert(`Failed to update delivery status: ${apiError.message}`);
-                                    return;
-                                }
-                            }
+        if (useDatabase) {
+            try {
+                // Update in Database
+                await apiService.updateDeliveryStatus(orderId, deliveryStatus);
+                console.log(`✅ Delivery status updated for order ${orderId}: ${deliveryStatus}`);
+            } catch (apiError) {
+                console.error('Error updating delivery status:', apiError);
+                // Revert checkbox
+                if (checkbox) {
+                    checkbox.checked = !isDelivered;
+                }
+                alert(`Failed to update delivery status: ${apiError.message}`);
+                return;
+            }
+        }
 
-                            // Update local order
-                            if (order.delivery) {
-                                order.delivery.status = deliveryStatus;
-                                if (isDelivered) {
-                                    order.delivery.deliveredAt = new Date();
-                                    order.delivery.deliveredBy = 'admin';
-                                }
-                            } else {
-                                order.delivery = {
-                                    status: deliveryStatus,
-                                    deliveredAt: isDelivered ? new Date() : null,
-                                    deliveredBy: isDelivered ? 'admin' : ''
-                                };
-                            }
+        // Update local order
+        if (order.delivery) {
+            order.delivery.status = deliveryStatus;
+            if (isDelivered) {
+                order.delivery.deliveredAt = new Date();
+                order.delivery.deliveredBy = 'admin';
+            }
+        } else {
+            order.delivery = {
+                status: deliveryStatus,
+                deliveredAt: isDelivered ? new Date() : null,
+                deliveredBy: isDelivered ? 'admin' : ''
+            };
+        }
 
-                            // Update in allAdminOrders array
-                            const orderIndex = allAdminOrders.findIndex(o => o.orderId === orderId);
-                            if (orderIndex !== -1) {
-                                allAdminOrders[orderIndex] = order;
-                            }
+        // Update in allAdminOrders array
+        const orderIndex = allAdminOrders.findIndex(o => o.orderId === orderId);
+        if (orderIndex !== -1) {
+            allAdminOrders[orderIndex] = order;
+        }
 
-                            // Save to localStorage
-                            try {
-                                const ordersJson = localStorage.getItem('orders');
-                                if (ordersJson) {
-                                    let localOrders = JSON.parse(ordersJson);
-                                    const localOrderIndex = localOrders.findIndex(o => o.orderId === orderId);
-                                    if (localOrderIndex !== -1) {
-                                        localOrders[localOrderIndex] = order;
-                                        localStorage.setItem('orders', JSON.stringify(localOrders));
-                                    }
-                                }
-                            } catch (localError) {
-                                console.error('Error updating order in localStorage:', localError);
-                            }
+        // Save to localStorage
+        try {
+            const ordersJson = localStorage.getItem('orders');
+            if (ordersJson) {
+                let localOrders = JSON.parse(ordersJson);
+                const localOrderIndex = localOrders.findIndex(o => o.orderId === orderId);
+                if (localOrderIndex !== -1) {
+                    localOrders[localOrderIndex] = order;
+                    localStorage.setItem('orders', JSON.stringify(localOrders));
+                }
+            }
+        } catch (localError) {
+            console.error('Error updating order in localStorage:', localError);
+        }
 
-                            // Reload orders display (both active and completed)
-                            const searchQuery = document.getElementById('adminOrderSearch')?.value || '';
-                            const completedSearchQuery = document.getElementById('adminCompletedSearch')?.value || '';
+        // Reload orders display (both active and completed)
+        const searchQuery = document.getElementById('adminOrderSearch')?.value || '';
+        const completedSearchQuery = document.getElementById('adminCompletedSearch')?.value || '';
 
-                            await loadAdminOrders(searchQuery);
-                            await loadCompletedOrders(completedSearchQuery);
+        await loadAdminOrders(searchQuery);
+        await loadCompletedOrders(completedSearchQuery);
 
-                            // Show notification
-                            showNotification(
-                                isDelivered ? '✅ Delivery marked as completed!' : '📦 Delivery status reset to pending',
-                                isDelivered ? 'success' : 'info'
-                            );
+        // Show notification
+        showNotification(
+            isDelivered ? '✅ Delivery marked as completed!' : '📦 Delivery status reset to pending',
+            isDelivered ? 'success' : 'info'
+        );
 
-                        } catch (error) {
-                            console.error('Error toggling delivery status:', error);
-                            alert(`Error updating delivery status: ${error.message}`);
+    } catch (error) {
+        console.error('Error toggling delivery status:', error);
+        alert(`Error updating delivery status: ${error.message}`);
 
-                            // Revert checkbox
-                            const checkbox = document.getElementById(`deliveryCheck_${orderId}`);
-                            if (checkbox) {
-                                checkbox.checked = !isDelivered;
-                                checkbox.disabled = false;
-                            }
-                        }
-                    }
+        // Revert checkbox
+        const checkbox = document.getElementById(`deliveryCheck_${orderId}`);
+        if (checkbox) {
+            checkbox.checked = !isDelivered;
+            checkbox.disabled = false;
+        }
+    }
+}
 
+// Function to manually refresh products from the server
+async function refreshProducts() {
+    if (typeof isAdmin !== 'undefined' && !isAdmin) {
+        showNotification('You must be an admin to perform this action', 'error');
+        return;
+    }
 
-                    // Function to manually refresh products from the server
-                    async function refreshProducts() {
-                        if (!isAdmin) {
-                            showNotification('You must be an admin to perform this action', 'error');
-                            return;
-                        }
+    const refreshBtn = document.querySelector('button[onclick="refreshProducts()"]');
+    const originalContent = refreshBtn ? refreshBtn.innerHTML : '';
 
-                        const refreshBtn = document.querySelector('button[onclick="refreshProducts()"]');
-                        const originalContent = refreshBtn ? refreshBtn.innerHTML : '';
+    if (refreshBtn) {
+        refreshBtn.disabled = true;
+        refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing...';
+    }
 
-                        if (refreshBtn) {
-                            refreshBtn.disabled = true;
-                            refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing...';
-                        }
+    showNotification('Refreshing products from server...', 'info');
 
-                        showNotification('Refreshing products from server...', 'info');
+    try {
+        // Force reload
+        if (typeof loadProducts === 'function') {
+            await loadProducts();
+            showNotification('Products refreshed successfully!', 'success');
+        } else {
+            console.error('loadProducts function not found');
+        }
+    } catch (error) {
+        console.error('Error refreshing products:', error);
+        showNotification('Failed to refresh products. Please try again.', 'error');
+    } finally {
+        if (refreshBtn) {
+            refreshBtn.disabled = false;
+            refreshBtn.innerHTML = originalContent;
+        }
+    }
+}
 
-                        try {
-                            // Force reload
-                            await loadProducts();
-
-                            showNotification('Products refreshed successfully!', 'success');
-                        } catch (error) {
-                            console.error('Error refreshing products:', error);
-                            showNotification('Failed to refresh products. Please try again.', 'error');
-                        } finally {
-                            if (refreshBtn) {
-                                refreshBtn.disabled = false;
-                                refreshBtn.innerHTML = originalContent;
-                            }
-                        }
-                    }
-
-                    // Expose to global scope
-                    window.refreshProducts = refreshProducts;
-
-                } // End of if (useDatabase) block
-            } // End of verifyMpesaCodeBeforePayment function
-        } // End of another unclosed block
-    } // Final closing brace
-} // Very final closing brace
+// Expose to global scope
+window.refreshProducts = refreshProducts;
