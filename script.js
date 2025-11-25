@@ -6584,7 +6584,9 @@ function loadAdminContent() {
     // Load current username display
     const currentUsernameDisplay = document.getElementById('currentUsernameDisplay');
     if (currentUsernameDisplay) {
-        currentUsernameDisplay.textContent = ADMIN_CREDENTIALS.username;
+        // Admin credentials are now handled by the backend
+        const adminUsername = localStorage.getItem('adminUsername') || 'admin';
+        currentUsernameDisplay.textContent = adminUsername;
     }
 
     // Load website icon preview
