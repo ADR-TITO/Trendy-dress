@@ -394,6 +394,7 @@ class ApiService {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    ...ApiService.getAuthHeader(), // Add authorization header
                 },
                 body: JSON.stringify(product)
             });
@@ -421,6 +422,7 @@ class ApiService {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
+                    ...ApiService.getAuthHeader(), // Add authorization header
                 },
                 body: JSON.stringify(product)
             });
@@ -439,7 +441,10 @@ class ApiService {
     async deleteProduct(id) {
         try {
             const response = await fetch(`${this.baseURL}/products/${id}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: {
+                    ...ApiService.getAuthHeader(), // Add authorization header
+                },
             });
             if (!response.ok) {
                 const error = await response.json();
@@ -459,6 +464,7 @@ class ApiService {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
+                    ...ApiService.getAuthHeader(), // Add authorization header
                 },
                 body: JSON.stringify({ quantity })
             });
@@ -532,6 +538,7 @@ class ApiService {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    ...ApiService.getAuthHeader(), // Add authorization header
                 },
                 body: JSON.stringify(orderData)
             });
@@ -566,6 +573,7 @@ class ApiService {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
+                    ...ApiService.getAuthHeader(), // Add authorization header
                 }
             });
             if (!response.ok) {
@@ -639,6 +647,7 @@ class ApiService {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
+                    ...ApiService.getAuthHeader(), // Add authorization header
                 },
                 body: JSON.stringify({
                     deliveryStatus,
@@ -685,6 +694,7 @@ class ApiService {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    ...ApiService.getAuthHeader(), // Add authorization header
                 },
                 body: JSON.stringify({
                     ...order,
@@ -703,6 +713,20 @@ class ApiService {
         }
     }
 
+    // Set and get authentication token
+    static setAuthToken(token) {
+        localStorage.setItem('jwt_token', token);
+    }
+
+    static getAuthHeader() {
+        const token = localStorage.getItem('jwt_token');
+        return token ? { 'Authorization': `Bearer ${token}` } : {};
+    }
+
+    static removeAuthToken() {
+        localStorage.removeItem('jwt_token');
+    }
+
     // Login
     async login(username, password) {
         try {
@@ -717,7 +741,14 @@ class ApiService {
             const data = await response.json();
 
             if (!response.ok) {
+                // If login fails, ensure any old token is removed
+                ApiService.removeAuthToken();
                 throw new Error(data.message || 'Login failed');
+            }
+
+            // If login successful, store the token
+            if (data.token) {
+                ApiService.setAuthToken(data.token);
             }
 
             return data;
@@ -734,6 +765,7 @@ class ApiService {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    ...ApiService.getAuthHeader(), // Add authorization header
                 }
             });
 
@@ -742,6 +774,9 @@ class ApiService {
             if (!response.ok) {
                 throw new Error(data.message || 'Logout failed');
             }
+
+            // If logout successful, remove the token
+            ApiService.removeAuthToken();
 
             return data;
         } catch (error) {
@@ -757,6 +792,7 @@ class ApiService {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',
+                    ...ApiService.getAuthHeader(), // Add authorization header
                 }
             });
 
@@ -778,6 +814,7 @@ class ApiService {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    ...ApiService.getAuthHeader(), // Add authorization header
                 },
                 body: JSON.stringify({
                     currentPassword,

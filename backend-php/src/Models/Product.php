@@ -226,4 +226,35 @@ class Product {
             throw $e;
         }
     }
+
+    /**
+     * Update product quantity
+     */
+    public function updateQuantity($id, $quantity) {
+        try {
+            if (!Database::isConnected()) {
+                throw new \Exception('Database not connected');
+            }
+            $pdo = Database::getConnection();
+
+            // Ensure quantity is an integer
+            $quantity = (int)$quantity;
+            if ($quantity < 0) {
+                $quantity = 0; // Prevent negative quantities
+            }
+
+            $sql = "UPDATE products SET quantity = :quantity, updatedAt = NOW() WHERE id = :id";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([
+                ':quantity' => $quantity,
+                ':id' => $id
+            ]);
+
+            return $stmt->rowCount() > 0;
+        } catch (\Exception $e) {
+            error_log("Error updating product quantity: " . $e->getMessage());
+            throw $e;
+        }
+    }
 }
+
