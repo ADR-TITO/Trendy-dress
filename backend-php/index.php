@@ -64,6 +64,13 @@ $routeParts = explode('/', trim($route, '/'));
 $resource = $routeParts[0] ?? '';
 $id = $routeParts[1] ?? null;
 
+// Special handling for PATCH requests on nested routes
+// Example: /products/{id}/quantity
+if ($method === 'PATCH' && $resource === 'products' && isset($routeParts[2])) {
+    // The logic for this is expected to be in the resource's route file
+    require_once __DIR__ . '/routes/products.php';
+    exit;
+}
 // Route to appropriate controller
 try {
     switch ($resource) {
@@ -120,4 +127,3 @@ try {
     ]);
     error_log('API Error: ' . $e->getMessage());
 }
-

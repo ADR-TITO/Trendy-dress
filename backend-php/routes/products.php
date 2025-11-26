@@ -173,6 +173,40 @@ try {
             echo json_encode($product);
             break;
             
+        case 'PATCH':
+            // Admin-only: Check if user is logged in
+            if (!isset($_SESSION['admin_logged_in']) || !$_SESSION['admin_logged_in']) {
+                http_response_code(401);
+                echo json_encode(['error' => 'Unauthorized']);
+                exit;
+            }
+
+            // Update product quantity
+            if (!$id) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Product ID required']);
+                exit;
+            }
+            
+            $data = json_decode(file_get_contents('php://input'), true);
+            
+            if (!$data || !isset($data['quantity'])) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Invalid JSON data or missing quantity']);
+                exit;
+            }
+            
+            $updated = $productModel->updateQuantity($id, $data['quantity']);
+            
+            if (!$updated) {
+                http_response_code(404);
+                echo json_encode(['error' => 'Product not found or quantity not updated']);
+                exit;
+            }
+            
+            echo json_encode(['message' => 'Product quantity updated successfully']);
+            break;
+            
         case 'DELETE':
             // Admin-only: Check if user is logged in
             if (!isset($_SESSION['admin_logged_in']) || !$_SESSION['admin_logged_in']) {
