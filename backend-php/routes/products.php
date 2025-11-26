@@ -6,6 +6,14 @@
 // Start output buffering to catch any unexpected output
 ob_start();
 
+// Start session securely
+if (session_status() === PHP_SESSION_NONE) {
+    ini_set('session.cookie_httponly', 1);
+    ini_set('session.use_only_cookies', 1);
+    ini_set('session.cookie_secure', isset($_SERVER['HTTPS']));
+    session_start();
+}
+
 require_once __DIR__ . '/../config/database.php';
 
 // Autoload Product model
@@ -108,6 +116,13 @@ try {
             break;
             
         case 'POST':
+            // Admin-only: Check if user is logged in
+            if (!isset($_SESSION['admin_logged_in']) || !$_SESSION['admin_logged_in']) {
+                http_response_code(401);
+                echo json_encode(['error' => 'Unauthorized']);
+                exit;
+            }
+
             // Create new product
             $data = json_decode(file_get_contents('php://input'), true);
             
@@ -123,6 +138,13 @@ try {
             break;
             
         case 'PUT':
+            // Admin-only: Check if user is logged in
+            if (!isset($_SESSION['admin_logged_in']) || !$_SESSION['admin_logged_in']) {
+                http_response_code(401);
+                echo json_encode(['error' => 'Unauthorized']);
+                exit;
+            }
+
             // Update product
             if (!$id) {
                 http_response_code(400);
@@ -152,6 +174,13 @@ try {
             break;
             
         case 'DELETE':
+            // Admin-only: Check if user is logged in
+            if (!isset($_SESSION['admin_logged_in']) || !$_SESSION['admin_logged_in']) {
+                http_response_code(401);
+                echo json_encode(['error' => 'Unauthorized']);
+                exit;
+            }
+
             // Delete product
             if (!$id) {
                 http_response_code(400);
