@@ -4044,18 +4044,18 @@ async function processPayment(event) {
         } catch (whatsappError) {
             console.error('❌ Error sending receipt to WhatsApp:', whatsappError);
             // Don't show error to user - fail silently
-        }
-
-        // Clear cart
-        cart = [];
-        updateCartUI();
-        saveCart();
-        toggleCart();
-
-        // No notification shown - receipt is sent to WhatsApp automatically
-
-    } catch (error) {
-        // Hide loading modal in case of any unexpected error
+            }
+        
+            try {
+            // Clear cart
+            cart = [];
+            updateCartUI();
+            saveCart();
+            toggleCart();
+        
+            // No notification shown - receipt is sent to WhatsApp automatically
+        
+            } catch (error) {        // Hide loading modal in case of any unexpected error
         hidePaymentVerificationModal();
         console.error('❌ Error processing payment:', error);
         alert('An error occurred while processing your payment. Please try again or contact support.\n\nError: ' + error.message);
