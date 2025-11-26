@@ -1998,10 +1998,13 @@ function addToCart(productId) {
         existingItem.price = finalPrice;
     } else {
         cart.push({
-            ...product,
-            price: finalPrice,
+            id: product.id,
+            name: product.name,
+            price: finalPrice, // Use final price after discount
+            size: product.size,
+            image: product.image,
             quantity: 1,
-            cartItemId: cartItemId // Store unique identifier
+            cartItemId: cartItemId // Unique identifier for grouped products
         });
     }
 
@@ -4052,15 +4055,12 @@ async function processPayment(event) {
             updateCartUI();
             saveCart();
             toggleCart();
-        
-                                    // No notification shown - receipt is sent to WhatsApp automatically
-                                    } // This closes the try block
+            // No notification shown - receipt is sent to WhatsApp automatically
+        } catch (error) {        // Hide loading modal in case of any unexpected error
                         
-                                                catch (error) {        // Hide loading modal in case of any unexpected error
+            hidePaymentVerificationModal();
                         
-                                                    hidePaymentVerificationModal();
-                        
-                                                    console.error('❌ Error processing payment:', error);        alert('An error occurred while processing your payment. Please try again or contact support.\n\nError: ' + error.message);
+            console.error('❌ Error processing payment:', error);        alert('An error occurred while processing your payment. Please try again or contact support.\n\nError: ' + error.message);
         showNotification('Payment processing failed. Please try again.', 'error');
     }
 }
