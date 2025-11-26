@@ -4167,6 +4167,7 @@ async function processSTKPushPayment(customerName, customerPhone, customerEmail,
         if (!stkResult.success) {
             hidePaymentVerificationModal();
             alert(`Failed to initiate M-Pesa payment prompt:\n\n${stkResult.responseDescription || 'Unknown error'}\n\nPlease ensure your phone number is correct and registered with M-Pesa.`);
+            console.error('❌ STK Push initiation failed:', stkResult);
             return;
         }
 
