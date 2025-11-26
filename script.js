@@ -856,6 +856,12 @@ async function syncProductsToAllStorage(productsToSync, options = {}) {
                                     console.log(`✅ Created product in Database (recovery): ${product.name}`);
                                 } else {
                                     throw updateError;
+                                    updateCount++;
+                                    console.log(`✅ Updated product in Database: ${product.name} (${product.size})`);
+                                } catch (updateError) {
+                                    // If update fails, try to create new
+                                    const created = await apiService.createProduct(productData);
+                                    console.log(`✅ Created product in Database (after update failed): ${product.name}`);
                                 }
                             }
                                 } else {
@@ -904,6 +910,7 @@ async function syncProductsToAllStorage(productsToSync, options = {}) {
                         failCount++;
                     }
                 }
+                        }
 
                         // Delete products from Database that are not in the remaining products list
                         // This ensures deleted products are removed from Database
@@ -969,12 +976,15 @@ async function syncProductsToAllStorage(productsToSync, options = {}) {
         } catch (dbStatusError) {
             console.log('ℹ️ Could not check Database connection status - skipping Database sync');
             results.database.error = 'Could not verify database connection';
+            results.database.error = 'Could not verify database connection: ' + dbStatusError.message;
         }
     } else {
         console.log('ℹ️ Database backend not available - skipping Database sync');
         results.database.error = 'Backend not available';
     }
 } catch (error) {
+
+} catch (error) { // This catch was missing
     console.error('❌ Database sync error:', error);
     results.database.error = error.message;
 }
@@ -1090,6 +1100,7 @@ async function deleteProductFromAllStorage(productId) {
         results.database.error = 'Backend not available';
     }
 } catch (error) {
+} catch (error) { // This catch was also missing
     console.error('❌ Database delete error:', error);
     results.database.error = error.message;
 }
