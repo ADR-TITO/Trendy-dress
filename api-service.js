@@ -428,6 +428,7 @@ class ApiService {
             });
             if (!response.ok) {
                 const error = await response.json();
+                console.error('Update product failed response data:', error); // Add this line for better debugging
                 throw new Error(error.error || 'Failed to update product');
             }
             return await response.json();
@@ -448,6 +449,7 @@ class ApiService {
             });
             if (!response.ok) {
                 const error = await response.json();
+                console.error('Delete product failed response data:', error); // Add this line for better debugging
                 throw new Error(error.error || 'Failed to delete product');
             }
             return await response.json();
@@ -470,6 +472,7 @@ class ApiService {
             });
             if (!response.ok) {
                 const error = await response.json();
+                console.error('Update quantity failed response data:', error); // Add this line for better debugging
                 throw new Error(error.error || 'Failed to update quantity');
             }
             return await response.json();
@@ -743,6 +746,7 @@ class ApiService {
             if (!response.ok) {
                 // If login fails, ensure any old token is removed
                 ApiService.removeAuthToken();
+                console.error('Login failed response data:', data); // Add this line for better debugging
                 throw new Error(data.message || 'Login failed');
             }
 

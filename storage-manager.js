@@ -39,11 +39,12 @@ class StorageManager {
                 // If it's an "UnknownError" (often indicates corruption or serious issue), try to delete and recreate
                 if (error && error.name === 'UnknownError') {
                     console.warn('Attempting to delete and recreate IndexedDB due to UnknownError...');
-                    indexedDB.deleteDatabase(this.dbName).onsuccess = () => {
+                    const deleteRequest = indexedDB.deleteDatabase(this.dbName);
+                    deleteRequest.onsuccess = () => {
                         console.log('IndexedDB deleted successfully. Retrying initialization...');
                         this.init().then(resolve).catch(reject); // Try initializing again
                     };
-                    indexedDB.deleteDatabase(this.dbName).onerror = (deleteEvent) => {
+                    deleteRequest.onerror = (deleteEvent) => {
                         console.error('Error deleting IndexedDB:', deleteEvent.target.error);
                         this.useIndexedDB = false;
                         resolve(false);
