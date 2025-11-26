@@ -1,21 +1,5 @@
 // Product Data - Prices in Kenyan Shillings
-let products = [
-    // Dresses
-    { id: 13, name: 'Floral Summer Dress', category: 'dresses', price: 6000, icon: '👗', image: '', size: 'M' },
-    { id: 14, name: 'Little Black Dress', category: 'dresses', price: 6500, icon: '👗', image: '', size: 'S' },
-    { id: 15, name: 'Maxi Evening Dress', category: 'dresses', price: 7500, icon: '👗', image: '', size: 'L' },
-    { id: 16, name: 'Casual Midi Dress', category: 'dresses', price: 5000, icon: '👗', image: '', size: 'M' },
-    { id: 17, name: 'A-Line Dress', category: 'dresses', price: 5500, icon: '👗', image: '', size: 'S' },
-    { id: 18, name: 'Wrap Dress', category: 'dresses', price: 5800, icon: '👗', image: '', size: 'M' },
-
-    // Tracksuits
-    { id: 19, name: 'Classic Tracksuit Set', category: 'tracksuits', price: 7000, icon: '👟', image: '', size: 'L' },
-    { id: 20, name: 'Sporty Tracksuit', category: 'tracksuits', price: 6500, icon: '👟', image: '', size: 'M' },
-    { id: 21, name: 'Premium Tracksuit', category: 'tracksuits', price: 8500, icon: '👟', image: '', size: 'XL' },
-    { id: 22, name: 'Casual Tracksuit', category: 'tracksuits', price: 6000, icon: '👟', image: '', size: 'M' },
-    { id: 23, name: 'Designer Tracksuit', category: 'tracksuits', price: 9500, icon: '👟', image: '', size: 'L' },
-    { id: 24, name: 'Athletic Tracksuit', category: 'tracksuits', price: 7500, icon: '👟', image: '', size: 'M' }
-];
+let products = [];
 
 // Cart
 let cart = [];
@@ -862,6 +846,7 @@ async function syncProductsToAllStorage(productsToSync, options = {}) {
                                 if (existingProduct && existingProduct._id) {
                                     // Product exists in Database - update it
                                     await apiService.updateProduct(existingProduct._id, productData);
+            console.log(`✅ API: Successfully updated product ${product.name} (${product.size}) in Database.`);
                                     // Update product ID with Database _id
                                     product.id = existingProduct._id;
                                     product._id = existingProduct._id;
@@ -934,63 +919,18 @@ async function syncProductsToAllStorage(productsToSync, options = {}) {
                             }
                         }
 
-                        // Delete products from Database that are not in the remaining products list
-                        // This ensures deleted products are removed from Database
-                        let deletedCount = 0;
-                        try {
-                            // Find products in Database that are not in the remaining products list
-                            const remainingProductKeys = new Set();
-                            productsToSave.forEach(p => {
-                                const key = `${(p.name || '').toLowerCase().trim()}_${normalizeSize(p.size || 'M').toUpperCase().trim()}`;
-                                remainingProductKeys.add(key);
-                                // Also add by ID if it's a Database ObjectId
-                                if (p.id && typeof p.id === 'string' && (p.id.length === 24 && /^[0-9a-fA-F]{24}$/.test(p.id) || p.id.startsWith('prod_'))) {
-                                    remainingProductKeys.add(p.id);
-                                }
-                                if (p._id && typeof p._id === 'string' && (p._id.length === 24 && /^[0-9a-fA-F]{24}$/.test(p._id) || p._id.startsWith('prod_'))) {
-                                    remainingProductKeys.add(p._id);
-                                }
-                            });
-
-                            // Delete products from Database that are not in remaining list
-                            const productsToDelete = existingProducts.filter(p => {
-                                const key = `${(p.name || '').toLowerCase().trim()}_${normalizeSize(p.size || 'M').toUpperCase().trim()}`;
-                                const hasKey = remainingProductKeys.has(key);
-                                const hasId = p._id && remainingProductKeys.has(p._id);
-                                return !hasKey && !hasId;
-                            });
-
-                            if (productsToDelete.length > 0) {
-                                console.log(`🗑️ Deleting ${productsToDelete.length} products from Database that are not in remaining list...`);
-                                for (const productToDelete of productsToDelete) {
-                                    try {
-                                        if (productToDelete._id) {
-                                            await apiService.deleteProduct(productToDelete._id);
-                                            deletedCount++;
-                                            console.log(`✅ Deleted product from Database: ${productToDelete.name} (${productToDelete.size})`);
-                                        }
-                                    } catch (deleteError) {
-                                        console.error(`❌ Error deleting product from Database: ${productToDelete.name}`, deleteError.message);
-                                    }
-                                }
-                            }
-                        } catch (deleteError) {
-                            console.warn('⚠️ Error deleting products from Database:', deleteError.message);
-                        }
+                            // No longer deleting products automatically
+                            // Deletions should only be triggered by explicit admin actions.
+                            // The sync process focuses on adding and updating products.
 
                         if (successCount > 0) {
                             results.database.success = true;
                             results.database.count = successCount;
-                            console.log(`✅ Synced ${successCount} products to Database (${updateCount} updated, ${createCount} created, ${deletedCount} deleted)`);
+                            console.log(`✅ Synced ${successCount} products to Database (${updateCount} updated, ${createCount} created)`);
                             if (failCount > 0) {
                                 console.warn(`⚠️ ${failCount} products failed to sync to Database`);
                             }
-                        } else if (deletedCount > 0) {
-                            // Even if no products were synced, deletion was successful
-                            results.database.success = true;
-                            results.database.count = deletedCount;
-                            console.log(`✅ Deleted ${deletedCount} products from Database`);
-                        } else {
+                        } else { // No products were synced successfully (could be all failed)
                             results.database.error = `All ${productsToSave.length} products failed to sync`;
                             console.error('❌ Failed to sync any products to Database');
                         }
@@ -5608,6 +5548,9 @@ async function adjustQuantity(productId, change) {
         // Update local cache if needed
         saveProductsToLocalCache();
     }
+
+    // After updating quantity, force a full reload from the database to ensure consistency
+    await loadProducts();
 
     // Update displays
     displayProducts(currentCategory);
