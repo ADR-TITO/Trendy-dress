@@ -5346,18 +5346,18 @@ async function saveProduct(event) {
             // Create new product
             console.log('✨ Creating new product');
             result = await apiService.createProduct(productData);
+            products.push(result); // Add the newly created product to the local array
             showNotification('Product created successfully!', 'success');
         }
 
-        // Close modal and refresh products
+        // Close modal
         closeModal();
 
-        // Refresh products list
+        // Sync and refresh products list to ensure consistency
+        await saveProducts(); // Explicitly sync current 'products' array to database
+        await loadProducts(); // Reload from database to ensure local 'products' array is authoritative
         if (typeof loadAdminProducts === 'function') {
             await loadAdminProducts();
-        }
-        if (typeof loadProducts === 'function') {
-            await loadProducts();
         }
 
     } catch (error) {
