@@ -153,18 +153,20 @@ class Database {
             // M-Pesa transactions table
             $pdo->exec("CREATE TABLE IF NOT EXISTS mpesa_transactions (
                 id INT AUTO_INCREMENT PRIMARY KEY,
-                receiptNumber VARCHAR(100) UNIQUE NOT NULL,
+                receiptNumber VARCHAR(100) UNIQUE,
                 transactionDate DATETIME NOT NULL,
                 phoneNumber VARCHAR(50),
                 amount DECIMAL(10, 2) NOT NULL,
                 merchantRequestID VARCHAR(255),
                 checkoutRequestID VARCHAR(255),
+                orderId VARCHAR(255),
                 resultCode INT,
                 resultDesc VARCHAR(255),
                 createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 INDEX idx_receiptNumber (receiptNumber),
                 INDEX idx_transactionDate (transactionDate),
-                INDEX idx_checkoutRequestID (checkoutRequestID)
+                INDEX idx_checkoutRequestID (checkoutRequestID),
+                INDEX idx_orderId (orderId)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
             
             error_log("✅ Database tables created/verified");

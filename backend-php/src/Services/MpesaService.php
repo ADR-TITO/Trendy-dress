@@ -66,9 +66,23 @@ class MpesaService {
     /**
      * Initiate STK Push
      */
-    public function initiateSTKPush($phoneNumber, $amount, $accountReference, $transactionDesc) {
+    public function initiateSTKPush($phoneNumber, $orderId, $accountReference, $transactionDesc) {
         try {
             $token = $this->getAccessToken();
+            
+            // Get database connection
+            $pdo = \Database::getConnection();
+            
+            // Fetch the total amount for the given orderId
+            $stmt = $pdo->prepare("SELECT totalAmount FROM orders WHERE orderId = :orderId");
+            $stmt->execute([':orderId' => $orderId]);
+            $order = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if (!$order) {
+                throw new \Exception("Order with ID $orderId not found for STK Push.");
+            }
+            
+            $amount = (float)$order['totalAmount'];
             
             // Format phone number (254XXXXXXXXX)
             $phone = preg_replace('/^0/', '254', $phoneNumber);
@@ -89,7 +103,7 @@ class MpesaService {
                 'PartyB' => $this->shortCode,
                 'PhoneNumber' => $phone,
                 'CallBackURL' => $callbackURL . '/webhook',
-                'AccountReference' => $accountReference,
+                'AccountReference' => $accountReference . '_' . $orderId, // Append orderId for traceability
                 'TransactionDesc' => $transactionDesc
             ];
             
