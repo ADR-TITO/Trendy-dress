@@ -100,8 +100,8 @@ class MpesaTransaction {
                 $receiptNumber = 'PENDING_' . ($data['checkoutRequestID'] ?? uniqid());
             }
             
-            $sql = "INSERT INTO mpesa_transactions (receiptNumber, transactionDate, phoneNumber, amount, merchantRequestID, checkoutRequestID, resultCode, resultDesc) 
-                    VALUES (:receiptNumber, :transactionDate, :phoneNumber, :amount, :merchantRequestID, :checkoutRequestID, :resultCode, :resultDesc)";
+            $sql = "INSERT INTO mpesa_transactions (receiptNumber, transactionDate, phoneNumber, amount, merchantRequestID, checkoutRequestID, orderId, resultCode, resultDesc) 
+                    VALUES (:receiptNumber, :transactionDate, :phoneNumber, :amount, :merchantRequestID, :checkoutRequestID, :orderId, :resultCode, :resultDesc)";
             
             $stmt = $pdo->prepare($sql);
             $stmt->execute([
@@ -111,7 +111,8 @@ class MpesaTransaction {
                 ':amount' => $data['amount'] ?? 0,
                 ':merchantRequestID' => $data['merchantRequestID'] ?? '',
                 ':checkoutRequestID' => $data['checkoutRequestID'] ?? '',
-                ':resultCode' => $data['resultCode'] ?? null, // Null for pending
+                ':orderId' => $data['orderId'] ?? null, // Add orderId
+                ':resultCode' => $data['resultCode'] ?? null,
                 ':resultDesc' => $data['resultDesc'] ?? 'Pending'
             ]);
             
@@ -152,6 +153,10 @@ class MpesaTransaction {
                 $fields[] = "phoneNumber = :phoneNumber";
                 $params[':phoneNumber'] = $data['phoneNumber'];
             }
+            if (isset($data['orderId'])) {
+                $fields[] = "orderId = :orderId";
+                $params[':orderId'] = $data['orderId'];
+            }
             
             if (empty($fields)) {
                 return false;
@@ -182,6 +187,7 @@ class MpesaTransaction {
             'receiptNumber' => $isPending ? null : $receiptNumber,
             'amount' => isset($transaction['amount']) ? (float)$transaction['amount'] : 0.0,
             'phoneNumber' => $transaction['phoneNumber'] ?? '',
+            'orderId' => $transaction['orderId'] ?? null,
             'transactionDate' => $transaction['transactionDate'] ?? date('Y-m-d H:i:s'),
             'status' => $isPending ? 'pending' : ($transaction['resultCode'] === 0 ? 'completed' : 'failed'),
             'resultCode' => $transaction['resultCode'],

@@ -388,6 +388,7 @@ class ApiService {
 
     // Create new product
     async createProduct(product) {
+        console.log('🚀 [ApiService] Creating product:', product);
         try {
             const response = await fetch(`${this.baseURL}/products`, {
                 method: 'POST',
@@ -414,6 +415,7 @@ class ApiService {
 
     // Update product
     async updateProduct(id, product) {
+        console.log('🚀 [ApiService] Updating product:', id, product);
         try {
             const response = await fetch(`${this.baseURL}/products/${id}`, {
                 method: 'PUT',
