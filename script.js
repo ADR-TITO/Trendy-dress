@@ -3583,37 +3583,41 @@ async function processPayment(event) {
         const deliveryCost = getDeliveryCost();
         const total = subtotal + deliveryCost;
 
-        // Force payment method to 'till' (Manual M-Pesa)
-        // We removed STK Push option, so this is the only path
-
-
-        // Handle Till Number payment (existing flow)
-        // Get all M-Pesa codes (first + additional)
-        const allMpesaCodes = getAllMpesaCodes();
-
-        // Validate that at least one M-Pesa code is provided
-        if (allMpesaCodes.length === 0) {
-            alert('Please enter at least one M-Pesa transaction code.');
-            document.getElementById('mpesaCode')?.focus();
+        // Conditional logic based on payment method
+        if (paymentMethod === 'stk-push') {
+            await processSTKPushPayment(customerName, customerPhone, customerEmail, total, deliveryOption, deliveryAddress, subtotal, deliveryCost);
+            // After STK push, close modal and return, as STK push will handle further steps
+            closePaymentModal();
             return;
-        }
+        } else {
+            // Handle Till Number payment (existing flow)
+            // Get all M-Pesa codes (first + additional)
+            const allMpesaCodes = getAllMpesaCodes();
 
-        // Validate all M-Pesa codes
-        for (const codeInfo of allMpesaCodes) {
-            const validation = validateMpesaCode(codeInfo.code);
-            if (!validation.valid) {
-                alert(`Invalid M-Pesa code: ${codeInfo.code}\n\n${validation.error}`);
-                const input = document.getElementById(codeInfo.inputId);
-                if (input) {
-                    input.focus();
-                    input.style.borderColor = '#f44336';
-                    setTimeout(() => {
-                        input.style.borderColor = '#ddd';
-                    }, 3000);
-                }
+            // Validate that at least one M-Pesa code is provided
+            if (allMpesaCodes.length === 0) {
+                alert('Please enter at least one M-Pesa transaction code.');
+                document.getElementById('mpesaCode')?.focus();
                 return;
             }
-        }
+
+            // Validate all M-Pesa codes
+            for (const codeInfo of allMpesaCodes) {
+                const validation = validateMpesaCode(codeInfo.code);
+                if (!validation.valid) {
+                    alert(`Invalid M-Pesa code: ${codeInfo.code}\n\n${validation.error}`);
+                    const input = document.getElementById(codeInfo.inputId);
+                    if (input) {
+                        input.focus();
+                        input.style.borderColor = '#f44336';
+                        setTimeout(() => {
+                            input.style.borderColor = '#ddd';
+                        }, 3000);
+                    }
+                    return;
+                }
+            }
+
 
         // Show loading modal
         showPaymentVerificationModal();
