@@ -4053,11 +4053,15 @@ async function processPayment(event) {
             saveCart();
             toggleCart();
         
-            // No notification shown - receipt is sent to WhatsApp automatically
+                        // No notification shown - receipt is sent to WhatsApp automatically
         
-            } catch (error) {        // Hide loading modal in case of any unexpected error
-        hidePaymentVerificationModal();
-        console.error('❌ Error processing payment:', error);
+            
+        
+                        catch (error) {        // Hide loading modal in case of any unexpected error
+        
+                            hidePaymentVerificationModal();
+        
+                            console.error('❌ Error processing payment:', error);
         alert('An error occurred while processing your payment. Please try again or contact support.\n\nError: ' + error.message);
         showNotification('Payment processing failed. Please try again.', 'error');
     }
