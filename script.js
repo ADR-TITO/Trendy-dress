@@ -846,204 +846,163 @@ async function syncProductsToAllStorage(productsToSync, options = {}) {
                                 if (existingProduct && existingProduct._id) {
                                     // Product exists in Database - update it
                                     await apiService.updateProduct(existingProduct._id, productData);
-                                    console.log(`✅ API: Successfully updated product ${product.name} (${product.size}) in Database.`);
+            console.log(`✅ API: Successfully updated product ${product.name} (${product.size}) in Database.`);
                                     // Update product ID with Database _id
                                     product.id = existingProduct._id;
-                                    // Update product ID with new Database _id
-                                    product.id = created._id || created.id || product.id;
-                                    product._id = created._id || created.id;
-                                    createCount++;
-                                    console.log(`✅ Created product in Database (recovery): ${product.name}`);
-                                } else {
-                                    throw updateError;
+                                    product._id = existingProduct._id;
                                     updateCount++;
                                     console.log(`✅ Updated product in Database: ${product.name} (${product.size})`);
-                                } catch (updateError) {
-                                    // If update fails, try to create new
-                                    const created = await apiService.createProduct(productData);
-                                    console.log(`✅ Created product in Database (after update failed): ${product.name}`);
-                                }
-                            }
-                                } else {
-                            // New product or numeric ID - try to create new
-                            try {
-                                const created = await apiService.createProduct(productData);
-                                // Update product ID with Database _id
-                                product.id = created._id || created.id || product.id;
-                                product._id = created._id || created.id;
-                                createCount++;
-                                console.log(`✅ Created product in Database: ${product.name} (${product.size})`);
-                            } catch (createError) {
-                                // If create fails (e.g., duplicate), try to find and update
-                                if (createError.message && createError.message.includes('duplicate')) {
-                                    console.log(`⚠️ Duplicate product detected, trying to update: ${product.name}`);
-                                    // Try to find by name+size and update
-                                    const found = existingProducts.find(p => {
-                                        const key = `${(p.name || '').toLowerCase().trim()}_${normalizeSize(p.size || 'M').toUpperCase().trim()}`;
-                                        return key === productKey;
-                                    });
-                                    if (found && found._id) {
-                                        await apiService.updateProduct(found._id, productData);
-                                        product.id = found._id;
-                                        product._id = found._id;
+                                } else if (product.id && typeof product.id === 'string' && (product.id.length === 24 && /^[0-9a-fA-F]{24}$/.test(product.id) || product.id.startsWith('prod_'))) {
+                                    // Product has Database ObjectId or prod_ ID - try to update existing
+                                    try {
+                                        await apiService.updateProduct(product.id, productData);
                                         updateCount++;
-                                        console.log(`✅ Updated duplicate product in Database: ${product.name}`);
-                                    } else {
-                                        throw createError;
+                                        console.log(`✅ Updated product in Database by ID: ${product.name}`);
+                                    } catch (updateError) {
+                                        // If update fails with 404 (Product not found), try to create it instead
+                                        if (updateError.message && (updateError.message.includes('Product not found') || updateError.message.includes('404'))) {
+                                            console.log(`⚠️ Product ID ${product.id} not found in Database, creating new...`);
+                                            const created = await apiService.createProduct(productData);
+                                            // Update product ID with new Database _id
+                                            product.id = created._id || created.id || product.id;
+                                            product._id = created._id || created.id;
+                                            createCount++;
+                                            console.log(`✅ Created product in Database (after update failed): ${product.name}`);
+                                        } else {
+                                            throw updateError; // Re-throw other update errors
+                                        }
                                     }
                                 } else {
-                                    throw createError;
+                                    // New product or numeric ID not matching existing, try to create new
+                                    try {
+                                        const created = await apiService.createProduct(productData);
+                                        // Update product ID with Database _id
+                                        product.id = created._id || created.id || product.id;
+                                        product._id = created._id || created.id;
+                                        createCount++;
+                                        console.log(`✅ Created product in Database: ${product.name} (${product.size})`);
+                                    } catch (createError) {
+                                        // If create fails (e.g., duplicate), try to find by name+size and update
+                                        if (createError.message && createError.message.includes('duplicate')) {
+                                            console.log(`⚠️ Duplicate product detected during creation, trying to find and update: ${product.name}`);
+                                            // Try to find by name+size and update
+                                            const found = existingProducts.find(p => {
+                                                const key = `${(p.name || '').toLowerCase().trim()}_${normalizeSize(p.size || 'M').toUpperCase().trim()}`;
+                                                return key === productKey;
+                                            });
+                                            if (found && found._id) {
+                                                await apiService.updateProduct(found._id, productData);
+                                                product.id = found._id;
+                                                product._id = found._id;
+                                                updateCount++;
+                                                console.log(`✅ Updated duplicate product in Database: ${product.name}`);
+                                            } else {
+                                                throw createError; // If not found, re-throw original create error
+                                            }
+                                        } else {
+                                            throw createError; // Re-throw other creation errors
+                                        }
+                                    }
                                 }
+                                successCount++;
+                            } catch (error) {
+                                // Only log if it's not a database connection error (we already handled that)
+                                const errorMsg = error.message || error.toString() || '';
+                                if (!errorMsg.includes('Database not connected') && !errorMsg.includes('Database connection')) {
+                                    console.error('❌ Error syncing product to Database:', product.id, product.name, errorMsg);
+                                } else {
+                                    // Database connection error - stop trying to sync to Database
+                                    console.log('⚠️ Database database not connected - stopping sync to Database');
+                                    break; // Stop trying to sync remaining products
+                                }
+                                failCount++;
                             }
                         }
-                        successCount++;
-                    } catch (error) {
-                        // Only log if it's not a database connection error (we already handled that)
-                        const errorMsg = error.message || error.toString() || '';
-                        if (!errorMsg.includes('Database not connected') && !errorMsg.includes('Database connection')) {
-                            console.error('❌ Error syncing product to Database:', product.id, product.name, errorMsg);
-                        } else {
-                            // Database connection error - stop trying to sync to Database
-                            console.log('⚠️ Database database not connected - stopping sync to Database');
-                            break; // Stop trying to sync remaining products
-                        }
-                        failCount++;
-                    }
-                }
-                        }
 
-                        // Delete products from Database that are not in the remaining products list
-                        // This ensures deleted products are removed from Database
-                        let deletedCount = 0;
-                try {
-                    // Find products in Database that are not in the remaining products list
-                    const remainingProductKeys = new Set();
-                    productsToSave.forEach(p => {
-                        const key = `${(p.name || '').toLowerCase().trim()}_${normalizeSize(p.size || 'M').toUpperCase().trim()}`;
-                        remainingProductKeys.add(key);
-                        // Also add by ID if it's a Database ObjectId
-                        if (p.id && typeof p.id === 'string' && (p.id.length === 24 && /^[0-9a-fA-F]{24}$/.test(p.id) || p.id.startsWith('prod_'))) {
-                            remainingProductKeys.add(p.id);
-                        }
-                        if (p._id && typeof p._id === 'string' && (p._id.length === 24 && /^[0-9a-fA-F]{24}$/.test(p._id) || p._id.startsWith('prod_'))) {
-                            remainingProductKeys.add(p._id);
-                        }
-                    });
+                            // No longer deleting products automatically
+                            // Deletions should only be triggered by explicit admin actions.
+                            // The sync process focuses on adding and updating products.
 
-                    // Delete products from Database that are not in remaining list
-                    const productsToDelete = existingProducts.filter(p => {
-                        const key = `${(p.name || '').toLowerCase().trim()}_${normalizeSize(p.size || 'M').toUpperCase().trim()}`;
-                        const hasKey = remainingProductKeys.has(key);
-                        const hasId = p._id && remainingProductKeys.has(p._id);
-                        return !hasKey && !hasId;
-                    });
-
-                    if (productsToDelete.length > 0) {
-                        console.log(`🗑️ Deleting ${productsToDelete.length} products from Database that are not in remaining list...`);
-                        for (const productToDelete of productsToDelete) {
-                            try {
-                                if (productToDelete._id) {
-                                    await apiService.deleteProduct(productToDelete._id);
-                                    deletedCount++;
-                                    console.log(`✅ Deleted product from Database: ${productToDelete.name} (${productToDelete.size})`);
-                                }
-                            } catch (deleteError) {
-                                console.error(`❌ Error deleting product from Database: ${productToDelete.name}`, deleteError.message);
+                        if (successCount > 0) {
+                            results.database.success = true;
+                            results.database.count = successCount;
+                            console.log(`✅ Synced ${successCount} products to Database (${updateCount} updated, ${createCount} created)`);
+                            if (failCount > 0) {
+                                console.warn(`⚠️ ${failCount} products failed to sync to Database`);
                             }
+                        } else { // No products were synced successfully (could be all failed)
+                            results.database.error = `All ${productsToSave.length} products failed to sync`;
+                            console.error('❌ Failed to sync any products to Database');
                         }
                     }
-                } catch (deleteError) {
-                    console.warn('⚠️ Error deleting products from Database:', deleteError.message);
+                } catch (dbStatusError) {
+                    console.log('ℹ️ Could not check Database connection status - skipping Database sync');
+                    results.database.error = 'Could not verify database connection';
                 }
-
-                if (successCount > 0) {
-                    results.database.success = true;
-                    results.database.count = successCount;
-                    console.log(`✅ Synced ${successCount} products to Database (${updateCount} updated, ${createCount} created, ${deletedCount} deleted)`);
-                    if (failCount > 0) {
-                        console.warn(`⚠️ ${failCount} products failed to sync to Database`);
-                    }
-                } else if (deletedCount > 0) {
-                    // Even if no products were synced, deletion was successful
-                    results.database.success = true;
-                    results.database.count = deletedCount;
-                    console.log(`✅ Deleted ${deletedCount} products from Database`);
-                } else {
-                    results.database.error = `All ${productsToSave.length} products failed to sync`;
-                    console.error('❌ Failed to sync any products to Database');
-                }
-            }
-        } catch (dbStatusError) {
-            console.log('ℹ️ Could not check Database connection status - skipping Database sync');
-            results.database.error = 'Could not verify database connection';
-            results.database.error = 'Could not verify database connection: ' + dbStatusError.message;
-        }
-    } else {
-        console.log('ℹ️ Database backend not available - skipping Database sync');
-        results.database.error = 'Backend not available';
-    }
-} catch (error) {
-
-} catch (error) { // This catch was missing
-    console.error('❌ Database sync error:', error);
-    results.database.error = error.message;
-}
-    }
-
-// 2. Cache to IndexedDB (for offline access only - Database is PRIMARY)
-// NOTE: localStorage is NOT used for products - only for UI data (cart, preferences)
-if (!skipIndexedDB) {
-    try {
-        console.log('🔄 Caching to IndexedDB (for offline access only)...');
-        // Initialize IndexedDB
-        await storageManager.init();
-
-        if (storageManager.useIndexedDB && storageManager.db) {
-            // Cache to IndexedDB (Database is primary, this is just for offline access)
-            const indexedResult = await storageManager.saveProducts(productsToSave);
-            if (indexedResult) {
-                results.indexedDB.success = true;
-                results.indexedDB.count = productsToSave.length;
-                console.log(`✅ Cached ${productsToSave.length} products to IndexedDB (for offline access)`);
             } else {
-                results.indexedDB.error = 'Save operation returned false';
-                console.error('❌ IndexedDB cache save returned false');
+                console.log('ℹ️ Database backend not available - skipping Database sync');
+                results.database.error = 'Backend not available';
             }
-        } else {
-            console.log('ℹ️ IndexedDB not available - skipping cache');
-            results.indexedDB.error = 'IndexedDB not available';
+        } catch (error) {
+            console.error('❌ Database sync error:', error);
+            results.database.error = error.message;
         }
-    } catch (error) {
-        console.error('❌ IndexedDB cache error:', error);
-        results.indexedDB.error = error.message;
     }
-}
 
-// 3. DO NOT sync to localStorage for products
-// localStorage is ONLY for UI-related data (cart, preferences, admin credentials)
-// Products are stored in Database (permanent storage) and cached in IndexedDB (offline access)
-if (!skipLocalStorage && false) { // Disabled - localStorage not used for products
-    console.log('ℹ️ localStorage sync skipped - localStorage is ONLY for UI data (cart, preferences)');
-    results.localStorage.error = 'Not used for products - only for UI data';
-}
+    // 2. Cache to IndexedDB (for offline access only - Database is PRIMARY)
+    // NOTE: localStorage is NOT used for products - only for UI data (cart, preferences)
+    if (!skipIndexedDB) {
+        try {
+            console.log('🔄 Caching to IndexedDB (for offline access only)...');
+            // Initialize IndexedDB
+            await storageManager.init();
 
-// Summary
-const totalSuccess = (results.database.success ? 1 : 0) +
-    (results.indexedDB.success ? 1 : 0); // localStorage not counted - not used for products
+            if (storageManager.useIndexedDB && storageManager.db) {
+                // Cache to IndexedDB (Database is primary, this is just for offline access)
+                const indexedResult = await storageManager.saveProducts(productsToSave);
+                if (indexedResult) {
+                    results.indexedDB.success = true;
+                    results.indexedDB.count = productsToSave.length;
+                    console.log(`✅ Cached ${productsToSave.length} products to IndexedDB (for offline access)`);
+                } else {
+                    results.indexedDB.error = 'Save operation returned false';
+                    console.error('❌ IndexedDB cache save returned false');
+                }
+            } else {
+                console.log('ℹ️ IndexedDB not available - skipping cache');
+                results.indexedDB.error = 'IndexedDB not available';
+            }
+        } catch (error) {
+            console.error('❌ IndexedDB cache error:', error);
+            results.indexedDB.error = error.message;
+        }
+    }
 
-console.log('\n📊 Sync Summary:');
-console.log(`   Database:      ${results.database.success ? '✅' : '❌'} ${results.database.count} products ${results.database.error ? '(' + results.database.error + ')' : ''} (PRIMARY - permanent storage)`);
-console.log(`   IndexedDB:    ${results.indexedDB.success ? '✅' : '❌'} ${results.indexedDB.count} products ${results.indexedDB.error ? '(' + results.indexedDB.error + ')' : ''} (CACHE - offline access)`);
-console.log(`   localStorage: ⏭️ Not used for products (ONLY for UI data: cart, preferences)`);
-console.log(`   Total: ${totalSuccess}/2 storage locations synced successfully`);
+    // 3. DO NOT sync to localStorage for products
+    // localStorage is ONLY for UI-related data (cart, preferences, admin credentials)
+    // Products are stored in Database (permanent storage) and cached in IndexedDB (offline access)
+    if (!skipLocalStorage && false) { // Disabled - localStorage not used for products
+        console.log('ℹ️ localStorage sync skipped - localStorage is ONLY for UI data (cart, preferences)');
+        results.localStorage.error = 'Not used for products - only for UI data';
+    }
 
-// Return success if Database succeeded (primary requirement)
-// IndexedDB cache is optional (for offline access)
-return {
-    success: results.database.success, // Database is required for success
-    results: results,
-    products: productsToSave // Return updated products (with Database IDs if applicable)
-};
+    // Summary
+    const totalSuccess = (results.database.success ? 1 : 0) +
+        (results.indexedDB.success ? 1 : 0); // localStorage not counted - not used for products
+
+    console.log('\n📊 Sync Summary:');
+    console.log(`   Database:      ${results.database.success ? '✅' : '❌'} ${results.database.count} products ${results.database.error ? '(' + results.database.error + ')' : ''} (PRIMARY - permanent storage)`);
+    console.log(`   IndexedDB:    ${results.indexedDB.success ? '✅' : '❌'} ${results.indexedDB.count} products ${results.indexedDB.error ? '(' + results.indexedDB.error + ')' : ''} (CACHE - offline access)`);
+    console.log(`   localStorage: ⏭️ Not used for products (ONLY for UI data: cart, preferences)`);
+    console.log(`   Total: ${totalSuccess}/2 storage locations synced successfully`);
+
+    // Return success if Database succeeded (primary requirement)
+    // IndexedDB cache is optional (for offline access)
+    return {
+        success: results.database.success, // Database is required for success
+        results: results,
+        products: productsToSave // Return updated products (with Database IDs if applicable)
+    };
 }
 
 
@@ -1082,120 +1041,133 @@ async function deleteProductFromAllStorage(productId) {
                     console.log('ℹ️ Database backend available but database not connected - skipping Database deletion');
                     results.database.error = `Database not connected (ReadyState: ${dbStatus.readyState})`;
                 } else {
-                    // Numeric ID or other format - try to find product by name+size and delete
-                    // Note: We need the product name and size to find it in Database
-                    // For now, we'll skip Database deletion if ID is not a Database ObjectId or prod_ ID
-                    // The product will be removed when we sync remaining products
-                    console.log('ℹ️ Product ID is not a Database ObjectId or prod_ ID - will remove during sync of remaining products');
-                    results.database.error = 'Invalid product ID format (not Database ObjectId or prod_ ID)';
-                    // This is okay - the product will be removed when we sync remaining products
+                    console.log('🗑️ Deleting from Database...');
+
+                    // Check if productId is a Database ObjectId (24 char hex string) or prod_ ID
+                    if (typeof productId === 'string' && ((productId.length === 24 && /^[0-9a-fA-F]{24}$/.test(productId)) || productId.startsWith('prod_'))) {
+                        // Database ObjectId or prod_ ID - try to delete directly
+                        try {
+                            await apiService.deleteProduct(productId);
+                            results.database.success = true;
+                            console.log('✅ Product deleted from Database');
+                        } catch (error) {
+                            console.error('❌ Error deleting from Database:', error.message);
+                            results.database.error = error.message;
+                        }
+                    } else {
+                        // Numeric ID or other format - try to find product by name+size and delete
+                        // Note: We need the product name and size to find it in Database
+                        // For now, we'll skip Database deletion if ID is not a Database ObjectId or prod_ ID
+                        // The product will be removed when we sync remaining products
+                        console.log('ℹ️ Product ID is not a Database ObjectId or prod_ ID - will remove during sync of remaining products');
+                        results.database.error = 'Invalid product ID format (not Database ObjectId or prod_ ID)';
+                        // This is okay - the product will be removed when we sync remaining products
+                    }
                 }
-            }
             } catch (dbStatusError) {
-            console.log('ℹ️ Could not check Database connection status - skipping Database deletion');
-            results.database.error = 'Could not verify database connection';
-        }
-    } else {
-        console.log('ℹ️ Database backend not available - skipping Database deletion');
-        results.database.error = 'Backend not available';
-    }
-} catch (error) {
-} catch (error) { // This catch was also missing
-    console.error('❌ Database delete error:', error);
-    results.database.error = error.message;
-}
-
-// 2. Delete from localStorage
-try {
-    console.log('🗑️ Deleting from localStorage...');
-    const savedProducts = localStorage.getItem('products');
-    if (savedProducts) {
-        try {
-            const parsed = JSON.parse(savedProducts);
-            const filtered = parsed.filter(p => {
-                // Check both id and _id fields
-                return !compareIds(p.id, productId) && !compareIds(p._id, productId);
-            });
-
-            if (filtered.length < parsed.length) {
-                localStorage.setItem('products', JSON.stringify(filtered));
-                results.localStorage.success = true;
-                console.log(`✅ Product deleted from localStorage (${parsed.length} → ${filtered.length} products)`);
-            } else {
-                console.log('ℹ️ Product not found in localStorage');
-                results.localStorage.success = true; // Not found, but operation succeeded
+                console.log('ℹ️ Could not check Database connection status - skipping Database deletion');
+                results.database.error = 'Could not verify database connection';
             }
-        } catch (error) {
-            console.error('❌ Error parsing localStorage products:', error);
-            results.localStorage.error = error.message;
+        } else {
+            console.log('ℹ️ Database backend not available - skipping Database deletion');
+            results.database.error = 'Backend not available';
         }
-    } else {
-        console.log('ℹ️ No products in localStorage');
-        results.localStorage.success = true; // No products, operation succeeded
+    } catch (error) {
+        console.error('❌ Database delete error:', error);
+        results.database.error = error.message;
     }
-} catch (error) {
-    console.error('❌ localStorage delete error:', error);
-    results.localStorage.error = error.message;
-}
 
-// 3. Delete from IndexedDB
-try {
-    console.log('🗑️ Deleting from IndexedDB...');
-    await storageManager.init();
-
-    if (storageManager.useIndexedDB && storageManager.db) {
-        try {
-            // Load all products from IndexedDB to find the correct product to delete
-            const indexedProducts = await storageManager.loadProducts();
-            if (indexedProducts && indexedProducts.length > 0) {
-                // Find the product to delete (handle both Database ObjectId and numeric IDs)
-                const productToDelete = indexedProducts.find(p => {
-                    return compareIds(p.id, productId) || compareIds(p._id, productId);
+    // 2. Delete from localStorage
+    try {
+        console.log('🗑️ Deleting from localStorage...');
+        const savedProducts = localStorage.getItem('products');
+        if (savedProducts) {
+            try {
+                const parsed = JSON.parse(savedProducts);
+                const filtered = parsed.filter(p => {
+                    // Check both id and _id fields
+                    return !compareIds(p.id, productId) && !compareIds(p._id, productId);
                 });
 
-                if (productToDelete) {
-                    // Delete using the product's actual stored ID
-                    const storedId = productToDelete.id;
-                    await storageManager.deleteProduct(storedId);
-                    results.indexedDB.success = true;
-                    console.log(`✅ Product deleted from IndexedDB (ID: ${storedId})`);
+                if (filtered.length < parsed.length) {
+                    localStorage.setItem('products', JSON.stringify(filtered));
+                    results.localStorage.success = true;
+                    console.log(`✅ Product deleted from localStorage (${parsed.length} → ${filtered.length} products)`);
                 } else {
-                    console.log('ℹ️ Product not found in IndexedDB (may have already been deleted)');
-                    results.indexedDB.success = true; // Not found, but operation succeeded
+                    console.log('ℹ️ Product not found in localStorage');
+                    results.localStorage.success = true; // Not found, but operation succeeded
                 }
-            } else {
-                console.log('ℹ️ No products in IndexedDB');
-                results.indexedDB.success = true; // No products, operation succeeded
+            } catch (error) {
+                console.error('❌ Error parsing localStorage products:', error);
+                results.localStorage.error = error.message;
             }
-        } catch (error) {
-            console.error('❌ Error deleting from IndexedDB:', error);
-            results.indexedDB.error = error.message;
+        } else {
+            console.log('ℹ️ No products in localStorage');
+            results.localStorage.success = true; // No products, operation succeeded
         }
-    } else {
-        console.log('ℹ️ IndexedDB not available - skipping IndexedDB deletion');
-        results.indexedDB.error = 'IndexedDB not available';
+    } catch (error) {
+        console.error('❌ localStorage delete error:', error);
+        results.localStorage.error = error.message;
     }
-} catch (error) {
-    console.error('❌ IndexedDB delete error:', error);
-    results.indexedDB.error = error.message;
-}
 
-// Summary
-const totalSuccess = (results.database.success ? 1 : 0) +
-    (results.localStorage.success ? 1 : 0) +
-    (results.indexedDB.success ? 1 : 0);
+    // 3. Delete from IndexedDB
+    try {
+        console.log('🗑️ Deleting from IndexedDB...');
+        await storageManager.init();
 
-console.log('\n📊 Delete Summary:');
-console.log(`   Database:      ${results.database.success ? '✅' : '❌'} ${results.database.error ? '(' + results.database.error + ')' : ''}`);
-console.log(`   localStorage: ${results.localStorage.success ? '✅' : '❌'} ${results.localStorage.error ? '(' + results.localStorage.error + ')' : ''}`);
-console.log(`   IndexedDB:    ${results.indexedDB.success ? '✅' : '❌'} ${results.indexedDB.error ? '(' + results.indexedDB.error + ')' : ''}`);
-console.log(`   Total: ${totalSuccess}/3 storage locations deleted successfully`);
+        if (storageManager.useIndexedDB && storageManager.db) {
+            try {
+                // Load all products from IndexedDB to find the correct product to delete
+                const indexedProducts = await storageManager.loadProducts();
+                if (indexedProducts && indexedProducts.length > 0) {
+                    // Find the product to delete (handle both Database ObjectId and numeric IDs)
+                    const productToDelete = indexedProducts.find(p => {
+                        return compareIds(p.id, productId) || compareIds(p._id, productId);
+                    });
 
-// Return success if at least one storage location succeeded
-return {
-    success: totalSuccess > 0,
-    results: results
-};
+                    if (productToDelete) {
+                        // Delete using the product's actual stored ID
+                        const storedId = productToDelete.id;
+                        await storageManager.deleteProduct(storedId);
+                        results.indexedDB.success = true;
+                        console.log(`✅ Product deleted from IndexedDB (ID: ${storedId})`);
+                    } else {
+                        console.log('ℹ️ Product not found in IndexedDB (may have already been deleted)');
+                        results.indexedDB.success = true; // Not found, but operation succeeded
+                    }
+                } else {
+                    console.log('ℹ️ No products in IndexedDB');
+                    results.indexedDB.success = true; // No products, operation succeeded
+                }
+            } catch (error) {
+                console.error('❌ Error deleting from IndexedDB:', error);
+                results.indexedDB.error = error.message;
+            }
+        } else {
+            console.log('ℹ️ IndexedDB not available - skipping IndexedDB deletion');
+            results.indexedDB.error = 'IndexedDB not available';
+        }
+    } catch (error) {
+        console.error('❌ IndexedDB delete error:', error);
+        results.indexedDB.error = error.message;
+    }
+
+    // Summary
+    const totalSuccess = (results.database.success ? 1 : 0) +
+        (results.localStorage.success ? 1 : 0) +
+        (results.indexedDB.success ? 1 : 0);
+
+    console.log('\n📊 Delete Summary:');
+    console.log(`   Database:      ${results.database.success ? '✅' : '❌'} ${results.database.error ? '(' + results.database.error + ')' : ''}`);
+    console.log(`   localStorage: ${results.localStorage.success ? '✅' : '❌'} ${results.localStorage.error ? '(' + results.localStorage.error + ')' : ''}`);
+    console.log(`   IndexedDB:    ${results.indexedDB.success ? '✅' : '❌'} ${results.indexedDB.error ? '(' + results.indexedDB.error + ')' : ''}`);
+    console.log(`   Total: ${totalSuccess}/3 storage locations deleted successfully`);
+
+    // Return success if at least one storage location succeeded
+    return {
+        success: totalSuccess > 0,
+        results: results
+    };
 }
 
 // Make migration functions available globally
@@ -1686,8 +1658,6 @@ function displayProducts(filterCategory = 'all') {
     const productsGrid = document.getElementById('productsGrid');
     const sectionTitle = document.querySelector('.section-title');
 
-    console.log('[displayProducts] Called with category:', filterCategory, 'products array length:', products.length);
-
     // Check if productsGrid exists
     if (!productsGrid) {
         console.error('[displayProducts] productsGrid element not found');
@@ -1698,8 +1668,6 @@ function displayProducts(filterCategory = 'all') {
     const filteredProducts = filterCategory === 'all'
         ? products
         : products.filter(p => p.category === filterCategory);
-
-    console.log('[displayProducts] Filtered products count:', filteredProducts.length);
 
     // Update section title with product count (only visible to admin)
     if (sectionTitle) {
@@ -1732,8 +1700,6 @@ function displayProducts(filterCategory = 'all') {
 
     // Display grouped products
     const groupedCount = Object.keys(groupedProducts).length;
-    const totalProductCount = filteredProducts.length;
-    console.log(`[displayProducts] Grouping ${totalProductCount} products into ${groupedCount} product groups (products with same name are grouped)`);
 
     const htmlContent = Object.values(groupedProducts).map(productGroup => {
         // Use first product for main info (image, price, category)
@@ -1919,9 +1885,7 @@ function displayProducts(filterCategory = 'all') {
         `;
     }).join('');
 
-    console.log(`[displayProducts] Generated HTML for ${groupedCount} product groups (${totalProductCount} total products). HTML length:`, htmlContent.length);
     productsGrid.innerHTML = htmlContent;
-    console.log(`[displayProducts] HTML set to productsGrid. Grid now has ${productsGrid.children.length} product cards (${totalProductCount} total products grouped by name)`);
 }
 
 // Setup Event Listeners
@@ -1962,8 +1926,6 @@ function selectSizeAndAddToCart(productId) {
 
 // Add to Cart
 function addToCart(productId) {
-    console.log('🛒 addToCart called with productId:', productId, 'Type:', typeof productId);
-
     // Handle both Database IDs (string), numeric IDs, and string IDs (e.g. prod_...)
     let id = productId;
     if (typeof productId === 'string' && (productId.length === 24 && /^[0-9a-fA-F]{24}$/.test(productId) || productId.startsWith('prod_'))) {
@@ -2001,12 +1963,9 @@ function addToCart(productId) {
 
     if (!product) {
         console.error('❌ Product not found for addToCart. ID:', id);
-        console.log('Available products:', products.map(p => ({ id: p.id, name: p.name })));
         showNotification('Product not found!', 'error');
         return;
     }
-
-    console.log('✅ Product found:', product.name, 'Size:', product.size);
 
     // Check if product is in stock
     const quantity = product.quantity || 0;
@@ -2358,12 +2317,6 @@ function updatePaymentMethod() {
     const customerPhoneLabel = document.getElementById('customerPhoneLabel');
     const phoneNumberHint = document.getElementById('phoneNumberHint');
     const customerPhoneInput = document.getElementById('customerPhone');
-    const paymentMethodTillRadio = document.getElementById('paymentMethodTill');
-
-    // Default state for Till Number (initially selected)
-    if (paymentMethodTillRadio) {
-        paymentMethodTillRadio.checked = true; // Ensure Till Number is selected by default
-    }
 
     if (paymentMethod === 'stk-push') {
         console.log('📱 STK Push selected - showing phone number field');
@@ -2405,7 +2358,7 @@ function updatePaymentMethod() {
             customerPhoneInput.style.fontSize = '1.1rem';
             customerPhoneInput.style.padding = '12px';
             customerPhoneInput.style.borderWidth = '2px';
-            customerPhoneInput.placeholder = 'Enter M-Pesa phone number (07XX XXX XXX or 2547XX XXX XXX)';
+            customerPhoneInput.placeholder = 'Enter M-Pesa phone number (0724904692 or 254724904692)';
             customerPhoneInput.focus(); // Focus on phone number input
         }
     } else {
@@ -2452,9 +2405,6 @@ function updatePaymentMethod() {
 }
 
 // Update payment steps (simplified - only Till Number)
-function updatePaymentSteps() {
-    // This function is no longer needed as logic is moved to updatePaymentMethod
-}
 function updatePaymentSteps() {
     // Payment steps are now static since we only support Till Number
     updatePaymentMethod(); // Also update payment method UI
@@ -3592,113 +3542,6 @@ async function completeTillPayment() {
 window.completeTillPayment = completeTillPayment;
 
 // Process Payment
-// Global variables for STK Push polling
-let currentSTKPushCheckoutRequestID = null;
-let stkPushPollingInterval = null;
-
-// Function to poll STK Push status
-async function pollSTKPushStatus(checkoutRequestID, totalAmount, orderId) {
-    console.log('🔄 Polling STK Push status for:', checkoutRequestID);
-    showPaymentVerificationModal('Waiting for M-Pesa PIN entry...'); // Update message
-
-    try {
-        const result = await apiService.querySTKPushStatus(checkoutRequestID);
-        console.log('STK Push Status Result:', result);
-
-        if (result && result.ResponseCode === '0') {
-            // Transaction is complete or failed, stop polling
-            clearInterval(stkPushPollingInterval);
-            stkPushPollingInterval = null;
-            hidePaymentVerificationModal();
-
-            if (result.ResultCode === '0') {
-                // Payment successful - proceed with order creation
-                showNotification('M-Pesa payment successful!', 'success');
-                // The webhook should handle the order creation, but as a fallback/immediate UI update,
-                // we can trigger the final order processing here.
-                // For now, we'll rely on the webhook to create the order and just show success.
-                // The webhook also prevents race conditions and handles amount validation server-side.
-                processSuccessfulSTKPush(orderId, totalAmount, result);
-
-            } else {
-                // Payment failed or cancelled
-                showNotification(`M-Pesa payment failed: ${result.ResultDesc || 'Unknown error'}`, 'error');
-                // Allow user to try again or choose another method
-            }
-        } else if (result && result.ResponseCode === '17') {
-            // User cancelled - stop polling
-            clearInterval(stkPushPollingInterval);
-            stkPushPollingInterval = null;
-            hidePaymentVerificationModal();
-            showNotification('M-Pesa STK Push cancelled by user.', 'warning');
-        } else {
-            // Still pending, continue polling
-            console.log('STK Push still pending...');
-            // Keep loading modal open, maybe update message
-        }
-    } catch (error) {
-        console.error('Error polling STK Push status:', error);
-        clearInterval(stkPushPollingInterval);
-        stkPushPollingInterval = null;
-        hidePaymentVerificationModal();
-        showNotification('Failed to check M-Pesa payment status. Please check your M-Pesa messages.', 'error');
-    }
-}
-
-// Function to process a successful STK Push (after callback/polling)
-async function processSuccessfulSTKPush(orderId, totalAmount, mpesaData) {
-    try {
-        // Fetch the order details from the backend using the orderId
-        // This is important because the webhook might have already updated the order
-        // and we want the most up-to-date information.
-        const order = await apiService.getOrderByOrderId(orderId);
-
-        if (!order) {
-            showNotification('Order not found after successful payment. Please contact support.', 'error');
-            return;
-        }
-
-        // Subtract quantity from products
-        order.items.forEach(orderItem => {
-            const product = products.find(p => p.id === orderItem.productId || p._id === orderItem.productId);
-            if (product) {
-                const currentQuantity = product.quantity || 0;
-                const purchasedQuantity = orderItem.quantity;
-                product.quantity = Math.max(0, currentQuantity - purchasedQuantity);
-            }
-        });
-
-        await saveProducts(); // Save updated product quantities
-        displayProducts(currentCategory); // Refresh product display
-
-        currentOrder = order; // Set current order for receipt generation
-        closePaymentModal(); // Close payment modal
-
-        // Generate and send receipt
-        try {
-            if (!currentOrderPDF) {
-                await generateReceiptPDF(order);
-            }
-            const useDatabase = localStorage.getItem('useDatabase') === 'true';
-            if (useDatabase) {
-                await apiService.sendReceiptToWhatsApp(order, currentOrderPDF);
-                console.log('✅ Receipt and PDF sent to WhatsApp via backend');
-            } else {
-                sendReceiptViaWhatsAppSilent();
-            }
-        } catch (whatsappError) {
-            console.error('❌ Error sending receipt to WhatsApp after STK Push:', whatsappError);
-        }
-
-        openReceiptModal(); // Show receipt modal
-        clearCart(); // Clear cart after successful payment
-
-    } catch (error) {
-        console.error('Error processing successful STK Push:', error);
-        showNotification('There was an error finalizing your order. Please contact support.', 'error');
-    }
-}
-
 async function processPayment(event) {
     event.preventDefault();
 
@@ -3740,563 +3583,422 @@ async function processPayment(event) {
         const deliveryCost = getDeliveryCost();
         const total = subtotal + deliveryCost;
 
-        async function processPayment(event) {
-            event.preventDefault();
+        // Force payment method to 'till' (Manual M-Pesa)
+        // We removed STK Push option, so this is the only path
 
-            try {
-                // Check if cart is empty
-                if (!cart || cart.length === 0) {
-                    alert('Your cart is empty. Please add items to cart before proceeding to payment.');
-                    closePaymentModal();
-                    return;
+
+        // Handle Till Number payment (existing flow)
+        // Get all M-Pesa codes (first + additional)
+        const allMpesaCodes = getAllMpesaCodes();
+
+        // Validate that at least one M-Pesa code is provided
+        if (allMpesaCodes.length === 0) {
+            alert('Please enter at least one M-Pesa transaction code.');
+            document.getElementById('mpesaCode')?.focus();
+            return;
+        }
+
+        // Validate all M-Pesa codes
+        for (const codeInfo of allMpesaCodes) {
+            const validation = validateMpesaCode(codeInfo.code);
+            if (!validation.valid) {
+                alert(`Invalid M-Pesa code: ${codeInfo.code}\n\n${validation.error}`);
+                const input = document.getElementById(codeInfo.inputId);
+                if (input) {
+                    input.focus();
+                    input.style.borderColor = '#f44336';
+                    setTimeout(() => {
+                        input.style.borderColor = '#ddd';
+                    }, 3000);
                 }
-
-                const customerName = document.getElementById('customerName')?.value?.trim();
-                let customerPhone = document.getElementById('customerPhone')?.value?.trim() || '';
-                const customerEmail = document.getElementById('customerEmail')?.value?.trim() || '';
-
-                // Get selected payment method
-                const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked')?.value || 'till';
-
-                // Validate required fields
-                if (!customerName || !customerPhone) {
-                    alert('Please fill in all required fields: Name and Phone Number.');
-                    if (!customerName) document.getElementById('customerName')?.focus();
-                    else if (!customerPhone) document.getElementById('customerPhone')?.focus();
-                    return;
-                }
-                const deliveryOption = document.querySelector('input[name="deliveryOption"]:checked');
-                const deliveryAddress = document.getElementById('deliveryAddress')?.value || '';
-
-                // Validate delivery address if delivery is selected
-                if (deliveryOption && (deliveryOption.value === 'nairobi-cbd' || deliveryOption.value === 'elsewhere')) {
-                    if (!deliveryAddress || deliveryAddress.trim() === '') {
-                        alert('Please provide delivery address/details for delivery option.');
-                        document.getElementById('deliveryAddress')?.focus();
-                        return;
-                    }
-                }
-
-                const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-                const deliveryCost = getDeliveryCost();
-                const total = subtotal + deliveryCost;
-
-                // --- STK Push Payment Flow ---
-                if (paymentMethod === 'stk-push') {
-                    console.log('Initiating STK Push...');
-
-                    // Clear any previous polling
-                    if (stkPushPollingInterval) {
-                        clearInterval(stkPushPollingInterval);
-                        stkPushPollingInterval = null;
-                    }
-
-                    // Phone number validation for STK Push
-                    if (!customerPhone.match(/^(?:254|0)?(7|1)(?:(?:[0-9]{8})|(?:[0-9]{8}))$/)) {
-                        alert('Please enter a valid M-Pesa phone number (e.g., 0712345678 or 254712345678).');
-                        document.getElementById('customerPhone')?.focus();
-                        return;
-                    }
-
-                    // Generate orderId for STK Push transaction
-                    const orderId = 'ORD-' + Date.now();
-
-                    try {
-                        showPaymentVerificationModal('Initiating M-Pesa STK Push...');
-
-                        const stkPushResult = await apiService.initiateSTKPush(customerPhone, orderId, total);
-
-                        if (stkPushResult.success) {
-                            currentSTKPushCheckoutRequestID = stkPushResult.CheckoutRequestID;
-                            showNotification('M-Pesa STK Push initiated. Please check your phone for a prompt!', 'success');
-
-                            // Start polling for status updates
-                            stkPushPollingInterval = setInterval(() => {
-                                pollSTKPushStatus(currentSTKPushCheckoutRequestID, total, orderId);
-                            }, 5000); // Poll every 5 seconds
-
-                        } else {
-                            hidePaymentVerificationModal();
-                            alert(stkPushResult.error || 'Failed to initiate STK Push. Please try again.');
-                            showNotification('STK Push failed: ' + (stkPushResult.error || 'Unknown error'), 'error');
-                        }
-                    } catch (error) {
-                        console.error('STK Push initiation error:', error);
-                        hidePaymentVerificationModal();
-                        alert('An unexpected error occurred during STK Push. Please try again.');
-                        showNotification('STK Push initiation error.', 'error');
-                    }
-                    return; // Exit function after handling STK Push
-                }
-
-                // --- Till Number Payment Flow (existing logic) ---
-                else if (paymentMethod === 'till') {
-                    // Get all M-Pesa codes (first + additional)
-                    const allMpesaCodes = getAllMpesaCodes();
-
-                    // Validate that at least one M-Pesa code is provided
-                    if (allMpesaCodes.length === 0) {
-                        alert('Please enter at least one M-Pesa transaction code.');
-                        document.getElementById('mpesaCode')?.focus();
-                        return;
-                    }
-
-                    // Validate all M-Pesa codes
-                    for (const codeInfo of allMpesaCodes) {
-                        const validation = validateMpesaCode(codeInfo.code);
-                        if (!validation.valid) {
-                            alert(`Invalid M-Pesa code: ${codeInfo.code}\n\n${validation.error}`);
-                            const input = document.getElementById(codeInfo.inputId);
-                            if (input) {
-                                input.focus();
-                                input.style.borderColor = '#f44336';
-                                setTimeout(() => {
-                                    input.style.borderColor = '#ddd';
-                                }, 3000);
-                            }
-                            return;
-                        }
-                    }
-
-                    // Show loading modal
-                    showPaymentVerificationModal('Verifying M-Pesa codes...');
-
-                    // Check if Database is available
-                    const useDatabase = localStorage.getItem('useDatabase') === 'true';
-
-                    // Track payment progress
-                    let totalPaid = 0;
-                    const paymentCodes = [];
-                    let remainingBalance = total;
-
-                    // Verify each M-Pesa code and track amounts
-                    for (let i = 0; i < allMpesaCodes.length; i++) {
-                        const codeInfo = allMpesaCodes[i];
-                        const validMpesaCode = codeInfo.code.toUpperCase().trim();
-                        const codeInput = document.getElementById(codeInfo.inputId);
-
-                        // Verify this M-Pesa code
-                        try {
-                            // For additional codes, verify against remaining balance
-                            const verifyAmount = (i === 0) ? total : remainingBalance;
-                            const verificationResult = await verifyMpesaCodeBeforePayment(validMpesaCode, verifyAmount, codeInput);
-
-                            if (!verificationResult.valid) {
-                                hidePaymentVerificationModal(); // Hide loading modal
-                                return; // Stop here - verification failed
-                            }
-
-                            // Get actual amount paid from this transaction
-                            let actualAmount = verificationResult.actualAmount || verifyAmount;
-
-                            // If it's a partial payment, use the actual amount
-                            if (verificationResult.reason === 'partial_payment') {
-                                actualAmount = verificationResult.actualAmount;
-                            }
-
-                            // Track this payment
-                            totalPaid += actualAmount;
-                            paymentCodes.push({ code: validMpesaCode, amount: actualAmount });
-                            remainingBalance = total - totalPaid;
-
-                            console.log(`💰 Payment ${i + 1}: Code ${validMpesaCode}, Amount: KSh ${actualAmount.toLocaleString('en-KE')}, Total Paid: KSh ${totalPaid.toLocaleString('en-KE')}, Remaining: KSh ${remainingBalance.toLocaleString('en-KE')}`);
-
-                            // If partial payment detected and this is the first code, show additional input
-                            if (verificationResult.reason === 'partial_payment' && i === 0 && remainingBalance > 0) {
-                                hidePaymentVerificationModal(); // Hide loading modal
-                                // Update payment progress
-                                partialPaymentState.paymentCodes = paymentCodes;
-                                updatePaymentProgress(total, totalPaid, remainingBalance);
-
-                                // Show additional M-Pesa code input
-                                const additionalIndex = allMpesaCodes.length; // Next index
-                                addAdditionalMpesaCodeInput(remainingBalance, additionalIndex);
-
-                                // Update payment amount in instructions
-                                const paymentAmountSpan = document.getElementById('paymentAmount');
-                                if (paymentAmountSpan) {
-                                    paymentAmountSpan.textContent = `KSh ${remainingBalance.toLocaleString('en-KE')}`;
-                                }
-
-                                showNotification(`Partial payment received: KSh ${actualAmount.toLocaleString('en-KE')}. Please enter M-Pesa code for remaining balance: KSh ${remainingBalance.toLocaleString('en-KE')}`, 'info');
-                                return; // Stop here, wait for additional code
-                            }
-
-                        } catch (verifyError) {
-                            console.error('Error verifying M-Pesa code:', verifyError);
-
-                            // Even if verification fails, check localStorage for duplicates
-                            const duplicateOrder = checkDuplicateMpesaCodeLocal(validMpesaCode);
-                            if (duplicateOrder) {
-                                const errorMessage = `⚠️ This M-Pesa code has already been used!\n\n` +
-                                    `Order ID: ${duplicateOrder.orderId || 'N/A'}\n` +
-                                    `Date: ${duplicateOrder.date || 'N/A'}\n` +
-                                    `Amount: KSh ${duplicateOrder.total?.toLocaleString('en-KE') || 'N/A'}\n\n` +
-                                    `Please enter the correct M-Pesa transaction code from your payment confirmation message.\n\n` +
-                                    `If you believe this is an error, please contact us:\n` +
-                                    `WhatsApp: +254 724 904 692`;
-                                hidePaymentVerificationModal(); // Hide loading modal
-                                alert(errorMessage);
-                                const codeInput = document.getElementById(codeInfo.inputId);
-                                if (codeInput) {
-                                    codeInput.focus();
-                                    codeInput.style.borderColor = '#f44336';
-                                }
-                                showNotification('M-Pesa code already used. Please check and try again.', 'error');
-                                return;
-                            }
-
-                            // CRITICAL SECURITY: Block payment if verification fails
-                            // Never allow payment without proper verification
-                            hidePaymentVerificationModal(); // Hide loading modal
-                            const errorMessage = `❌ M-Pesa Verification Failed!\n\n` +
-                                `Error: ${verifyError.message}\n\n` +
-                                `⚠️ SECURITY: Payment cannot be accepted without proper verification.\n\n` +
-                                `Please ensure:\n` +
-                                `1. You have a stable internet connection\n` +
-                                `2. You entered the correct M-Pesa transaction code\n` +
-                                `3. The transaction was completed recently (within 24 hours)\n\n` +
-                                `Please try again or contact us:\n` +
-                                `WhatsApp: +254 724 904 692`;
-                            alert(errorMessage);
-                            if (codeInput) {
-                                codeInput.focus();
-                                codeInput.style.borderColor = '#f44336';
-                            }
-                            showNotification('M-Pesa verification failed. Payment blocked for security.', 'error');
-                            return;
-                        }
-                    }
-
-                    // Check if full payment has been made
-                    if (remainingBalance > 0) {
-                        hidePaymentVerificationModal(); // Hide loading modal
-                        // Still need more payment - show additional input
-                        partialPaymentState.paymentCodes = paymentCodes;
-                        updatePaymentProgress(total, totalPaid, remainingBalance);
-
-                        const additionalIndex = allMpesaCodes.length;
-                        addAdditionalMpesaCodeInput(remainingBalance, additionalIndex);
-
-                        // Update payment amount in instructions
-                        const paymentAmountSpan = document.getElementById('paymentAmount');
-                        if (paymentAmountSpan) {
-                            paymentAmountSpan.textContent = `KSh ${remainingBalance.toLocaleString('en-KE')}`;
-                        }
-
-                        showNotification(`Payment incomplete. Amount paid: KSh ${totalPaid.toLocaleString('en-KE')}. Please enter M-Pesa code for remaining balance: KSh ${remainingBalance.toLocaleString('en-KE')}`, 'warning');
-                        return; // Stop here, wait for additional code
-                    }
-
-                    // Full payment received - proceed with order creation
-                    console.log('✅ Full payment received! Total paid: KSh', totalPaid.toLocaleString('en-KE'));
-                    hidePaymentVerificationModal(); // Hide loading modal - verification complete
-
-                    // Get delivery option text
-                    let deliveryOptionText = 'Shop Pickup';
-                    if (deliveryOption) {
-                        switch (deliveryOption.value) {
-                            case 'pickup':
-                                deliveryOptionText = 'Shop Pickup';
-                                break;
-                            case 'nairobi-cbd':
-                                deliveryOptionText = 'Delivery within Nairobi CBD (KSh 250)';
-                                break;
-                            case 'elsewhere':
-                                deliveryOptionText = 'Delivery Elsewhere (within Kenya) (KSh 300)';
-                                break;
-                        }
-                    }
-
-                    // CRITICAL: Final duplicate check before creating order (race condition protection)
-                    // Check all payment codes for duplicates
-                    for (const payment of paymentCodes) {
-                        const finalDuplicateCheck = checkDuplicateMpesaCodeLocal(payment.code);
-                        if (finalDuplicateCheck) {
-                            const errorMessage = `⚠️ M-Pesa code ${payment.code} has already been used!\n\n` +
-                                `Order ID: ${finalDuplicateCheck.orderId || 'N/A'}\n` +
-                                `Date: ${finalDuplicateCheck.date || 'N/A'}\n` +
-                                `Amount: KSh ${finalDuplicateCheck.total?.toLocaleString('en-KE') || 'N/A'}\n\n` +
-                                `Please enter the correct M-Pesa transaction code from your payment confirmation message.\n\n` +
-                                `If you believe this is an error, please contact us:\n` +
-                                `WhatsApp: +254 724 904 692`;
-                            alert(errorMessage);
-                            const codeInput = document.getElementById(allMpesaCodes.find(c => c.code === payment.code)?.inputId || 'mpesaCode');
-                            if (codeInput) {
-                                codeInput.focus();
-                                codeInput.style.borderColor = '#f44336';
-                            }
-                            showNotification('M-Pesa code already used. Please check and try again.', 'error');
-                            return; // Stop here - don't generate receipt
-                        }
-                    }
-
-                    // Combine all M-Pesa codes into a single string for the order
-                    const allMpesaCodesString = paymentCodes.map(p => `${p.code} (KSh ${p.amount.toLocaleString('en-KE')})`).join(', ');
-                    const primaryMpesaCode = paymentCodes[0]?.code || '';
-
-                    // Create order object
-                    const order = {
-                        orderId: 'ORD-' + Date.now(),
-                        date: new Date().toLocaleString('en-KE'),
-                        customer: {
-                            name: customerName,
-                            phone: customerPhone,
-                            email: customerEmail
-                        },
-                        items: cart.map(item => {
-                            // Find the product to get the image
-                            const product = products.find(p => p.id === item.id);
-                            return {
-                                name: item.name,
-                                quantity: item.quantity,
-                                price: item.price,
-                                subtotal: item.price * item.quantity,
-                                productId: item.id || '',
-                                image: product?.image || item.image || '' // Include image in order items
-                            };
-                        }),
-                        subtotal: subtotal,
-                        delivery: {
-                            option: deliveryOption ? deliveryOption.value : 'pickup',
-                            optionText: deliveryOptionText,
-                            cost: deliveryCost,
-                            address: deliveryAddress || ''
-                        },
-                        total: total,
-                        totalPaid: totalPaid, // Track total paid (may differ from total if overpaid)
-                        paymentMethod: 'M-Pesa Till (177104)',
-                        mpesaCode: primaryMpesaCode, // Primary code for backward compatibility
-                        mpesaCodes: paymentCodes, // All payment codes with amounts
-                        mpesaCodesString: allMpesaCodesString // Human-readable string
-                    };
-
-                    // CRITICAL: Save order to localStorage FIRST (prevents duplicates immediately)
-                    saveOrderToLocalStorage(order);
-                    console.log('✅ Order saved to localStorage (prevents duplicate M-Pesa codes)');
-
-                    // Save order to Database if available
-                    if (useDatabase) {
-                        try {
-                            await apiService.createOrder(order);
-                            console.log('✅ Order saved to Database');
-                        } catch (orderError) {
-                            console.error('❌ Error saving order:', orderError);
-
-                            // Helper function to cleanup localStorage
-                            const cleanupLocalStorage = () => {
-                                try {
-                                    const ordersJson = localStorage.getItem('orders');
-                                    if (ordersJson) {
-                                        let orders = JSON.parse(ordersJson);
-                                        orders = orders.filter(o => o.orderId !== order.orderId);
-                                        localStorage.setItem('orders', JSON.stringify(orders));
-
-                                        // Remove all payment codes from used codes
-                                        const usedCodesJson = localStorage.getItem('usedMpesaCodes');
-                                        if (usedCodesJson) {
-                                            let usedCodes = JSON.parse(usedCodesJson);
-                                            paymentCodes.forEach(payment => {
-                                                usedCodes = usedCodes.filter(c => c !== payment.code);
-                                            });
-                                            localStorage.setItem('usedMpesaCodes', JSON.stringify(usedCodes));
-                                        }
-                                    }
-                                } catch (cleanupError) {
-                                    console.error('Error cleaning up localStorage:', cleanupError);
-                                }
-                            };
-
-                            // CRITICAL: Check if it's an amount mismatch error
-                            if (orderError.message && (orderError.message.includes('Amount mismatch') || orderError.message.includes('amount mismatch'))) {
-                                cleanupLocalStorage();
-
-                                // Parse error message to get amounts
-                                let errorMessage = `❌ M-Pesa Transaction Amount Mismatch!\n\n`;
-                                try {
-                                    // Try to extract amounts from error message
-                                    const amountMatch = orderError.message.match(/Expected: KSh ([\d,]+).*Found: KSh ([\d,]+)/);
-                                    if (amountMatch) {
-                                        errorMessage += `Expected Amount: KSh ${amountMatch[1]}\n`;
-                                        errorMessage += `Transaction Amount: KSh ${amountMatch[2]}\n\n`;
-                                    } else {
-                                        errorMessage += orderError.message + '\n\n';
-                                    }
-                                } catch (parseError) {
-                                    errorMessage += orderError.message + '\n\n';
-                                }
-
-                                errorMessage += `The M-Pesa transaction amount does not match your order total.\n\n` +
-                                    `Please verify:\n` +
-                                    `1. You entered the correct M-Pesa transaction code\n` +
-                                    `2. You paid the correct amount (KSh ${total.toLocaleString('en-KE')})\n` +
-                                    `3. You selected the correct delivery option\n\n` +
-                                    `If you believe this is an error, please contact us:\n` +
-                                    `WhatsApp: +254 724 904 692`;
-                                alert(errorMessage);
-                                if (mpesaCodeInput) {
-                                    mpesaCodeInput.focus();
-                                    mpesaCodeInput.style.borderColor = '#f44336';
-                                }
-                                showNotification('M-Pesa transaction amount mismatch. Payment blocked.', 'error');
-                                return; // Stop here - don't generate receipt
-                            }
-
-                            // Check if it's a date mismatch error
-                            if (orderError.message && (orderError.message.includes('Date mismatch') || orderError.message.includes('date mismatch'))) {
-                                cleanupLocalStorage();
-
-                                const errorMessage = `❌ M-Pesa Transaction Date Invalid!\n\n` +
-                                    `The M-Pesa transaction date is outside the valid range (24 hours).\n\n` +
-                                    `${orderError.message}\n\n` +
-                                    `Please ensure you are using a recent transaction code from your M-Pesa confirmation message.\n\n` +
-                                    `If you believe this is an error, please contact us:\n` +
-                                    `WhatsApp: +254 724 904 692`;
-                                alert(errorMessage);
-                                if (mpesaCodeInput) {
-                                    mpesaCodeInput.focus();
-                                    mpesaCodeInput.style.borderColor = '#f44336';
-                                }
-                                showNotification('M-Pesa transaction date invalid. Payment blocked.', 'error');
-                                return; // Stop here - don't generate receipt
-                            }
-
-                            // CRITICAL SECURITY: Check if transaction not found error
-                            if (orderError.message && (orderError.message.includes('Transaction not found') || orderError.message.includes('transaction not found') || orderError.message.includes('not found in database'))) {
-                                cleanupLocalStorage();
-
-                                const errorMessage = `❌ M-Pesa Transaction Not Verified!\n\n` +
-                                    `${orderError.message}\n\n` +
-                                    `⚠️ SECURITY: Payment cannot be accepted until the transaction is verified through M-Pesa API.\n\n` +
-                                    `Please ensure:\n` +
-                                    `1. You completed the M-Pesa payment successfully\n` +
-                                    `2. You entered the correct M-Pesa transaction code\n` +
-                                    `3. You wait a few moments for the transaction to be received via webhook\n` +
-                                    `4. You try again after the transaction has been processed\n\n` +
-                                    `If you continue to have issues, please contact us:\n` +
-                                    `WhatsApp: +254 724 904 692\n\n` +
-                                    `This security measure prevents fake or guessed transaction codes from being accepted.`;
-                                alert(errorMessage);
-                                if (mpesaCodeInput) {
-                                    mpesaCodeInput.focus();
-                                    mpesaCodeInput.style.borderColor = '#f44336';
-                                }
-                                showNotification('Transaction not verified. Payment blocked for security.', 'error');
-                                return; // Stop here - don't generate receipt
-                            }
-
-                            // Check if it's a duplicate code error
-                            if (orderError.message && (orderError.message.includes('Duplicate') || orderError.message.includes('already been used'))) {
-                                cleanupLocalStorage();
-
-                                const errorMessage = `⚠️ This M-Pesa code has already been used in Database!\n\n` +
-                                    `Please enter the correct M-Pesa transaction code from your payment confirmation message.\n\n` +
-                                    `If you believe this is an error, please contact us:\n` +
-                                    `WhatsApp: +254 724 904 692`;
-                                alert(errorMessage);
-                                if (mpesaCodeInput) {
-                                    mpesaCodeInput.focus();
-                                    mpesaCodeInput.style.borderColor = '#f44336';
-                                }
-                                showNotification('M-Pesa code already used. Please check and try again.', 'error');
-                                return; // Stop here - don't generate receipt
-                            }
-
-                            // Check if it's a verification error
-                            if (orderError.message && (orderError.message.includes('Verification error') || orderError.message.includes('verification error'))) {
-                                cleanupLocalStorage();
-
-                                const errorMessage = `❌ M-Pesa Verification Error!\n\n` +
-                                    `${orderError.message}\n\n` +
-                                    `Payment cannot be accepted until verification is successful.\n\n` +
-                                    `Please try again or contact us:\n` +
-                                    `WhatsApp: +254 724 904 692`;
-                                alert(errorMessage);
-                                if (mpesaCodeInput) {
-                                    mpesaCodeInput.focus();
-                                    mpesaCodeInput.style.borderColor = '#f44336';
-                                }
-                                showNotification('Verification error. Payment blocked. Please try again.', 'error');
-                                return; // Stop here - don't generate receipt
-                            }
-
-                            // For other errors, show warning but continue (order is already saved to localStorage)
-                            console.warn('⚠️ Order save to Database failed, but order is saved to localStorage');
-                            showNotification('Order saved locally. Database save failed. Please contact support if needed.', 'warning');
-                        }
-                    }
-
-                    // Subtract quantity from products when payment is completed
-                    cart.forEach(cartItem => {
-                        const product = products.find(p => p.id === cartItem.id);
-                        if (product) {
-                            const currentQuantity = product.quantity || 0;
-                            const purchasedQuantity = cartItem.quantity;
-                            product.quantity = Math.max(0, currentQuantity - purchasedQuantity);
-                        }
-                    });
-
-                    // Save updated products
-                    try {
-                        await saveProducts();
-                    } catch (saveError) {
-                        console.error('❌ Error saving products:', saveError);
-                        // Continue even if save fails
-                    }
-
-                    // Refresh product display to show updated quantities
-                    try {
-                        displayProducts(currentCategory);
-                    } catch (displayError) {
-                        console.error('❌ Error displaying products:', displayError);
-                        // Continue even if display fails
-                    }
-
-                    // Store order
-                    currentOrder = order;
-
-                    // Close payment modal silently
-                    closePaymentModal();
-
-                    // Automatically send receipt to WhatsApp via backend (no notification on website)
-                    try {
-                        // Generate PDF first (await to ensure it's ready)
-                        if (!currentOrderPDF) {
-                            await generateReceiptPDF(order);
-                        }
-
-                        // Send receipt to WhatsApp via backend API (automatic) - WITH PDF
-                        const useDatabase = localStorage.getItem('useDatabase') === 'true';
-                        if (useDatabase) {
-                            try {
-                                // Call backend to send receipt to WhatsApp (including PDF)
-                                await apiService.sendReceiptToWhatsApp(order, currentOrderPDF);
-                                console.log('✅ Receipt and PDF sent to WhatsApp via backend');
-                            } catch (backendError) {
-                                console.error('❌ Backend WhatsApp send failed, trying frontend method:', backendError);
-                                // Fallback to frontend method (opens WhatsApp with pre-filled message)
-                                sendReceiptViaWhatsAppSilent();
-                            }
-                        } else {
-                            // If Database not available, use frontend method
-                            sendReceiptViaWhatsAppSilent();
-                        }
-                    } catch (whatsappError) {
-                        console.error('❌ Error sending receipt to WhatsApp:', whatsappError);
-                        // Don't show error to user - fail silently
-                    }
-
-                    openReceiptModal(); // Show receipt modal
-                    clearCart(); // Clear cart after successful payment
-                }
-            } catch (error) {
-                console.error('Error processing payment:', error);
-                hidePaymentVerificationModal();
-                alert('An unexpected error occurred. Please try again.');
-                showNotification('Payment process error.', 'error');
+                return;
             }
         }
 
+        // Show loading modal
+        showPaymentVerificationModal();
+
+        // Check if Database is available
+        const useDatabase = localStorage.getItem('useDatabase') === 'true';
+
+        // Track payment progress
+        let totalPaid = 0;
+        const paymentCodes = [];
+        let remainingBalance = total;
+
+        // Verify each M-Pesa code and track amounts
+        for (let i = 0; i < allMpesaCodes.length; i++) {
+            const codeInfo = allMpesaCodes[i];
+            const validMpesaCode = codeInfo.code.toUpperCase().trim();
+            const codeInput = document.getElementById(codeInfo.inputId);
+
+            // Verify this M-Pesa code
+            try {
+                // For additional codes, verify against remaining balance
+                const verifyAmount = (i === 0) ? total : remainingBalance;
+                const verificationResult = await verifyMpesaCodeBeforePayment(validMpesaCode, verifyAmount, codeInput);
+
+                if (!verificationResult.valid) {
+                    hidePaymentVerificationModal(); // Hide loading modal
+                    return; // Stop here - verification failed
+                }
+
+                // Get actual amount paid from this transaction
+                let actualAmount = verificationResult.actualAmount || verifyAmount;
+
+                // If it's a partial payment, use the actual amount
+                if (verificationResult.reason === 'partial_payment') {
+                    actualAmount = verificationResult.actualAmount;
+                }
+
+                // Track this payment
+                totalPaid += actualAmount;
+                paymentCodes.push({ code: validMpesaCode, amount: actualAmount });
+                remainingBalance = total - totalPaid;
+
+                console.log(`💰 Payment ${i + 1}: Code ${validMpesaCode}, Amount: KSh ${actualAmount.toLocaleString('en-KE')}, Total Paid: KSh ${totalPaid.toLocaleString('en-KE')}, Remaining: KSh ${remainingBalance.toLocaleString('en-KE')}`);
+
+                // If partial payment detected and this is the first code, show additional input
+                if (verificationResult.reason === 'partial_payment' && i === 0 && remainingBalance > 0) {
+                    hidePaymentVerificationModal(); // Hide loading modal
+                    // Update payment progress
+                    partialPaymentState.paymentCodes = paymentCodes;
+                    updatePaymentProgress(total, totalPaid, remainingBalance);
+
+                    // Show additional M-Pesa code input
+                    const additionalIndex = allMpesaCodes.length; // Next index
+                    addAdditionalMpesaCodeInput(remainingBalance, additionalIndex);
+
+                    // Update payment amount in instructions
+                    const paymentAmountSpan = document.getElementById('paymentAmount');
+                    if (paymentAmountSpan) {
+                        paymentAmountSpan.textContent = `KSh ${remainingBalance.toLocaleString('en-KE')}`;
+                    }
+
+                    showNotification(`Partial payment received: KSh ${actualAmount.toLocaleString('en-KE')}. Please enter M-Pesa code for remaining balance: KSh ${remainingBalance.toLocaleString('en-KE')}`, 'info');
+                    return; // Stop here, wait for additional code
+                }
+
+            } catch (verifyError) {
+                console.error('Error verifying M-Pesa code:', verifyError);
+
+                // Even if verification fails, check localStorage for duplicates
+                const duplicateOrder = checkDuplicateMpesaCodeLocal(validMpesaCode);
+                if (duplicateOrder) {
+                    const errorMessage = `⚠️ This M-Pesa code has already been used!\n\n` +
+                        `Order ID: ${duplicateOrder.orderId || 'N/A'}\n` +
+                        `Date: ${duplicateOrder.date || 'N/A'}\n` +
+                        `Amount: KSh ${duplicateOrder.total?.toLocaleString('en-KE') || 'N/A'}\n\n` +
+                        `Please enter the correct M-Pesa transaction code from your payment confirmation message.\n\n` +
+                        `If you believe this is an error, please contact us:\n` +
+                        `WhatsApp: +254 724 904 692`;
+                    hidePaymentVerificationModal(); // Hide loading modal
+                    alert(errorMessage);
+                    if (codeInput) {
+                        codeInput.focus();
+                        codeInput.style.borderColor = '#f44336';
+                    }
+                    showNotification('M-Pesa code already used. Please check and try again.', 'error');
+                    return;
+                }
+
+                // CRITICAL SECURITY: Block payment if verification fails
+                // Never allow payment without proper verification
+                hidePaymentVerificationModal(); // Hide loading modal
+                const errorMessage = `❌ M-Pesa Verification Failed!\n\n` +
+                    `Error: ${verifyError.message}\n\n` +
+                    `⚠️ SECURITY: Payment cannot be accepted without proper verification.\n\n` +
+                    `Please ensure:\n` +
+                    `1. You have a stable internet connection\n` +
+                    `2. You entered the correct M-Pesa transaction code\n` +
+                    `3. The transaction was completed recently (within 24 hours)\n\n` +
+                    `Please try again or contact us:\n` +
+                    `WhatsApp: +254 724 904 692`;
+                alert(errorMessage);
+                if (codeInput) {
+                    codeInput.focus();
+                    codeInput.style.borderColor = '#f44336';
+                }
+                showNotification('M-Pesa verification failed. Payment blocked for security.', 'error');
+                return;
+            }
+        }
+
+        // Check if full payment has been made
+        if (remainingBalance > 0) {
+            hidePaymentVerificationModal(); // Hide loading modal
+            // Still need more payment - show additional input
+            partialPaymentState.paymentCodes = paymentCodes;
+            updatePaymentProgress(total, totalPaid, remainingBalance);
+
+            const additionalIndex = allMpesaCodes.length;
+            addAdditionalMpesaCodeInput(remainingBalance, additionalIndex);
+
+            // Update payment amount in instructions
+            const paymentAmountSpan = document.getElementById('paymentAmount');
+            if (paymentAmountSpan) {
+                paymentAmountSpan.textContent = `KSh ${remainingBalance.toLocaleString('en-KE')}`;
+            }
+
+            showNotification(`Payment incomplete. Amount paid: KSh ${totalPaid.toLocaleString('en-KE')}. Please enter M-Pesa code for remaining balance: KSh ${remainingBalance.toLocaleString('en-KE')}`, 'warning');
+            return; // Stop here, wait for additional code
+        }
+
+        // Full payment received - proceed with order creation
+        console.log('✅ Full payment received! Total paid: KSh', totalPaid.toLocaleString('en-KE'));
+        hidePaymentVerificationModal(); // Hide loading modal - verification complete
+
+        // Get delivery option text
+        let deliveryOptionText = 'Shop Pickup';
+        if (deliveryOption) {
+            switch (deliveryOption.value) {
+                case 'pickup':
+                    deliveryOptionText = 'Shop Pickup';
+                    break;
+                case 'nairobi-cbd':
+                    deliveryOptionText = 'Delivery within Nairobi CBD (KSh 250)';
+                    break;
+                case 'elsewhere':
+                    deliveryOptionText = 'Delivery Elsewhere (within Kenya) (KSh 300)';
+                    break;
+            }
+        }
+
+        // CRITICAL: Final duplicate check before creating order (race condition protection)
+        // Check all payment codes for duplicates
+        for (const payment of paymentCodes) {
+            const finalDuplicateCheck = checkDuplicateMpesaCodeLocal(payment.code);
+            if (finalDuplicateCheck) {
+                const errorMessage = `⚠️ M-Pesa code ${payment.code} has already been used!\n\n` +
+                    `Order ID: ${finalDuplicateCheck.orderId || 'N/A'}\n` +
+                    `Date: ${finalDuplicateCheck.date || 'N/A'}\n` +
+                    `Amount: KSh ${finalDuplicateCheck.total?.toLocaleString('en-KE') || 'N/A'}\n\n` +
+                    `Please enter the correct M-Pesa transaction code from your payment confirmation message.\n\n` +
+                    `If you believe this is an error, please contact us:\n` +
+                    `WhatsApp: +254 724 904 692`;
+                alert(errorMessage);
+                const codeInput = document.getElementById(allMpesaCodes.find(c => c.code === payment.code)?.inputId || 'mpesaCode');
+                if (codeInput) {
+                    codeInput.focus();
+                    codeInput.style.borderColor = '#f44336';
+                }
+                showNotification('M-Pesa code already used. Please check and try again.', 'error');
+                return; // Stop here - don't generate receipt
+            }
+        }
+
+        // Combine all M-Pesa codes into a single string for the order
+        const allMpesaCodesString = paymentCodes.map(p => `${p.code} (KSh ${p.amount.toLocaleString('en-KE')})`).join(', ');
+        const primaryMpesaCode = paymentCodes[0]?.code || '';
+
+        // Create order object
+        const order = {
+            orderId: 'ORD-' + Date.now(),
+            date: new Date().toLocaleString('en-KE'),
+            customer: {
+                name: customerName,
+                phone: customerPhone,
+                email: customerEmail
+            },
+            items: cart.map(item => {
+                // Find the product to get the image
+                const product = products.find(p => p.id === item.id);
+                return {
+                    name: item.name,
+                    quantity: item.quantity,
+                    price: item.price,
+                    subtotal: item.price * item.quantity,
+                    productId: item.id || '',
+                    image: product?.image || item.image || '' // Include image in order items
+                };
+            }),
+            subtotal: subtotal,
+            delivery: {
+                option: deliveryOption ? deliveryOption.value : 'pickup',
+                optionText: deliveryOptionText,
+                cost: deliveryCost,
+                address: deliveryAddress || ''
+            },
+            total: total,
+            totalPaid: totalPaid, // Track total paid (may differ from total if overpaid)
+            paymentMethod: 'M-Pesa Till (177104)',
+            mpesaCode: primaryMpesaCode, // Primary code for backward compatibility
+            mpesaCodes: paymentCodes, // All payment codes with amounts
+            mpesaCodesString: allMpesaCodesString // Human-readable string
+        };
+
+        // CRITICAL: Save order to localStorage FIRST (prevents duplicates immediately)
+        saveOrderToLocalStorage(order);
+        console.log('✅ Order saved to localStorage (prevents duplicate M-Pesa codes)');
+
+        // Save order to Database if available
+        if (useDatabase) {
+            try {
+                await apiService.createOrder(order);
+                console.log('✅ Order saved to Database');
+            } catch (orderError) {
+                console.error('❌ Error saving order:', orderError);
+
+                // Helper function to cleanup localStorage
+                const cleanupLocalStorage = () => {
+                    try {
+                        const ordersJson = localStorage.getItem('orders');
+                        if (ordersJson) {
+                            let orders = JSON.parse(ordersJson);
+                            orders = orders.filter(o => o.orderId !== order.orderId);
+                            localStorage.setItem('orders', JSON.stringify(orders));
+
+                            // Remove all payment codes from used codes
+                            const usedCodesJson = localStorage.getItem('usedMpesaCodes');
+                            if (usedCodesJson) {
+                                let usedCodes = JSON.parse(usedCodesJson);
+                                paymentCodes.forEach(payment => {
+                                    usedCodes = usedCodes.filter(c => c !== payment.code);
+                                });
+                                localStorage.setItem('usedMpesaCodes', JSON.stringify(usedCodes));
+                            }
+                        }
+                    } catch (cleanupError) {
+                        console.error('Error cleaning up localStorage:', cleanupError);
+                    }
+                };
+
+                // CRITICAL: Check if it's an amount mismatch error
+                if (orderError.message && (orderError.message.includes('Amount mismatch') || orderError.message.includes('amount mismatch'))) {
+                    cleanupLocalStorage();
+
+                    // Parse error message to get amounts
+                    let errorMessage = `❌ M-Pesa Transaction Amount Mismatch!\n\n`;
+                    try {
+                        // Try to extract amounts from error message
+                        const amountMatch = orderError.message.match(/Expected: KSh ([\d,]+).*Found: KSh ([\d,]+)/);
+                        if (amountMatch) {
+                            errorMessage += `Expected Amount: KSh ${amountMatch[1]}\n`;
+                            errorMessage += `Transaction Amount: KSh ${amountMatch[2]}\n\n`;
+                        } else {
+                            errorMessage += orderError.message + '\n\n';
+                        }
+                    } catch (parseError) {
+                        errorMessage += orderError.message + '\n\n';
+                    }
+
+                    errorMessage += `The M-Pesa transaction amount does not match your order total.\n\n` +
+                        `Please verify:\n` +
+                        `1. You entered the correct M-Pesa transaction code\n` +
+                        `2. You paid the correct amount (KSh ${total.toLocaleString('en-KE')})\n` +
+                        `3. You selected the correct delivery option\n\n` +
+                        `If you believe this is an error, please contact us:\n` +
+                        `WhatsApp: +254 724 904 692`;
+                    alert(errorMessage);
+                    if (mpesaCodeInput) {
+                        mpesaCodeInput.focus();
+                        mpesaCodeInput.style.borderColor = '#f44336';
+                    }
+                    showNotification('M-Pesa transaction amount mismatch. Payment blocked.', 'error');
+                    return; // Stop here - don't generate receipt
+                }
+
+                // Check if it's a date mismatch error
+                if (orderError.message && (orderError.message.includes('Date mismatch') || orderError.message.includes('date mismatch'))) {
+                    cleanupLocalStorage();
+
+                    const errorMessage = `❌ M-Pesa Transaction Date Invalid!\n\n` +
+                        `The M-Pesa transaction date is outside the valid range (24 hours).\n\n` +
+                        `${orderError.message}\n\n` +
+                        `Please ensure you are using a recent transaction code from your M-Pesa confirmation message.\n\n` +
+                        `If you believe this is an error, please contact us:\n` +
+                        `WhatsApp: +254 724 904 692`;
+                    alert(errorMessage);
+                    if (mpesaCodeInput) {
+                        mpesaCodeInput.focus();
+                        mpesaCodeInput.style.borderColor = '#f44336';
+                    }
+                    showNotification('M-Pesa transaction date invalid. Payment blocked.', 'error');
+                    return; // Stop here - don't generate receipt
+                }
+
+                // CRITICAL SECURITY: Check if transaction not found error
+                if (orderError.message && (orderError.message.includes('Transaction not found') || orderError.message.includes('transaction not found') || orderError.message.includes('not found in database'))) {
+                    cleanupLocalStorage();
+
+                    const errorMessage = `❌ M-Pesa Transaction Not Verified!\n\n` +
+                        `${orderError.message}\n\n` +
+                        `⚠️ SECURITY: Payment cannot be accepted until the transaction is verified through M-Pesa API.\n\n` +
+                        `Please ensure:\n` +
+                        `1. You completed the M-Pesa payment successfully\n` +
+                        `2. You entered the correct M-Pesa transaction code\n` +
+                        `3. You wait a few moments for the transaction to be received via webhook\n` +
+                        `4. You try again after the transaction has been processed\n\n` +
+                        `If you continue to have issues, please contact us:\n` +
+                        `WhatsApp: +254 724 904 692\n\n` +
+                        `This security measure prevents fake or guessed transaction codes from being accepted.`;
+                    alert(errorMessage);
+                    if (mpesaCodeInput) {
+                        mpesaCodeInput.focus();
+                        mpesaCodeInput.style.borderColor = '#f44336';
+                    }
+                    showNotification('Transaction not verified. Payment blocked for security.', 'error');
+                    return; // Stop here - don't generate receipt
+                }
+
+                // Check if it's a duplicate code error
+                if (orderError.message && (orderError.message.includes('Duplicate') || orderError.message.includes('already been used'))) {
+                    cleanupLocalStorage();
+
+                    const errorMessage = `⚠️ This M-Pesa code has already been used in Database!\n\n` +
+                        `Please enter the correct M-Pesa transaction code from your payment confirmation message.\n\n` +
+                        `If you believe this is an error, please contact us:\n` +
+                        `WhatsApp: +254 724 904 692`;
+                    alert(errorMessage);
+                    if (mpesaCodeInput) {
+                        mpesaCodeInput.focus();
+                        mpesaCodeInput.style.borderColor = '#f44336';
+                    }
+                    showNotification('M-Pesa code already used. Please check and try again.', 'error');
+                    return; // Stop here - don't generate receipt
+                }
+
+                // Check if it's a verification error
+                if (orderError.message && (orderError.message.includes('Verification error') || orderError.message.includes('verification error'))) {
+                    cleanupLocalStorage();
+
+                    const errorMessage = `❌ M-Pesa Verification Error!\n\n` +
+                        `${orderError.message}\n\n` +
+                        `Payment cannot be accepted until verification is successful.\n\n` +
+                        `Please try again or contact us:\n` +
+                        `WhatsApp: +254 724 904 692`;
+                    alert(errorMessage);
+                    if (mpesaCodeInput) {
+                        mpesaCodeInput.focus();
+                        mpesaCodeInput.style.borderColor = '#f44336';
+                    }
+                    showNotification('Verification error. Payment blocked. Please try again.', 'error');
+                    return; // Stop here - don't generate receipt
+                }
+
+                // For other errors, show warning but continue (order is already saved to localStorage)
+                console.warn('⚠️ Order save to Database failed, but order is saved to localStorage');
+                showNotification('Order saved locally. Database save failed. Please contact support if needed.', 'warning');
+            }
+        }
+
+        // Subtract quantity from products when payment is completed
+        cart.forEach(cartItem => {
+            const product = products.find(p => p.id === cartItem.id);
+            if (product) {
+                const currentQuantity = product.quantity || 0;
+                const purchasedQuantity = cartItem.quantity;
+                product.quantity = Math.max(0, currentQuantity - purchasedQuantity);
+            }
+        });
+
+        // Save updated products
+        try {
+            await saveProducts();
+        } catch (saveError) {
+            console.error('❌ Error saving products:', saveError);
+            // Continue even if save fails
+        }
 
         // Refresh product display to show updated quantities
         try {
