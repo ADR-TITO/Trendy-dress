@@ -3549,9 +3549,9 @@ window.completeTillPayment = completeTillPayment;
 
 // Process Payment
 async function processPayment(event) {
+    try {
     event.preventDefault();
 
-    try {
         // Check if cart is empty
         if (!cart || cart.length === 0) {
             alert('Your cart is empty. Please add items to cart before proceeding to payment.');
@@ -4050,9 +4050,9 @@ async function processPayment(event) {
         } catch (whatsappError) {
             console.error('❌ Error sending receipt to WhatsApp:', whatsappError);
             // Don't show error to user - fail silently
-            }
+        }
         
-            try {
+        try {
             // Clear cart
             cart = [];
             updateCartUI();
@@ -4063,6 +4063,7 @@ async function processPayment(event) {
             console.error('❌ Error clearing cart:', clearCartError);
             // Continue execution even if cart clear fails, as payment was successful
         }
+
     } catch (error) { // This is the correct catch block for the entire function
         hidePaymentVerificationModal();
         console.error('❌ Error processing payment:', error);
@@ -7914,5 +7915,6 @@ async function refreshProducts() {
             refreshBtn.innerHTML = originalContent;
         }
     }
+} // Closing brace for refreshProducts function
 // Expose to global scope
 window.refreshProducts = refreshProducts;
