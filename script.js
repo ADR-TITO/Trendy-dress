@@ -4062,8 +4062,8 @@ async function processPayment(event) {
             console.error('❌ Error clearing cart:', clearCartError);
             // Continue execution even if cart clear fails, as payment was successful
         }
-
-    } catch (error) { // This is the correct catch block for the entire function
+    } // This brace closes the 'else' block for the 'till' payment method.
+    catch (error) { // This is the correct catch block for the entire function
         hidePaymentVerificationModal();
         console.error('❌ Error processing payment:', error);
         alert('An error occurred while processing your payment. Please try again or contact support.\n\nError: ' + error.message);
