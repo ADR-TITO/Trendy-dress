@@ -4058,9 +4058,12 @@ async function processPayment(event) {
             // No notification shown - receipt is sent to WhatsApp automatically
         } catch (error) {        // Hide loading modal in case of any unexpected error
                         
-            hidePaymentVerificationModal();
-                        
-            console.error('❌ Error processing payment:', error);        alert('An error occurred while processing your payment. Please try again or contact support.\n\nError: ' + error.message);
+            // This was the start of the misplaced catch block. The logic is now inside the main catch.
+        }
+    } catch (error) { // This is the correct catch block for the entire function
+        hidePaymentVerificationModal();
+        console.error('❌ Error processing payment:', error);
+        alert('An error occurred while processing your payment. Please try again or contact support.\n\nError: ' + error.message);
         showNotification('Payment processing failed. Please try again.', 'error');
     }
 }
