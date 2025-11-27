@@ -3624,9 +3624,8 @@ async function processPayment(event) {
                 }
             }
 
-
-        // Show loading modal
-        showPaymentVerificationModal();
+            // Show loading modal
+            showPaymentVerificationModal();
 
         // Check if Database is available
         const useDatabase = localStorage.getItem('useDatabase') === 'true';
