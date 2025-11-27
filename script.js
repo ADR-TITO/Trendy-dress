@@ -2009,15 +2009,7 @@ function addToCart(productId) {
             cartItemId: cartItemId // Unique identifier for this item in cart
         });
     }
-            id: product.id,
-            name: product.name,
-            price: finalPrice, // Use final price after discount
-            size: product.size,
-            image: product.image,
-            quantity: 1,
-            cartItemId: cartItemId // Unique identifier for grouped products
-        });
-    }
+
 
     updateCartUI();
     saveCart();
@@ -7923,6 +7915,8 @@ async function refreshProducts() {
         }
     }
 }
+
+});
 
 // Expose to global scope
 window.refreshProducts = refreshProducts;
