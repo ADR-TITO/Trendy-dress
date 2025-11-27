@@ -4059,9 +4059,6 @@ async function processPayment(event) {
             saveCart();
             toggleCart();
             // No notification shown - receipt is sent to WhatsApp automatically
-        } catch (error) {        // Hide loading modal in case of any unexpected error
-                        
-            // This was the start of the misplaced catch block. The logic is now inside the main catch.
         }
     } catch (error) { // This is the correct catch block for the entire function
         hidePaymentVerificationModal();
@@ -7914,9 +7911,5 @@ async function refreshProducts() {
             refreshBtn.innerHTML = originalContent;
         }
     }
-}
-
-});
-
 // Expose to global scope
 window.refreshProducts = refreshProducts;
