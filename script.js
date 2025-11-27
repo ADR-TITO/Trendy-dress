@@ -2000,6 +2000,17 @@ function addToCart(productId) {
         cart.push({
             id: product.id,
             name: product.name,
+            image: product.image,
+            price: finalPrice, // Use final price after discount
+            originalPrice: product.price, // Store original price for display
+            discount: product.discount,
+            size: product.size,
+            quantity: 1,
+            cartItemId: cartItemId // Unique identifier for this item in cart
+        });
+    }
+            id: product.id,
+            name: product.name,
             price: finalPrice, // Use final price after discount
             size: product.size,
             image: product.image,
