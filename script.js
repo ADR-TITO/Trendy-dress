@@ -4164,6 +4164,48 @@ async function processSTKPushPayment(customerName, customerPhone, customerEmail,
             return;
         }
 
+        // Create and save the order *before* initiating STK Push
+        // This ensures the order exists in the database for the backend to retrieve the amount
+        const order = {
+            orderId: orderId,
+            date: new Date().toLocaleString('en-KE'),
+            customer: { name: customerName, phone: customerPhone, email: customerEmail },
+            items: cart.map(item => {
+                const product = products.find(p => p.id === item.id);
+                return {
+                    name: item.name,
+                    quantity: item.quantity,
+                    price: item.price,
+                    subtotal: item.price * item.quantity,
+                    productId: item.id || '',
+                    image: product?.image || item.image || ''
+                };
+            }),
+            subtotal: subtotal,
+            delivery: {
+                option: deliveryOption ? deliveryOption.value : 'pickup',
+                optionText: deliveryOptionText,
+                cost: deliveryCost,
+                address: deliveryAddress || ''
+            },
+            total: total,
+            totalPaid: 0,
+            paymentMethod: 'M-Pesa STK Push',
+            mpesaCode: 'PENDING_STK',
+            paymentStatus: 'pending' // Add paymentStatus
+        };
+
+        try {
+            console.log('💾 Saving order to database before initiating STK Push...');
+            await apiService.createOrder(order);
+            console.log(`✅ Order ${orderId} saved successfully.`);
+        } catch (orderError) {
+            hidePaymentVerificationModal();
+            console.error('❌ Failed to create order before STK Push:', orderError);
+            alert(`Failed to create your order in the system before payment.\n\nError: ${orderError.message}\n\nPlease try again.`);
+            return;
+        }
+
         // Initiate STK Push
         console.log('📱 Initiating STK Push payment...');
         console.log('📞 Phone number:', formattedPhone.replace(/(\d{3})(\d{3})(\d{3})/, '$1***$3')); // Mask middle digits for privacy
