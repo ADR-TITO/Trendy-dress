@@ -11,7 +11,7 @@ async function detectBackendPort() {
         // Production: Try different possible paths
         // Option 1: /backend-php/api (most common for cPanel)
         // Option 2: /api (if configured in root)
-        const possiblePaths = ['/backend-php/api', '/api'];
+        const possiblePaths = ['/backend-php/api'];
 
         for (const path of possiblePaths) {
             try {

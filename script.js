@@ -3550,7 +3550,7 @@ window.completeTillPayment = completeTillPayment;
 // Process Payment
 async function processPayment(event) {
     try {
-    event.preventDefault();
+        event.preventDefault();
 
         // Check if cart is empty
         if (!cart || cart.length === 0) {
@@ -3627,442 +3627,443 @@ async function processPayment(event) {
             // Show loading modal
             showPaymentVerificationModal();
 
-        // Check if Database is available
-        const useDatabase = localStorage.getItem('useDatabase') === 'true';
+            // Check if Database is available
+            const useDatabase = localStorage.getItem('useDatabase') === 'true';
 
-        // Track payment progress
-        let totalPaid = 0;
-        const paymentCodes = [];
-        let remainingBalance = total;
+            // Track payment progress
+            let totalPaid = 0;
+            const paymentCodes = [];
+            let remainingBalance = total;
 
-        // Verify each M-Pesa code and track amounts
-        for (let i = 0; i < allMpesaCodes.length; i++) {
-            const codeInfo = allMpesaCodes[i];
-            const validMpesaCode = codeInfo.code.toUpperCase().trim();
-            const codeInput = document.getElementById(codeInfo.inputId);
+            // Verify each M-Pesa code and track amounts
+            for (let i = 0; i < allMpesaCodes.length; i++) {
+                const codeInfo = allMpesaCodes[i];
+                const validMpesaCode = codeInfo.code.toUpperCase().trim();
+                const codeInput = document.getElementById(codeInfo.inputId);
 
-            // Verify this M-Pesa code
-            try {
-                // For additional codes, verify against remaining balance
-                const verifyAmount = (i === 0) ? total : remainingBalance;
-                const verificationResult = await verifyMpesaCodeBeforePayment(validMpesaCode, verifyAmount, codeInput);
+                // Verify this M-Pesa code
+                try {
+                    // For additional codes, verify against remaining balance
+                    const verifyAmount = (i === 0) ? total : remainingBalance;
+                    const verificationResult = await verifyMpesaCodeBeforePayment(validMpesaCode, verifyAmount, codeInput);
 
-                if (!verificationResult.valid) {
-                    hidePaymentVerificationModal(); // Hide loading modal
-                    return; // Stop here - verification failed
-                }
-
-                // Get actual amount paid from this transaction
-                let actualAmount = verificationResult.actualAmount || verifyAmount;
-
-                // If it's a partial payment, use the actual amount
-                if (verificationResult.reason === 'partial_payment') {
-                    actualAmount = verificationResult.actualAmount;
-                }
-
-                // Track this payment
-                totalPaid += actualAmount;
-                paymentCodes.push({ code: validMpesaCode, amount: actualAmount });
-                remainingBalance = total - totalPaid;
-
-                console.log(`💰 Payment ${i + 1}: Code ${validMpesaCode}, Amount: KSh ${actualAmount.toLocaleString('en-KE')}, Total Paid: KSh ${totalPaid.toLocaleString('en-KE')}, Remaining: KSh ${remainingBalance.toLocaleString('en-KE')}`);
-
-                // If partial payment detected and this is the first code, show additional input
-                if (verificationResult.reason === 'partial_payment' && i === 0 && remainingBalance > 0) {
-                    hidePaymentVerificationModal(); // Hide loading modal
-                    // Update payment progress
-                    partialPaymentState.paymentCodes = paymentCodes;
-                    updatePaymentProgress(total, totalPaid, remainingBalance);
-
-                    // Show additional M-Pesa code input
-                    const additionalIndex = allMpesaCodes.length; // Next index
-                    addAdditionalMpesaCodeInput(remainingBalance, additionalIndex);
-
-                    // Update payment amount in instructions
-                    const paymentAmountSpan = document.getElementById('paymentAmount');
-                    if (paymentAmountSpan) {
-                        paymentAmountSpan.textContent = `KSh ${remainingBalance.toLocaleString('en-KE')}`;
+                    if (!verificationResult.valid) {
+                        hidePaymentVerificationModal(); // Hide loading modal
+                        return; // Stop here - verification failed
                     }
 
-                    showNotification(`Partial payment received: KSh ${actualAmount.toLocaleString('en-KE')}. Please enter M-Pesa code for remaining balance: KSh ${remainingBalance.toLocaleString('en-KE')}`, 'info');
-                    return; // Stop here, wait for additional code
-                }
+                    // Get actual amount paid from this transaction
+                    let actualAmount = verificationResult.actualAmount || verifyAmount;
 
-            } catch (verifyError) {
-                console.error('Error verifying M-Pesa code:', verifyError);
+                    // If it's a partial payment, use the actual amount
+                    if (verificationResult.reason === 'partial_payment') {
+                        actualAmount = verificationResult.actualAmount;
+                    }
 
-                // Even if verification fails, check localStorage for duplicates
-                const duplicateOrder = checkDuplicateMpesaCodeLocal(validMpesaCode);
-                if (duplicateOrder) {
-                    const errorMessage = `⚠️ This M-Pesa code has already been used!\n\n` +
-                        `Order ID: ${duplicateOrder.orderId || 'N/A'}\n` +
-                        `Date: ${duplicateOrder.date || 'N/A'}\n` +
-                        `Amount: KSh ${duplicateOrder.total?.toLocaleString('en-KE') || 'N/A'}\n\n` +
-                        `Please enter the correct M-Pesa transaction code from your payment confirmation message.\n\n` +
-                        `If you believe this is an error, please contact us:\n` +
-                        `WhatsApp: +254 724 904 692`;
+                    // Track this payment
+                    totalPaid += actualAmount;
+                    paymentCodes.push({ code: validMpesaCode, amount: actualAmount });
+                    remainingBalance = total - totalPaid;
+
+                    console.log(`💰 Payment ${i + 1}: Code ${validMpesaCode}, Amount: KSh ${actualAmount.toLocaleString('en-KE')}, Total Paid: KSh ${totalPaid.toLocaleString('en-KE')}, Remaining: KSh ${remainingBalance.toLocaleString('en-KE')}`);
+
+                    // If partial payment detected and this is the first code, show additional input
+                    if (verificationResult.reason === 'partial_payment' && i === 0 && remainingBalance > 0) {
+                        hidePaymentVerificationModal(); // Hide loading modal
+                        // Update payment progress
+                        partialPaymentState.paymentCodes = paymentCodes;
+                        updatePaymentProgress(total, totalPaid, remainingBalance);
+
+                        // Show additional M-Pesa code input
+                        const additionalIndex = allMpesaCodes.length; // Next index
+                        addAdditionalMpesaCodeInput(remainingBalance, additionalIndex);
+
+                        // Update payment amount in instructions
+                        const paymentAmountSpan = document.getElementById('paymentAmount');
+                        if (paymentAmountSpan) {
+                            paymentAmountSpan.textContent = `KSh ${remainingBalance.toLocaleString('en-KE')}`;
+                        }
+
+                        showNotification(`Partial payment received: KSh ${actualAmount.toLocaleString('en-KE')}. Please enter M-Pesa code for remaining balance: KSh ${remainingBalance.toLocaleString('en-KE')}`, 'info');
+                        return; // Stop here, wait for additional code
+                    }
+
+                } catch (verifyError) {
+                    console.error('Error verifying M-Pesa code:', verifyError);
+
+                    // Even if verification fails, check localStorage for duplicates
+                    const duplicateOrder = checkDuplicateMpesaCodeLocal(validMpesaCode);
+                    if (duplicateOrder) {
+                        const errorMessage = `⚠️ This M-Pesa code has already been used!\n\n` +
+                            `Order ID: ${duplicateOrder.orderId || 'N/A'}\n` +
+                            `Date: ${duplicateOrder.date || 'N/A'}\n` +
+                            `Amount: KSh ${duplicateOrder.total?.toLocaleString('en-KE') || 'N/A'}\n\n` +
+                            `Please enter the correct M-Pesa transaction code from your payment confirmation message.\n\n` +
+                            `If you believe this is an error, please contact us:\n` +
+                            `WhatsApp: +254 724 904 692`;
+                        hidePaymentVerificationModal(); // Hide loading modal
+                        alert(errorMessage);
+                        if (codeInput) {
+                            codeInput.focus();
+                            codeInput.style.borderColor = '#f44336';
+                        }
+                        showNotification('M-Pesa code already used. Please check and try again.', 'error');
+                        return;
+                    }
+
+                    // CRITICAL SECURITY: Block payment if verification fails
+                    // Never allow payment without proper verification
                     hidePaymentVerificationModal(); // Hide loading modal
+                    const errorMessage = `❌ M-Pesa Verification Failed!\n\n` +
+                        `Error: ${verifyError.message}\n\n` +
+                        `⚠️ SECURITY: Payment cannot be accepted without proper verification.\n\n` +
+                        `Please ensure:\n` +
+                        `1. You have a stable internet connection\n` +
+                        `2. You entered the correct M-Pesa transaction code\n` +
+                        `3. The transaction was completed recently (within 24 hours)\n\n` +
+                        `Please try again or contact us:\n` +
+                        `WhatsApp: +254 724 904 692`;
                     alert(errorMessage);
                     if (codeInput) {
                         codeInput.focus();
                         codeInput.style.borderColor = '#f44336';
                     }
-                    showNotification('M-Pesa code already used. Please check and try again.', 'error');
+                    showNotification('M-Pesa verification failed. Payment blocked for security.', 'error');
                     return;
                 }
+            }
 
-                // CRITICAL SECURITY: Block payment if verification fails
-                // Never allow payment without proper verification
+            // Check if full payment has been made
+            if (remainingBalance > 0) {
                 hidePaymentVerificationModal(); // Hide loading modal
-                const errorMessage = `❌ M-Pesa Verification Failed!\n\n` +
-                    `Error: ${verifyError.message}\n\n` +
-                    `⚠️ SECURITY: Payment cannot be accepted without proper verification.\n\n` +
-                    `Please ensure:\n` +
-                    `1. You have a stable internet connection\n` +
-                    `2. You entered the correct M-Pesa transaction code\n` +
-                    `3. The transaction was completed recently (within 24 hours)\n\n` +
-                    `Please try again or contact us:\n` +
-                    `WhatsApp: +254 724 904 692`;
-                alert(errorMessage);
-                if (codeInput) {
-                    codeInput.focus();
-                    codeInput.style.borderColor = '#f44336';
+                // Still need more payment - show additional input
+                partialPaymentState.paymentCodes = paymentCodes;
+                updatePaymentProgress(total, totalPaid, remainingBalance);
+
+                const additionalIndex = allMpesaCodes.length;
+                addAdditionalMpesaCodeInput(remainingBalance, additionalIndex);
+
+                // Update payment amount in instructions
+                const paymentAmountSpan = document.getElementById('paymentAmount');
+                if (paymentAmountSpan) {
+                    paymentAmountSpan.textContent = `KSh ${remainingBalance.toLocaleString('en-KE')}`;
                 }
-                showNotification('M-Pesa verification failed. Payment blocked for security.', 'error');
-                return;
-            }
-        }
 
-        // Check if full payment has been made
-        if (remainingBalance > 0) {
-            hidePaymentVerificationModal(); // Hide loading modal
-            // Still need more payment - show additional input
-            partialPaymentState.paymentCodes = paymentCodes;
-            updatePaymentProgress(total, totalPaid, remainingBalance);
-
-            const additionalIndex = allMpesaCodes.length;
-            addAdditionalMpesaCodeInput(remainingBalance, additionalIndex);
-
-            // Update payment amount in instructions
-            const paymentAmountSpan = document.getElementById('paymentAmount');
-            if (paymentAmountSpan) {
-                paymentAmountSpan.textContent = `KSh ${remainingBalance.toLocaleString('en-KE')}`;
+                showNotification(`Payment incomplete. Amount paid: KSh ${totalPaid.toLocaleString('en-KE')}. Please enter M-Pesa code for remaining balance: KSh ${remainingBalance.toLocaleString('en-KE')}`, 'warning');
+                return; // Stop here, wait for additional code
             }
 
-            showNotification(`Payment incomplete. Amount paid: KSh ${totalPaid.toLocaleString('en-KE')}. Please enter M-Pesa code for remaining balance: KSh ${remainingBalance.toLocaleString('en-KE')}`, 'warning');
-            return; // Stop here, wait for additional code
-        }
+            // Full payment received - proceed with order creation
+            console.log('✅ Full payment received! Total paid: KSh', totalPaid.toLocaleString('en-KE'));
+            hidePaymentVerificationModal(); // Hide loading modal - verification complete
 
-        // Full payment received - proceed with order creation
-        console.log('✅ Full payment received! Total paid: KSh', totalPaid.toLocaleString('en-KE'));
-        hidePaymentVerificationModal(); // Hide loading modal - verification complete
-
-        // Get delivery option text
-        let deliveryOptionText = 'Shop Pickup';
-        if (deliveryOption) {
-            switch (deliveryOption.value) {
-                case 'pickup':
-                    deliveryOptionText = 'Shop Pickup';
-                    break;
-                case 'nairobi-cbd':
-                    deliveryOptionText = 'Delivery within Nairobi CBD (KSh 250)';
-                    break;
-                case 'elsewhere':
-                    deliveryOptionText = 'Delivery Elsewhere (within Kenya) (KSh 300)';
-                    break;
+            // Get delivery option text
+            let deliveryOptionText = 'Shop Pickup';
+            if (deliveryOption) {
+                switch (deliveryOption.value) {
+                    case 'pickup':
+                        deliveryOptionText = 'Shop Pickup';
+                        break;
+                    case 'nairobi-cbd':
+                        deliveryOptionText = 'Delivery within Nairobi CBD (KSh 250)';
+                        break;
+                    case 'elsewhere':
+                        deliveryOptionText = 'Delivery Elsewhere (within Kenya) (KSh 300)';
+                        break;
+                }
             }
-        }
 
-        // CRITICAL: Final duplicate check before creating order (race condition protection)
-        // Check all payment codes for duplicates
-        for (const payment of paymentCodes) {
-            const finalDuplicateCheck = checkDuplicateMpesaCodeLocal(payment.code);
-            if (finalDuplicateCheck) {
-                const errorMessage = `⚠️ M-Pesa code ${payment.code} has already been used!\n\n` +
-                    `Order ID: ${finalDuplicateCheck.orderId || 'N/A'}\n` +
-                    `Date: ${finalDuplicateCheck.date || 'N/A'}\n` +
-                    `Amount: KSh ${finalDuplicateCheck.total?.toLocaleString('en-KE') || 'N/A'}\n\n` +
-                    `Please enter the correct M-Pesa transaction code from your payment confirmation message.\n\n` +
-                    `If you believe this is an error, please contact us:\n` +
-                    `WhatsApp: +254 724 904 692`;
-                alert(errorMessage);
-                const codeInput = document.getElementById(allMpesaCodes.find(c => c.code === payment.code)?.inputId || 'mpesaCode');
-                if (codeInput) {
-                    codeInput.focus();
-                    codeInput.style.borderColor = '#f44336';
-                }
-                showNotification('M-Pesa code already used. Please check and try again.', 'error');
-                return; // Stop here - don't generate receipt
-            }
-        }
-
-        // Combine all M-Pesa codes into a single string for the order
-        const allMpesaCodesString = paymentCodes.map(p => `${p.code} (KSh ${p.amount.toLocaleString('en-KE')})`).join(', ');
-        const primaryMpesaCode = paymentCodes[0]?.code || '';
-
-        // Create order object
-        const order = {
-            orderId: 'ORD-' + Date.now(),
-            date: new Date().toLocaleString('en-KE'),
-            customer: {
-                name: customerName,
-                phone: customerPhone,
-                email: customerEmail
-            },
-            items: cart.map(item => {
-                // Find the product to get the image
-                const product = products.find(p => p.id === item.id);
-                return {
-                    name: item.name,
-                    quantity: item.quantity,
-                    price: item.price,
-                    subtotal: item.price * item.quantity,
-                    productId: item.id || '',
-                    image: product?.image || item.image || '' // Include image in order items
-                };
-            }),
-            subtotal: subtotal,
-            delivery: {
-                option: deliveryOption ? deliveryOption.value : 'pickup',
-                optionText: deliveryOptionText,
-                cost: deliveryCost,
-                address: deliveryAddress || ''
-            },
-            total: total,
-            totalPaid: totalPaid, // Track total paid (may differ from total if overpaid)
-            paymentMethod: 'M-Pesa Till (177104)',
-            mpesaCode: primaryMpesaCode, // Primary code for backward compatibility
-            mpesaCodes: paymentCodes, // All payment codes with amounts
-            mpesaCodesString: allMpesaCodesString // Human-readable string
-        };
-
-        // CRITICAL: Save order to localStorage FIRST (prevents duplicates immediately)
-        saveOrderToLocalStorage(order);
-        console.log('✅ Order saved to localStorage (prevents duplicate M-Pesa codes)');
-
-        // Save order to Database if available
-        if (useDatabase) {
-            try {
-                await apiService.createOrder(order);
-                console.log('✅ Order saved to Database');
-            } catch (orderError) {
-                console.error('❌ Error saving order:', orderError);
-
-                // Helper function to cleanup localStorage
-                const cleanupLocalStorage = () => {
-                    try {
-                        const ordersJson = localStorage.getItem('orders');
-                        if (ordersJson) {
-                            let orders = JSON.parse(ordersJson);
-                            orders = orders.filter(o => o.orderId !== order.orderId);
-                            localStorage.setItem('orders', JSON.stringify(orders));
-
-                            // Remove all payment codes from used codes
-                            const usedCodesJson = localStorage.getItem('usedMpesaCodes');
-                            if (usedCodesJson) {
-                                let usedCodes = JSON.parse(usedCodesJson);
-                                paymentCodes.forEach(payment => {
-                                    usedCodes = usedCodes.filter(c => c !== payment.code);
-                                });
-                                localStorage.setItem('usedMpesaCodes', JSON.stringify(usedCodes));
-                            }
-                        }
-                    } catch (cleanupError) {
-                        console.error('Error cleaning up localStorage:', cleanupError);
-                    }
-                };
-
-                // CRITICAL: Check if it's an amount mismatch error
-                if (orderError.message && (orderError.message.includes('Amount mismatch') || orderError.message.includes('amount mismatch'))) {
-                    cleanupLocalStorage();
-
-                    // Parse error message to get amounts
-                    let errorMessage = `❌ M-Pesa Transaction Amount Mismatch!\n\n`;
-                    try {
-                        // Try to extract amounts from error message
-                        const amountMatch = orderError.message.match(/Expected: KSh ([\d,]+).*Found: KSh ([\d,]+)/);
-                        if (amountMatch) {
-                            errorMessage += `Expected Amount: KSh ${amountMatch[1]}\n`;
-                            errorMessage += `Transaction Amount: KSh ${amountMatch[2]}\n\n`;
-                        } else {
-                            errorMessage += orderError.message + '\n\n';
-                        }
-                    } catch (parseError) {
-                        errorMessage += orderError.message + '\n\n';
-                    }
-
-                    errorMessage += `The M-Pesa transaction amount does not match your order total.\n\n` +
-                        `Please verify:\n` +
-                        `1. You entered the correct M-Pesa transaction code\n` +
-                        `2. You paid the correct amount (KSh ${total.toLocaleString('en-KE')})\n` +
-                        `3. You selected the correct delivery option\n\n` +
-                        `If you believe this is an error, please contact us:\n` +
-                        `WhatsApp: +254 724 904 692`;
-                    alert(errorMessage);
-                    if (mpesaCodeInput) {
-                        mpesaCodeInput.focus();
-                        mpesaCodeInput.style.borderColor = '#f44336';
-                    }
-                    showNotification('M-Pesa transaction amount mismatch. Payment blocked.', 'error');
-                    return; // Stop here - don't generate receipt
-                }
-
-                // Check if it's a date mismatch error
-                if (orderError.message && (orderError.message.includes('Date mismatch') || orderError.message.includes('date mismatch'))) {
-                    cleanupLocalStorage();
-
-                    const errorMessage = `❌ M-Pesa Transaction Date Invalid!\n\n` +
-                        `The M-Pesa transaction date is outside the valid range (24 hours).\n\n` +
-                        `${orderError.message}\n\n` +
-                        `Please ensure you are using a recent transaction code from your M-Pesa confirmation message.\n\n` +
-                        `If you believe this is an error, please contact us:\n` +
-                        `WhatsApp: +254 724 904 692`;
-                    alert(errorMessage);
-                    if (mpesaCodeInput) {
-                        mpesaCodeInput.focus();
-                        mpesaCodeInput.style.borderColor = '#f44336';
-                    }
-                    showNotification('M-Pesa transaction date invalid. Payment blocked.', 'error');
-                    return; // Stop here - don't generate receipt
-                }
-
-                // CRITICAL SECURITY: Check if transaction not found error
-                if (orderError.message && (orderError.message.includes('Transaction not found') || orderError.message.includes('transaction not found') || orderError.message.includes('not found in database'))) {
-                    cleanupLocalStorage();
-
-                    const errorMessage = `❌ M-Pesa Transaction Not Verified!\n\n` +
-                        `${orderError.message}\n\n` +
-                        `⚠️ SECURITY: Payment cannot be accepted until the transaction is verified through M-Pesa API.\n\n` +
-                        `Please ensure:\n` +
-                        `1. You completed the M-Pesa payment successfully\n` +
-                        `2. You entered the correct M-Pesa transaction code\n` +
-                        `3. You wait a few moments for the transaction to be received via webhook\n` +
-                        `4. You try again after the transaction has been processed\n\n` +
-                        `If you continue to have issues, please contact us:\n` +
-                        `WhatsApp: +254 724 904 692\n\n` +
-                        `This security measure prevents fake or guessed transaction codes from being accepted.`;
-                    alert(errorMessage);
-                    if (mpesaCodeInput) {
-                        mpesaCodeInput.focus();
-                        mpesaCodeInput.style.borderColor = '#f44336';
-                    }
-                    showNotification('Transaction not verified. Payment blocked for security.', 'error');
-                    return; // Stop here - don't generate receipt
-                }
-
-                // Check if it's a duplicate code error
-                if (orderError.message && (orderError.message.includes('Duplicate') || orderError.message.includes('already been used'))) {
-                    cleanupLocalStorage();
-
-                    const errorMessage = `⚠️ This M-Pesa code has already been used in Database!\n\n` +
+            // CRITICAL: Final duplicate check before creating order (race condition protection)
+            // Check all payment codes for duplicates
+            for (const payment of paymentCodes) {
+                const finalDuplicateCheck = checkDuplicateMpesaCodeLocal(payment.code);
+                if (finalDuplicateCheck) {
+                    const errorMessage = `⚠️ M-Pesa code ${payment.code} has already been used!\n\n` +
+                        `Order ID: ${finalDuplicateCheck.orderId || 'N/A'}\n` +
+                        `Date: ${finalDuplicateCheck.date || 'N/A'}\n` +
+                        `Amount: KSh ${finalDuplicateCheck.total?.toLocaleString('en-KE') || 'N/A'}\n\n` +
                         `Please enter the correct M-Pesa transaction code from your payment confirmation message.\n\n` +
                         `If you believe this is an error, please contact us:\n` +
                         `WhatsApp: +254 724 904 692`;
                     alert(errorMessage);
-                    if (mpesaCodeInput) {
-                        mpesaCodeInput.focus();
-                        mpesaCodeInput.style.borderColor = '#f44336';
+                    const codeInput = document.getElementById(allMpesaCodes.find(c => c.code === payment.code)?.inputId || 'mpesaCode');
+                    if (codeInput) {
+                        codeInput.focus();
+                        codeInput.style.borderColor = '#f44336';
                     }
                     showNotification('M-Pesa code already used. Please check and try again.', 'error');
                     return; // Stop here - don't generate receipt
                 }
-
-                // Check if it's a verification error
-                if (orderError.message && (orderError.message.includes('Verification error') || orderError.message.includes('verification error'))) {
-                    cleanupLocalStorage();
-
-                    const errorMessage = `❌ M-Pesa Verification Error!\n\n` +
-                        `${orderError.message}\n\n` +
-                        `Payment cannot be accepted until verification is successful.\n\n` +
-                        `Please try again or contact us:\n` +
-                        `WhatsApp: +254 724 904 692`;
-                    alert(errorMessage);
-                    if (mpesaCodeInput) {
-                        mpesaCodeInput.focus();
-                        mpesaCodeInput.style.borderColor = '#f44336';
-                    }
-                    showNotification('Verification error. Payment blocked. Please try again.', 'error');
-                    return; // Stop here - don't generate receipt
-                }
-
-                // For other errors, show warning but continue (order is already saved to localStorage)
-                console.warn('⚠️ Order save to Database failed, but order is saved to localStorage');
-                showNotification('Order saved locally. Database save failed. Please contact support if needed.', 'warning');
-            }
-        }
-
-        // Subtract quantity from products when payment is completed
-        cart.forEach(cartItem => {
-            const product = products.find(p => p.id === cartItem.id);
-            if (product) {
-                const currentQuantity = product.quantity || 0;
-                const purchasedQuantity = cartItem.quantity;
-                product.quantity = Math.max(0, currentQuantity - purchasedQuantity);
-            }
-        });
-
-        // Save updated products
-        try {
-            await saveProducts();
-        } catch (saveError) {
-            console.error('❌ Error saving products:', saveError);
-            // Continue even if save fails
-        }
-
-        // Refresh product display to show updated quantities
-        try {
-            displayProducts(currentCategory);
-        } catch (displayError) {
-            console.error('❌ Error displaying products:', displayError);
-            // Continue even if display fails
-        }
-
-        // Store order
-        currentOrder = order;
-
-        // Close payment modal silently
-        closePaymentModal();
-
-        // Automatically send receipt to WhatsApp via backend (no notification on website)
-        try {
-            // Generate PDF first (await to ensure it's ready)
-            if (!currentOrderPDF) {
-                await generateReceiptPDF(order);
             }
 
-            // Send receipt to WhatsApp via backend API (automatic) - WITH PDF
-            const useDatabase = localStorage.getItem('useDatabase') === 'true';
+            // Combine all M-Pesa codes into a single string for the order
+            const allMpesaCodesString = paymentCodes.map(p => `${p.code} (KSh ${p.amount.toLocaleString('en-KE')})`).join(', ');
+            const primaryMpesaCode = paymentCodes[0]?.code || '';
+
+            // Create order object
+            const order = {
+                orderId: 'ORD-' + Date.now(),
+                date: new Date().toLocaleString('en-KE'),
+                customer: {
+                    name: customerName,
+                    phone: customerPhone,
+                    email: customerEmail
+                },
+                items: cart.map(item => {
+                    // Find the product to get the image
+                    const product = products.find(p => p.id === item.id);
+                    return {
+                        name: item.name,
+                        quantity: item.quantity,
+                        price: item.price,
+                        subtotal: item.price * item.quantity,
+                        productId: item.id || '',
+                        image: product?.image || item.image || '' // Include image in order items
+                    };
+                }),
+                subtotal: subtotal,
+                delivery: {
+                    option: deliveryOption ? deliveryOption.value : 'pickup',
+                    optionText: deliveryOptionText,
+                    cost: deliveryCost,
+                    address: deliveryAddress || ''
+                },
+                total: total,
+                totalPaid: totalPaid, // Track total paid (may differ from total if overpaid)
+                paymentMethod: 'M-Pesa Till (177104)',
+                mpesaCode: primaryMpesaCode, // Primary code for backward compatibility
+                mpesaCodes: paymentCodes, // All payment codes with amounts
+                mpesaCodesString: allMpesaCodesString // Human-readable string
+            };
+
+            // CRITICAL: Save order to localStorage FIRST (prevents duplicates immediately)
+            saveOrderToLocalStorage(order);
+            console.log('✅ Order saved to localStorage (prevents duplicate M-Pesa codes)');
+
+            // Save order to Database if available
             if (useDatabase) {
                 try {
-                    // Call backend to send receipt to WhatsApp (including PDF)
-                    await apiService.sendReceiptToWhatsApp(order, currentOrderPDF);
-                    console.log('✅ Receipt and PDF sent to WhatsApp via backend');
-                } catch (backendError) {
-                    console.error('❌ Backend WhatsApp send failed, trying frontend method:', backendError);
-                    // Fallback to frontend method (opens WhatsApp with pre-filled message)
+                    await apiService.createOrder(order);
+                    console.log('✅ Order saved to Database');
+                } catch (orderError) {
+                    console.error('❌ Error saving order:', orderError);
+
+                    // Helper function to cleanup localStorage
+                    const cleanupLocalStorage = () => {
+                        try {
+                            const ordersJson = localStorage.getItem('orders');
+                            if (ordersJson) {
+                                let orders = JSON.parse(ordersJson);
+                                orders = orders.filter(o => o.orderId !== order.orderId);
+                                localStorage.setItem('orders', JSON.stringify(orders));
+
+                                // Remove all payment codes from used codes
+                                const usedCodesJson = localStorage.getItem('usedMpesaCodes');
+                                if (usedCodesJson) {
+                                    let usedCodes = JSON.parse(usedCodesJson);
+                                    paymentCodes.forEach(payment => {
+                                        usedCodes = usedCodes.filter(c => c !== payment.code);
+                                    });
+                                    localStorage.setItem('usedMpesaCodes', JSON.stringify(usedCodes));
+                                }
+                            }
+                        } catch (cleanupError) {
+                            console.error('Error cleaning up localStorage:', cleanupError);
+                        }
+                    };
+
+                    // CRITICAL: Check if it's an amount mismatch error
+                    if (orderError.message && (orderError.message.includes('Amount mismatch') || orderError.message.includes('amount mismatch'))) {
+                        cleanupLocalStorage();
+
+                        // Parse error message to get amounts
+                        let errorMessage = `❌ M-Pesa Transaction Amount Mismatch!\n\n`;
+                        try {
+                            // Try to extract amounts from error message
+                            const amountMatch = orderError.message.match(/Expected: KSh ([\d,]+).*Found: KSh ([\d,]+)/);
+                            if (amountMatch) {
+                                errorMessage += `Expected Amount: KSh ${amountMatch[1]}\n`;
+                                errorMessage += `Transaction Amount: KSh ${amountMatch[2]}\n\n`;
+                            } else {
+                                errorMessage += orderError.message + '\n\n';
+                            }
+                        } catch (parseError) {
+                            errorMessage += orderError.message + '\n\n';
+                        }
+
+                        errorMessage += `The M-Pesa transaction amount does not match your order total.\n\n` +
+                            `Please verify:\n` +
+                            `1. You entered the correct M-Pesa transaction code\n` +
+                            `2. You paid the correct amount (KSh ${total.toLocaleString('en-KE')})\n` +
+                            `3. You selected the correct delivery option\n\n` +
+                            `If you believe this is an error, please contact us:\n` +
+                            `WhatsApp: +254 724 904 692`;
+                        alert(errorMessage);
+                        if (mpesaCodeInput) {
+                            mpesaCodeInput.focus();
+                            mpesaCodeInput.style.borderColor = '#f44336';
+                        }
+                        showNotification('M-Pesa transaction amount mismatch. Payment blocked.', 'error');
+                        return; // Stop here - don't generate receipt
+                    }
+
+                    // Check if it's a date mismatch error
+                    if (orderError.message && (orderError.message.includes('Date mismatch') || orderError.message.includes('date mismatch'))) {
+                        cleanupLocalStorage();
+
+                        const errorMessage = `❌ M-Pesa Transaction Date Invalid!\n\n` +
+                            `The M-Pesa transaction date is outside the valid range (24 hours).\n\n` +
+                            `${orderError.message}\n\n` +
+                            `Please ensure you are using a recent transaction code from your M-Pesa confirmation message.\n\n` +
+                            `If you believe this is an error, please contact us:\n` +
+                            `WhatsApp: +254 724 904 692`;
+                        alert(errorMessage);
+                        if (mpesaCodeInput) {
+                            mpesaCodeInput.focus();
+                            mpesaCodeInput.style.borderColor = '#f44336';
+                        }
+                        showNotification('M-Pesa transaction date invalid. Payment blocked.', 'error');
+                        return; // Stop here - don't generate receipt
+                    }
+
+                    // CRITICAL SECURITY: Check if transaction not found error
+                    if (orderError.message && (orderError.message.includes('Transaction not found') || orderError.message.includes('transaction not found') || orderError.message.includes('not found in database'))) {
+                        cleanupLocalStorage();
+
+                        const errorMessage = `❌ M-Pesa Transaction Not Verified!\n\n` +
+                            `${orderError.message}\n\n` +
+                            `⚠️ SECURITY: Payment cannot be accepted until the transaction is verified through M-Pesa API.\n\n` +
+                            `Please ensure:\n` +
+                            `1. You completed the M-Pesa payment successfully\n` +
+                            `2. You entered the correct M-Pesa transaction code\n` +
+                            `3. You wait a few moments for the transaction to be received via webhook\n` +
+                            `4. You try again after the transaction has been processed\n\n` +
+                            `If you continue to have issues, please contact us:\n` +
+                            `WhatsApp: +254 724 904 692\n\n` +
+                            `This security measure prevents fake or guessed transaction codes from being accepted.`;
+                        alert(errorMessage);
+                        if (mpesaCodeInput) {
+                            mpesaCodeInput.focus();
+                            mpesaCodeInput.style.borderColor = '#f44336';
+                        }
+                        showNotification('Transaction not verified. Payment blocked for security.', 'error');
+                        return; // Stop here - don't generate receipt
+                    }
+
+                    // Check if it's a duplicate code error
+                    if (orderError.message && (orderError.message.includes('Duplicate') || orderError.message.includes('already been used'))) {
+                        cleanupLocalStorage();
+
+                        const errorMessage = `⚠️ This M-Pesa code has already been used in Database!\n\n` +
+                            `Please enter the correct M-Pesa transaction code from your payment confirmation message.\n\n` +
+                            `If you believe this is an error, please contact us:\n` +
+                            `WhatsApp: +254 724 904 692`;
+                        alert(errorMessage);
+                        if (mpesaCodeInput) {
+                            mpesaCodeInput.focus();
+                            mpesaCodeInput.style.borderColor = '#f44336';
+                        }
+                        showNotification('M-Pesa code already used. Please check and try again.', 'error');
+                        return; // Stop here - don't generate receipt
+                    }
+
+                    // Check if it's a verification error
+                    if (orderError.message && (orderError.message.includes('Verification error') || orderError.message.includes('verification error'))) {
+                        cleanupLocalStorage();
+
+                        const errorMessage = `❌ M-Pesa Verification Error!\n\n` +
+                            `${orderError.message}\n\n` +
+                            `Payment cannot be accepted until verification is successful.\n\n` +
+                            `Please try again or contact us:\n` +
+                            `WhatsApp: +254 724 904 692`;
+                        alert(errorMessage);
+                        if (mpesaCodeInput) {
+                            mpesaCodeInput.focus();
+                            mpesaCodeInput.style.borderColor = '#f44336';
+                        }
+                        showNotification('Verification error. Payment blocked. Please try again.', 'error');
+                        return; // Stop here - don't generate receipt
+                    }
+
+                    // For other errors, show warning but continue (order is already saved to localStorage)
+                    console.warn('⚠️ Order save to Database failed, but order is saved to localStorage');
+                    showNotification('Order saved locally. Database save failed. Please contact support if needed.', 'warning');
+                }
+            }
+
+            // Subtract quantity from products when payment is completed
+            cart.forEach(cartItem => {
+                const product = products.find(p => p.id === cartItem.id);
+                if (product) {
+                    const currentQuantity = product.quantity || 0;
+                    const purchasedQuantity = cartItem.quantity;
+                    product.quantity = Math.max(0, currentQuantity - purchasedQuantity);
+                }
+            });
+
+            // Save updated products
+            try {
+                await saveProducts();
+            } catch (saveError) {
+                console.error('❌ Error saving products:', saveError);
+                // Continue even if save fails
+            }
+
+            // Refresh product display to show updated quantities
+            try {
+                displayProducts(currentCategory);
+            } catch (displayError) {
+                console.error('❌ Error displaying products:', displayError);
+                // Continue even if display fails
+            }
+
+            // Store order
+            currentOrder = order;
+
+            // Close payment modal silently
+            closePaymentModal();
+
+            // Automatically send receipt to WhatsApp via backend (no notification on website)
+            try {
+                // Generate PDF first (await to ensure it's ready)
+                if (!currentOrderPDF) {
+                    await generateReceiptPDF(order);
+                }
+
+                // Send receipt to WhatsApp via backend API (automatic) - WITH PDF
+                const useDatabase = localStorage.getItem('useDatabase') === 'true';
+                if (useDatabase) {
+                    try {
+                        // Call backend to send receipt to WhatsApp (including PDF)
+                        await apiService.sendReceiptToWhatsApp(order, currentOrderPDF);
+                        console.log('✅ Receipt and PDF sent to WhatsApp via backend');
+                    } catch (backendError) {
+                        console.error('❌ Backend WhatsApp send failed, trying frontend method:', backendError);
+                        // Fallback to frontend method (opens WhatsApp with pre-filled message)
+                        sendReceiptViaWhatsAppSilent();
+                    }
+                } else {
+                    // If Database not available, use frontend method
                     sendReceiptViaWhatsAppSilent();
                 }
-            } else {
-                // If Database not available, use frontend method
-                sendReceiptViaWhatsAppSilent();
+            } catch (whatsappError) {
+                console.error('❌ Error sending receipt to WhatsApp:', whatsappError);
+                // Don't show error to user - fail silently
             }
-        } catch (whatsappError) {
-            console.error('❌ Error sending receipt to WhatsApp:', whatsappError);
-            // Don't show error to user - fail silently
-        }
-        
-        try {
-            // Clear cart
-            cart = [];
-            updateCartUI();
-            saveCart();
-            toggleCart();
-            // No notification shown - receipt is sent to WhatsApp automatically
-        } catch (clearCartError) {
-            console.error('❌ Error clearing cart:', clearCartError);
-            // Continue execution even if cart clear fails, as payment was successful
-        }
-    } // This brace closes the 'else' block for the 'till' payment method.
+            
+            try {
+                // Clear cart
+                cart = [];
+                updateCartUI();
+                saveCart();
+                toggleCart();
+                // No notification shown - receipt is sent to WhatsApp automatically
+            } catch (clearCartError) {
+                console.error('❌ Error clearing cart:', clearCartError);
+                // Continue execution even if cart clear fails, as payment was successful
+            }
+        } // This brace closes the 'else' block for the 'till' payment method.
+    }
     catch (error) { // This is the correct catch block for the entire function
         hidePaymentVerificationModal();
         console.error('❌ Error processing payment:', error);
