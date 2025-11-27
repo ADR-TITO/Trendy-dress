@@ -4192,7 +4192,8 @@ async function processSTKPushPayment(customerName, customerPhone, customerEmail,
             totalPaid: 0,
             paymentMethod: 'M-Pesa STK Push',
             mpesaCode: 'PENDING_STK',
-            paymentStatus: 'pending' // Add paymentStatus
+            paymentStatus: 'pending', // Add paymentStatus
+            skipTransactionCheck: true // Skip M-Pesa code verification for STK Push orders
         };
 
         try {
