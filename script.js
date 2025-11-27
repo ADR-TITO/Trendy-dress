@@ -4059,6 +4059,9 @@ async function processPayment(event) {
             saveCart();
             toggleCart();
             // No notification shown - receipt is sent to WhatsApp automatically
+        } catch (clearCartError) {
+            console.error('❌ Error clearing cart:', clearCartError);
+            // Continue execution even if cart clear fails, as payment was successful
         }
     } catch (error) { // This is the correct catch block for the entire function
         hidePaymentVerificationModal();
