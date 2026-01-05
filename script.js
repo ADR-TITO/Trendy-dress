@@ -7154,25 +7154,28 @@ function handleHeroImageUpload(event) {
         return;
     }
 
-    // Check file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-        alert('Image size should be less than 5MB');
+    // Check file size (max 10MB - we will compress it)
+    if (file.size > 10 * 1024 * 1024) {
+        alert('Image size should be less than 10MB');
         return;
     }
 
-    const reader = new FileReader();
-    reader.onload = function (e) {
-        const imageDataUrl = e.target.result;
-        // Store as base64 data URL
-        websiteContent.heroImage = imageDataUrl;
-        document.getElementById('heroImage').value = imageDataUrl;
-        previewHeroImage(imageDataUrl);
-        showNotification('Hero image uploaded successfully!');
-    };
-    reader.onerror = function () {
-        alert('Error reading image file');
-    };
-    reader.readAsDataURL(file);
+    showNotification('Processing hero image...', 'info');
+
+    // Compress image (1920x1080 max for hero)
+    compressImage(file, 1920, 1080, 0.8)
+        .then(compressedDataUrl => {
+            // Store as base64 data URL
+            websiteContent.heroImage = compressedDataUrl;
+            document.getElementById('heroImage').value = compressedDataUrl;
+            previewHeroImage(compressedDataUrl);
+            updateWebsiteContent(); // Update view immediately
+            showNotification('Hero image uploaded successfully!');
+        })
+        .catch(error => {
+            console.error('Error compressing hero image:', error);
+            alert('Error processing image. Please try another file.');
+        });
 }
 
 // Preview hero image in admin panel
@@ -7285,7 +7288,7 @@ function updateWebsiteIcon() {
         favicon.type = 'image/png';
     } else if (favicon) {
         // Set default favicon or remove
-        favicon.href = 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👔</text></svg>';
+        favicon.href = 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👗</text></svg>';
         favicon.type = 'image/svg+xml';
     }
 }
