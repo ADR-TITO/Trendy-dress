@@ -456,6 +456,8 @@ body {
     object-fit: cover;
     display: block;
     background: #f5f5f5;
+    opacity: 0;
+    transition: opacity 0.5s ease-in-out;
 }
 
 .no-image-placeholder {
