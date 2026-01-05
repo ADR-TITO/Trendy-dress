@@ -6718,7 +6718,17 @@ function saveSettings() {
 function loadWebsiteContent() {
     const savedContent = localStorage.getItem('websiteContent');
     if (savedContent) {
-        websiteContent = { ...websiteContent, ...JSON.parse(savedContent) };
+        try {
+            const parsedContent = JSON.parse(savedContent);
+            // If heroImage is not a remote URL, delete it from the object
+            if (parsedContent.heroImage && !parsedContent.heroImage.startsWith('http') && !parsedContent.heroImage.startsWith('data:')) {
+                delete parsedContent.heroImage;
+            }
+            websiteContent = { ...websiteContent, ...parsedContent };
+        } catch (error) {
+            console.error('Error parsing website content from localStorage:', error);
+            // Don't apply corrupted content
+        }
     }
     updateWebsiteContent();
 }
