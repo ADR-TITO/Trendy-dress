@@ -1794,7 +1794,7 @@ function displayProducts(filterCategory = 'all') {
         return `
         <div class="product-card ${!hasAnyStock ? 'sold-out' : ''}" 
              id="${cardId}"
-             style="${bgImageStyle} position: relative; min-height: 550px; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; cursor: pointer;"
+             style="${bgImageStyle} position: relative; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; cursor: pointer;"
              onmouseenter="this.style.transform='scale(1.05)'; this.style.backgroundSize='110%'; this.querySelector('.product-info-overlay').style.transform='translateY(0)';"
              onmouseleave="this.style.transform='scale(1)'; this.style.backgroundSize='cover'; this.querySelector('.product-info-overlay').style.transform='translateY(10px)';">
             

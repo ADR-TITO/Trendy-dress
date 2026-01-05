@@ -315,6 +315,9 @@ body {
         grid-template-columns: repeat(2, 1fr);
         gap: 15px;
     }
+    .product-card {
+        min-height: 380px;
+    }
 }
 
 /* Very small screens: Keep 2 columns but smaller gap */
@@ -322,6 +325,9 @@ body {
     .products-grid {
         grid-template-columns: repeat(2, 1fr);
         gap: 10px;
+    }
+    .product-card {
+        min-height: 280px;
     }
 }
 
@@ -334,6 +340,7 @@ body {
     cursor: pointer;
     content-visibility: auto;
     contain-intrinsic-size: 0 500px;
+    min-height: 550px;
 }
 
 .product-card:hover {
