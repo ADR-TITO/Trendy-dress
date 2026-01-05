@@ -152,7 +152,7 @@ body {
 
 /* Hero Section */
 .hero {
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)), url('https://via.placeholder.com/1920x1080');
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
@@ -166,6 +166,7 @@ body {
     align-items: center;
     justify-content: center;
     background-attachment: scroll;
+    background-blend-mode: multiply;
 }
 
 .hero-overlay {
@@ -1565,6 +1566,11 @@ body {
         display: block;
     }
 
+    .hero {
+        min-height: 300px;
+        padding: 60px 20px;
+    }
+
     .hero-content h1 {
         font-size: 2rem;
     }
@@ -1684,6 +1690,11 @@ body {
 
 /* Extra small screens (phones in portrait) */
 @media (max-width: 480px) {
+
+    .hero {
+        min-height: 250px;
+        padding: 40px 20px;
+    }
 
     /* Even smaller product images */
     .product-image {
