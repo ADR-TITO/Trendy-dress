@@ -5325,6 +5325,17 @@ async function saveProduct(event) {
             // Update existing product
             console.log('📝 Updating product:', id);
             result = await apiService.updateProduct(id, productData);
+            
+            // CRITICAL FIX: Update local products array immediately
+            // This prevents the subsequent saveProducts() sync from overwriting the DB with stale data
+            const index = products.findIndex(p => p.id === id || p._id === id);
+            if (index !== -1) {
+                // Merge result into existing product to preserve any other fields
+                products[index] = { ...products[index], ...productData };
+                // Ensure ID is preserved/normalized
+                if (result && (result.id || result._id)) products[index].id = result.id || result._id;
+            }
+            
             showNotification('Product updated successfully!', 'success');
         } else {
             // Create new product

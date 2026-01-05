@@ -91,7 +91,11 @@
         <div class="container">
             <h2 class="section-title">Our Products</h2>
             <div class="products-grid" id="productsGrid">
-                <!-- Products will be dynamically inserted here -->
+                <!-- Default Loading Spinner (Visible immediately on load) -->
+                <div style="grid-column: 1/-1; text-align: center; padding: 60px 20px; color: #666;">
+                    <div class="spinner" style="border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
+                    <p style="font-size: 1.1rem;">Loading products...</p>
+                </div>
             </div>
         </div>
     </section>
