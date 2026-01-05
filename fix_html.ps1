@@ -1,14 +1,4 @@
-$file = "c:\Users\TITO\Trendy Dresses Main\Trendy-dress-1\index.html"
-$lines = Get-Content $file
-
-# Lines are 0-indexed in array.
-# We want to keep lines 0 to 512 (which corresponds to line 1 to 513 in 1-based view).
-# Line 513 in 1-based view is index 512.
-$part1 = $lines[0..512]
-
-# We want to keep lines from 536 onwards (1-based).
-# Line 537 in 1-based view is index 536.
-$part2 = $lines[536..($lines.Count - 1)]
+$file = "c:\Users\user\TRENDY DRESSES\Trendy-dress\index.html"
 
 $fixedContent = @"
                 <div id="adminCompletedList" style="display: flex; flex-direction: column; gap: 15px;">
@@ -87,7 +77,17 @@ $fixedContent = @"
             </div>
 "@
 
-$newContent = $part1 + $fixedContent + $part2
-$newContent | Set-Content $file -Encoding UTF8
+$content = Get-Content $file -Raw -Encoding UTF8
 
-Write-Host "Fixed index.html successfully"
+# Regex to match the admin block (and any duplicates that may have accumulated)
+# Matches from <div id="adminCompletedList"> to the end of the content tab
+$pattern = '(?s)(\s*<div id="adminCompletedList".+?saveContent\(\)">Save Content</button>\s*</div>)+'
+
+if ($content -match $pattern) {
+    # Replace existing/duplicate blocks with a single clean copy
+    $newContent = $content -replace $pattern, "`n$fixedContent`n"
+    $newContent | Set-Content $file -Encoding UTF8
+    Write-Host "Fixed index.html: Replaced existing/duplicate admin blocks."
+} else {
+    Write-Host "Pattern not found. No changes made to avoid data loss."
+}
