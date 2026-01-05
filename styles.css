@@ -333,7 +333,7 @@ body {
     transition: transform 0.5s ease, box-shadow 0.3s ease, background-size 0.5s ease;
     cursor: pointer;
     content-visibility: auto;
-    contain-intrinsic-size: 0 550px;
+    contain-intrinsic-size: 0 500px;
 }
 
 .product-card:hover {
