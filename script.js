@@ -6058,6 +6058,17 @@ async function saveProducts() {
 }
 
 async function loadProducts() {
+    // Show loading spinner
+    const productsGrid = document.getElementById('productsGrid');
+    if (productsGrid) {
+        productsGrid.innerHTML = `
+            <div style="grid-column: 1/-1; text-align: center; padding: 60px 20px; color: #666;">
+                <div class="spinner" style="border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
+                <p style="font-size: 1.1rem;">Loading products...</p>
+            </div>
+        `;
+    }
+
     try {
         let loadedProducts = [];
         let loadSource = 'none';
@@ -6146,8 +6157,8 @@ async function loadProducts() {
             localStorage.setItem('preferredStorage', 'database');
 
             try {
-                // Step 1: Load products from Database (PERMANENT, CENTRALIZED storage) - WITHOUT images for faster loading
-                const dbProducts = await apiService.getProducts('all', false);
+                // Step 1: Load products from Database (PERMANENT, CENTRALIZED storage) - WITH images
+                const dbProducts = await apiService.getProducts('all', true);
                 console.log(`📦 Loaded ${dbProducts.length} products from Database (permanent, centralized storage)`);
 
                 // Step 1.5: Cache Database data to IndexedDB for offline access
@@ -7057,34 +7068,14 @@ function applyImageCrop() {
         uploadLabel.style.pointerEvents = 'none';
     }
 
-    let canvas;
-    try {
-        // Calculate dimensions based on selected ratio
-        let targetWidth, targetHeight;
-        if (currentCropRatio === 4 / 3) {
-            // 4:3 landscape
-            targetWidth = 1200;
-            targetHeight = 900;
-        } else {
-            // 3:4 portrait
-            targetWidth = 900;
-            targetHeight = 1200;
-        }
+    // 1. Resize: Limit width to 800px to prevent huge files
+    const canvas = imageCropper.getCroppedCanvas({
+        width: 800,
+        imageSmoothingQuality: 'high'
+    });
 
-        // Get cropped canvas
-        canvas = imageCropper.getCroppedCanvas({
-            width: targetWidth,
-            height: targetHeight,
-            imageSmoothingEnabled: true,
-            imageSmoothingQuality: 'high'
-        });
-
-        if (!canvas) {
-            throw new Error('Failed to get cropped canvas');
-        }
-    } catch (error) {
-        console.error('Error getting cropped canvas:', error);
-        alert('Error cropping image: ' + error.message + '. Please try again.');
+    if (!canvas) {
+        alert('Error cropping image. Please try again.');
         if (uploadLabel) {
             uploadLabel.innerHTML = '<i class="fas fa-upload"></i> Browse & Upload Image';
             uploadLabel.style.pointerEvents = 'auto';
@@ -7092,84 +7083,25 @@ function applyImageCrop() {
         return;
     }
 
-    // Convert to blob and compress
-    canvas.toBlob(function (blob) {
-        if (!blob) {
-            alert('Error processing cropped image. Please try again.');
-            if (uploadLabel) {
-                uploadLabel.innerHTML = '<i class="fas fa-upload"></i> Browse & Upload Image';
-                uploadLabel.style.pointerEvents = 'auto';
-            }
-            return;
-        }
+    // 2. Compress: Convert to WebP at 70% quality
+    // This creates a much smaller string for your database
+    const compressedDataUrl = canvas.toDataURL('image/webp', 0.7);
 
-        // Compress the cropped image based on ratio
-        let compressWidth, compressHeight;
-        if (currentCropRatio === 4 / 3) {
-            compressWidth = 1000;
-            compressHeight = 750;
-        } else {
-            compressWidth = 750;
-            compressHeight = 1000;
-        }
+    // 3. Update the preview and hidden input
+    const productImageInput = document.getElementById('productImage');
+    if (productImageInput) {
+        productImageInput.value = compressedDataUrl;
+        previewProductImage(compressedDataUrl);
+        showNotification('Image processed and compressed successfully!');
+    }
 
-        // Compress the cropped image
-        compressImage(blob, compressWidth, compressHeight, 0.8)
-            .then(compressedDataUrl => {
-                // Check compressed size
-                const sizeInMB = (compressedDataUrl.length * 3) / 4 / (1024 * 1024);
-                console.log('Cropped and compressed image size:', sizeInMB.toFixed(2), 'MB');
+    // 4. Close the cropper modal
+    closeImageCropper();
 
-                // Store as base64 data URL
-                const productImageInput = document.getElementById('productImage');
-                if (productImageInput) {
-                    // Ensure we're setting the full base64 string
-                    productImageInput.value = compressedDataUrl;
-                    console.log('✅ Cropped image saved to productImage input. Length:', compressedDataUrl.length);
-                    console.log('✅ Image preview updated');
-                    console.log('✅ Image data starts with:', compressedDataUrl.substring(0, 50));
-                    previewProductImage(compressedDataUrl);
-                    showNotification('Image cropped and processed successfully!');
-
-                    // Force update the preview to ensure it's visible
-                    setTimeout(() => {
-                        const previewImg = document.getElementById('previewImg');
-                        if (previewImg && previewImg.src !== compressedDataUrl) {
-                            previewImg.src = compressedDataUrl;
-                            console.log('✅ Forced preview image update');
-                        }
-                    }, 100);
-                } else {
-                    console.error('❌ productImage input element not found!');
-                    alert('Error: Could not save cropped image. Please try again.');
-                }
-
-                // Close cropper
-                closeImageCropper();
-
-                // Reset upload label
-                if (uploadLabel) {
-                    uploadLabel.innerHTML = '<i class="fas fa-upload"></i> Browse & Upload Image';
-                    uploadLabel.style.pointerEvents = 'auto';
-                }
-            })
-            .catch(error => {
-                console.error('Error compressing cropped image:', error);
-                // Use cropped canvas directly
-                const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-                const productImageInput = document.getElementById('productImage');
-                if (productImageInput) {
-                    productImageInput.value = dataUrl;
-                    previewProductImage(dataUrl);
-                    showNotification('Image cropped successfully!');
-                }
-                closeImageCropper();
-                if (uploadLabel) {
-                    uploadLabel.innerHTML = '<i class="fas fa-upload"></i> Browse & Upload Image';
-                    uploadLabel.style.pointerEvents = 'auto';
-                }
-            });
-    }, 'image/jpeg', 0.9);
+    if (uploadLabel) {
+        uploadLabel.innerHTML = '<i class="fas fa-upload"></i> Browse & Upload Image';
+        uploadLabel.style.pointerEvents = 'auto';
+    }
 }
 
 // Remove product image
