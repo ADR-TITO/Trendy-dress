@@ -15,7 +15,7 @@ let isAdmin = false;
 let websiteContent = {
     heroTitle: 'Fashion That Speaks Your Style',
     heroDescription: 'Discover the latest trends in dresses and tracksuits',
-    heroImage: '', // Background image URL for hero section
+    heroImage: 'https://via.placeholder.com/1920x1080', // Background image URL for hero section
     websiteIcon: '', // Website favicon/icon
     aboutText: 'Welcome to Trendy Dresses, your one-stop shop for the latest fashion trends. We offer a wide selection of high-quality dresses and tracksuits that combine style, comfort, and affordability. Our mission is to help you express your unique style with confidence.',
     contactPhone: '254724904692',

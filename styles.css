@@ -152,7 +152,7 @@ body {
 
 /* Hero Section */
 .hero {
-    background-image: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url('https://via.placeholder.com/1920x1080');
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
@@ -165,11 +165,9 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    background-attachment: scroll;
 }
 
 .hero-overlay {
-    display: none;
     position: absolute;
     top: 0;
     left: 0;
@@ -181,6 +179,7 @@ body {
 
 .hero-content {
     position: relative;
+    z-index: 2;
 }
 
 .hero-content h1 {
