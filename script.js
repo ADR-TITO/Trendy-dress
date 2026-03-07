@@ -1688,6 +1688,9 @@ function displayProducts(filterCategory = 'all') {
         return;
     }
 
+    // Clear the grid first
+    productsGrid.innerHTML = '';
+
     // Group products by name (case-insensitive)
     const groupedProducts = {};
     filteredProducts.forEach(product => {
@@ -1698,10 +1701,12 @@ function displayProducts(filterCategory = 'all') {
         groupedProducts[nameKey].push(product);
     });
 
-    // Display grouped products
+    // Display grouped products one by one
     const groupedCount = Object.keys(groupedProducts).length;
+    const productGroups = Object.values(groupedProducts);
 
-    const htmlContent = Object.values(groupedProducts).map(productGroup => {
+    // Render products with staggered animation
+    productGroups.forEach((productGroup, index) => {
         // Use first product for main info (image, price, category)
         const mainProduct = productGroup[0];
         const discount = mainProduct.discount || 0;
@@ -1780,7 +1785,8 @@ function displayProducts(filterCategory = 'all') {
         const hasImage = hasValidImage;
         const placeholderDisplay = '';
 
-        return `
+        // Create product HTML
+        const productHTML = `
         <div class="product-card ${!hasAnyStock ? 'sold-out' : ''}" 
              id="${cardId}"
              style="${bgImageStyle} position: relative; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; cursor: pointer;"
@@ -1872,9 +1878,28 @@ function displayProducts(filterCategory = 'all') {
             </div>
         </div>
         `;
-    }).join('');
 
-    productsGrid.innerHTML = htmlContent;
+        // Schedule product rendering with staggered delay
+        setTimeout(() => {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = productHTML.trim();
+            const productCard = tempDiv.firstChild;
+            
+            // Add fade-in animation
+            productCard.style.opacity = '0';
+            productCard.style.transform = 'translateY(10px)';
+            productCard.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+            
+            // Append to grid
+            productsGrid.appendChild(productCard);
+            
+            // Trigger animation
+            requestAnimationFrame(() => {
+                productCard.style.opacity = '1';
+                productCard.style.transform = 'translateY(0)';
+            });
+        }, index * 40); // 40ms delay between each product
+    });
 }
 
 // Setup Event Listeners
