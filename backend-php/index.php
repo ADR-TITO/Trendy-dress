@@ -110,6 +110,10 @@ try {
             require_once __DIR__ . '/routes/mpesa.php';
             break;
             
+        case 'website-content':
+            require_once __DIR__ . '/routes/website-content.php';
+            break;
+            
         case 'create-tables':
             require_once __DIR__ . '/create-tables.php';
             break;
