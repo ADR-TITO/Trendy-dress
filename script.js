@@ -5039,7 +5039,6 @@ async function handleLogin(event) {
 
         if (result.success) {
             isAdmin = true;
-            localStorage.setItem('wasAdmin', 'true'); // Remember login for offline access
             // No longer storing isAdmin in localStorage for security
             // Session cookie handles persistence
             await checkAdminStatus();
@@ -5073,14 +5072,7 @@ async function checkAdminStatus() {
         isAdmin = status.authenticated;
     } catch (error) {
         console.error('Error checking admin status:', error);
-        // Fallback: Check if user was previously logged in (localStorage)
-        const wasAdmin = localStorage.getItem('wasAdmin') === 'true';
-        if (wasAdmin) {
-            console.log('⚠️ Backend not available, but user was previously logged in');
-            isAdmin = true;
-        } else {
-            isAdmin = false;
-        }
+        isAdmin = false;
     }
 
     const loginBtn = document.getElementById('loginBtn');
@@ -5105,19 +5097,13 @@ async function logout() {
     try {
         await apiService.logout();
         isAdmin = false;
-        localStorage.removeItem('wasAdmin'); // Clear offline admin access
         // localStorage.removeItem('isAdmin'); // No longer used
         await checkAdminStatus();
         closeAdminPanel();
         showNotification('Logged out successfully!');
     } catch (error) {
         console.error('Logout error:', error);
-        // Even if backend logout fails, clear local state
-        isAdmin = false;
-        localStorage.removeItem('wasAdmin');
-        await checkAdminStatus();
-        closeAdminPanel();
-        showNotification('Logged out locally!');
+        showNotification('Error logging out', 'error');
     }
 }
 
@@ -5362,73 +5348,35 @@ async function saveProduct(event) {
         if (id) {
             // Update existing product
             console.log('📝 Updating product:', id);
-            try {
-                result = await apiService.updateProduct(id, productData);
-                
-                // CRITICAL FIX: Update local products array immediately
-                // This prevents the subsequent saveProducts() sync from overwriting the DB with stale data
-                const index = products.findIndex(p => p.id === id || p._id === id);
-                if (index !== -1) {
-                    // Merge result into existing product to preserve any other fields
-                    products[index] = { ...products[index], ...productData };
-                    // Ensure ID is preserved/normalized
-                    if (result && (result.id || result._id)) products[index].id = result.id || result._id;
-                }
-                
-                showNotification('Product updated successfully!', 'success');
-            } catch (backendError) {
-                console.warn('⚠️ Backend update failed, saving to local storage:', backendError.message);
-                
-                // Update local products array directly
-                const index = products.findIndex(p => p.id === id || p._id === id);
-                if (index !== -1) {
-                    products[index] = { ...products[index], ...productData };
-                    showNotification('Product updated locally! (Backend not available)', 'success');
-                } else {
-                    throw new Error('Product not found for update');
-                }
+            result = await apiService.updateProduct(id, productData);
+            
+            // CRITICAL FIX: Update local products array immediately
+            // This prevents the subsequent saveProducts() sync from overwriting the DB with stale data
+            const index = products.findIndex(p => p.id === id || p._id === id);
+            if (index !== -1) {
+                // Merge result into existing product to preserve any other fields
+                products[index] = { ...products[index], ...productData };
+                // Ensure ID is preserved/normalized
+                if (result && (result.id || result._id)) products[index].id = result.id || result._id;
             }
+            
+            showNotification('Product updated successfully!', 'success');
         } else {
             // Create new product
             console.log('✨ Creating new product');
-            try {
-                result = await apiService.createProduct(productData);
-                products.push(result); // Add the newly created product to the local array
-                showNotification('Product created successfully!', 'success');
-            } catch (backendError) {
-                console.warn('⚠️ Backend create failed, saving to local storage:', backendError.message);
-                
-                // Create product locally with a temporary ID
-                const newProduct = {
-                    ...productData,
-                    id: `temp_${Date.now()}`, // Temporary ID until backend is available
-                    _id: `temp_${Date.now()}`
-                };
-                products.push(newProduct);
-                showNotification('Product created locally! (Backend not available)', 'success');
-            }
+            result = await apiService.createProduct(productData);
+            products.push(result); // Add the newly created product to the local array
+            showNotification('Product created successfully!', 'success');
         }
 
         // Close modal
         closeModal();
 
         // Sync and refresh products list to ensure consistency
-        try {
-            await saveProducts(); // Explicitly sync current 'products' array to database
-        } catch (syncError) {
-            console.warn('⚠️ Could not sync to backend, but local changes are saved:', syncError.message);
-        }
-        
-        try {
-            await loadProducts(); // Reload from database to ensure local 'products' array is authoritative
-        } catch (loadError) {
-            console.warn('⚠️ Could not reload from backend, using local data:', loadError.message);
-            // Refresh display with current local data
-            displayProducts(currentCategory);
-        }
-        
+        await saveProducts(); // Explicitly sync current 'products' array to database
+        await loadProducts(); // Reload from database to ensure local 'products' array is authoritative
         if (typeof loadAdminProducts === 'function') {
-            loadAdminProducts();
+            await loadAdminProducts();
         }
 
     } catch (error) {
@@ -5659,8 +5607,8 @@ async function adjustQuantity(productId, change) {
             console.log('✅ Quantity updated via Database API');
         } catch (error) {
             console.error('❌ Error updating quantity via Database API:', error);
-            console.warn('⚠️ Continuing with local update only');
-            // Don't return - continue with local update
+            showNotification('Error updating stock: ' + error.message, 'error');
+            return;
         }
     }
 
@@ -5757,8 +5705,13 @@ async function setQuantity(productId, qtyValue) {
             console.log('✅ Quantity updated via Database API');
         } catch (error) {
             console.error('❌ Error updating quantity via Database API:', error);
-            console.warn('⚠️ Continuing with local update only');
-            // Don't return - continue with local update
+            showNotification('Error updating stock: ' + error.message, 'error');
+            // Revert input value
+            const qtyInput = document.getElementById(`qty-${productId}`);
+            if (qtyInput) {
+                qtyInput.value = oldQty;
+            }
+            return;
         }
     }
 
@@ -6770,31 +6723,17 @@ async function saveContent() {
     websiteContent.aboutText = document.getElementById('aboutText').value;
 
     try {
-        // Try to save to backend first
-        if (apiService) {
-            try {
-                await apiService.saveWebsiteContent(websiteContent);
-                console.log('✅ Content saved to backend');
-            } catch (backendError) {
-                console.warn('⚠️ Backend save failed, will use local storage', backendError.message);
-            }
-        }
+        // Save to backend - required
+        await apiService.saveWebsiteContent(websiteContent);
+        console.log('✅ Content saved to backend');
     } catch (error) {
-        console.warn('⚠️ API Service error:', error.message);
-    }
-
-    // Always save to localStorage as backup
-    try {
-        localStorage.setItem('websiteContent', JSON.stringify(websiteContent));
-        console.log('✅ Content saved to localStorage (local backup)');
-    } catch (error) {
-        console.error('❌ Failed to save to localStorage:', error.message);
-        showNotification('Warning: Could not save content (storage full or limited)', 'warning');
+        console.error('❌ Failed to save to backend:', error.message);
+        showNotification('Error: Could not save content - backend unavailable', 'error');
         return;
     }
 
     updateWebsiteContent();
-    showNotification('✅ Content saved successfully! (Backend + Local Storage)', 'success');
+    showNotification('✅ Content saved successfully!', 'success');
 }
 
 async function saveSettings() {
@@ -6805,39 +6744,25 @@ async function saveSettings() {
     // Website icon is saved when uploaded, not here
 
     try {
-        // Try to save to backend first
-        if (apiService) {
-            try {
-                await apiService.saveWebsiteContent(websiteContent);
-                console.log('✅ Settings saved to backend');
-            } catch (backendError) {
-                console.warn('⚠️ Backend save failed, will use local storage', backendError.message);
-            }
-        }
+        // Save to backend - required
+        await apiService.saveWebsiteContent(websiteContent);
+        console.log('✅ Settings saved to backend');
     } catch (error) {
-        console.warn('⚠️ API Service error:', error.message);
-    }
-
-    // Always save to localStorage as backup
-    try {
-        localStorage.setItem('websiteContent', JSON.stringify(websiteContent));
-        console.log('✅ Settings saved to localStorage (local backup)');
-    } catch (error) {
-        console.error('❌ Failed to save to localStorage:', error.message);
-        showNotification('Warning: Could not save settings (storage full or limited)', 'warning');
+        console.error('❌ Failed to save to backend:', error.message);
+        showNotification('Error: Could not save settings - backend unavailable', 'error');
         return;
     }
 
     updateContactDisplay();
     updateWebsiteIcon();
-    showNotification('✅ Settings saved successfully! (Backend + Local Storage)', 'success');
+    showNotification('✅ Settings saved successfully!', 'success');
 }
 
 async function loadWebsiteContent() {
     let loadedContent = null;
     let loadedFromBackend = false;
 
-    // Try to load from backend first
+    // Load from backend - required
     if (apiService) {
         try {
             const backendContent = await apiService.getWebsiteContent();
@@ -6847,21 +6772,9 @@ async function loadWebsiteContent() {
                 console.log('✅ Loaded website content from backend');
             }
         } catch (error) {
-            console.warn('⚠️ Could not load from backend:', error.message);
-            console.warn('   Falling back to local storage...');
-        }
-    }
-
-    // If backend failed, try localStorage
-    if (!loadedContent) {
-        try {
-            const savedContent = localStorage.getItem('websiteContent');
-            if (savedContent) {
-                loadedContent = JSON.parse(savedContent);
-                console.log('✅ Loaded website content from localStorage (local backup)');
-            }
-        } catch (error) {
-            console.error('❌ Error parsing website content from localStorage:', error);
+            console.error('❌ Could not load from backend:', error.message);
+            showNotification('Error: Could not load content - backend unavailable', 'error');
+            return;
         }
     }
 
