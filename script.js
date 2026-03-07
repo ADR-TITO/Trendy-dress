@@ -15,7 +15,7 @@ let isAdmin = false;
 let websiteContent = {
     heroTitle: 'Fashion That Speaks Your Style',
     heroDescription: 'Discover the latest trends in dresses and tracksuits',
-    heroImage: 'https://via.placeholder.com/1920x1080', // Background image URL for hero section
+    heroImage: '', // Background image URL for hero section
     websiteIcon: '', // Website favicon/icon
     aboutText: 'Welcome to Trendy Dresses, your one-stop shop for the latest fashion trends. We offer a wide selection of high-quality dresses and tracksuits that combine style, comfort, and affordability. Our mission is to help you express your unique style with confidence.',
     contactPhone: '254724904692',
@@ -1778,18 +1778,7 @@ function displayProducts(filterCategory = 'all') {
 
         // Add placeholder icon display if no image (reuse imageValue from above)
         const hasImage = hasValidImage;
-        const placeholderDisplay = !hasImage ? `
-            <div style="
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                font-size: 8rem;
-                opacity: 0.3;
-                z-index: 0;
-                pointer-events: none;
-            ">${mainProduct.icon || '👔'}</div>
-        ` : '';
+        const placeholderDisplay = '';
 
         return `
         <div class="product-card ${!hasAnyStock ? 'sold-out' : ''}" 
@@ -2129,8 +2118,8 @@ function updateCartUI() {
                 <div class="cart-item-image">
                     ${item.image && item.image.trim() ?
                 `<img src="${item.image}" alt="${item.name}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 5px;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                         <div class="no-image-placeholder" style="display: none;"><i class="fas fa-image"></i></div>` :
-                `<div class="no-image-placeholder"><i class="fas fa-image"></i></div>`
+                         <div class="no-image-placeholder" style="display: none;"></div>` :
+                `<div class="no-image-placeholder" style="display: none;"></div>`
             }
                 </div>
                 <div class="cart-item-info">
@@ -6816,7 +6805,7 @@ function handleImageError(img) {
     // Show placeholder if image fails to load
     const placeholder = document.createElement('div');
     placeholder.className = 'no-image-placeholder';
-    placeholder.innerHTML = '<i class="fas fa-image"></i><p>Image Not Available</p>';
+    placeholder.innerHTML = '';
     img.parentElement.appendChild(placeholder);
 }
 
