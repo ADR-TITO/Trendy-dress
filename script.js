@@ -5158,6 +5158,9 @@ function loadAdminProducts(searchQuery = '') {
     const searchResults = document.getElementById('adminSearchResults');
     const totalCountElement = document.getElementById('adminTotalCount');
 
+    console.log('📋 loadAdminProducts called - products count:', products.length);
+    console.log('📋 Products array sample:', products.slice(0, 2));
+
     // Update total product count (always show all products count)
     if (totalCountElement) {
         totalCountElement.textContent = products.length;
@@ -5262,7 +5265,7 @@ function loadAdminProducts(searchQuery = '') {
                         </button>
                     </div>
                     <div style="display: flex; gap: 5px;">
-                        <button class="btn-edit" onclick="editProduct('${product.id}')" style="font-size: 0.85rem; padding: 6px 12px;">
+                        <button class="btn-edit" type="button" onclick="console.log('🔴 EDIT CLICKED with ID:', '${product.id}'); editProduct('${product.id}')" style="font-size: 0.85rem; padding: 6px 12px;">
                     <i class="fas fa-edit"></i> Edit
                 </button>
                         <button class="btn-delete" onclick="deleteProduct('${product.id}')" style="font-size: 0.85rem; padding: 6px 12px;">
@@ -5437,6 +5440,9 @@ function closeLoginModal() {
 }
 
 function editProduct(productId) {
+    console.log('✏️ EDIT BUTTON CLICKED - editProduct called with ID:', productId, 'Type:', typeof productId);
+    console.log('📦 Current products array:', JSON.stringify(products.slice(0, 2))); // Log first 2 products as sample
+    
     try {
         console.log('✏️ editProduct called with ID:', productId, 'Type:', typeof productId);
         console.log('📦 Current products count:', products.length);
@@ -5507,6 +5513,19 @@ function editProduct(productId) {
         const imageInput = document.getElementById('productImage');
         const imageFileInput = document.getElementById('productImageFile');
 
+        console.log('🔍 Form elements found:', {
+            modalTitle: !!modalTitle,
+            productIdInput: !!productIdInput,
+            productNameInput: !!productNameInput,
+            productCategoryInput: !!productCategoryInput,
+            productPriceInput: !!productPriceInput,
+            productDiscountInput: !!productDiscountInput,
+            productQuantityInput: !!productQuantityInput,
+            productSizeInput: !!productSizeInput,
+            imageInput: !!imageInput,
+            imageFileInput: !!imageFileInput
+        });
+
         if (!modalTitle || !productIdInput || !productNameInput) {
             console.error('❌ Required form elements not found');
             showNotification('Error: Form elements not found', 'error');
@@ -5514,6 +5533,7 @@ function editProduct(productId) {
         }
 
         // Populate form fields
+        console.log('📝 Populating form fields with product data');
         modalTitle.textContent = 'Edit Product';
         productIdInput.value = product.id || product._id || '';
         productNameInput.value = product.name || '';
@@ -5531,14 +5551,24 @@ function editProduct(productId) {
             imageFileInput.value = ''; // Reset file input
         }
         previewProductImage(productImage);
+        
+        console.log('✅ Form fields populated with values:', {
+            id: productIdInput.value,
+            name: productNameInput.value,
+            category: productCategoryInput.value,
+            price: productPriceInput.value
+        });
 
         // Show modal
         const modal = document.getElementById('productModal');
         const overlay = document.getElementById('modalOverlay');
+        console.log('🔍 Modal elements:', { modal: !!modal, overlay: !!overlay });
+        
         if (modal && overlay) {
             modal.classList.add('show');
             overlay.classList.add('show');
-            console.log('✅ Modal opened successfully');
+            console.log('✅ Modal opened successfully - show class added');
+            console.log('📺 Modal classes:', modal.className);
         } else {
             console.error('❌ Modal elements not found:', { modal: !!modal, overlay: !!overlay });
             showNotification('Error: Modal not found', 'error');
