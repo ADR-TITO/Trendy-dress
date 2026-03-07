@@ -839,6 +839,67 @@ class ApiService {
             throw error;
         }
     }
+
+    // Save website content (hero, about, contact info)
+    async saveWebsiteContent(content) {
+        await this.ensureInitialized();
+        
+        try {
+            console.log('💾 Saving website content to backend...');
+            
+            const response = await fetch(`${this.baseURL}/website-content`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...ApiService.getAuthHeader(),
+                },
+                body: JSON.stringify(content)
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || data.message || 'Failed to save website content');
+            }
+
+            console.log('✅ Website content saved successfully');
+            return data;
+        } catch (error) {
+            // If backend fails, still allow saving to localStorage
+            console.warn('⚠️ Could not save to backend:', error.message);
+            console.warn('   Data will be saved to browser storage (local)');
+            throw error; // Still throw so caller knows backend failed
+        }
+    }
+
+    // Load website content from backend
+    async getWebsiteContent() {
+        await this.ensureInitialized();
+        
+        try {
+            console.log('📡 Loading website content from backend...');
+            
+            const response = await fetch(`${this.baseURL}/website-content`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`Failed to load website content: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log('✅ Website content loaded from backend');
+            return data;
+        } catch (error) {
+            // If backend fails, return null so caller can use localStorage
+            console.warn('⚠️ Could not load from backend:', error.message);
+            console.warn('   Will use browser storage (local data)');
+            return null;
+        }
+    }
 }
 
 // Create global API service instance

@@ -1435,7 +1435,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     setupEventListeners();
     loadCart();
-    loadWebsiteContent();
+    loadWebsiteContent().catch(error => console.warn('⚠️ Error loading website content:', error));
     checkAdminStatus();
     updateContactDisplay();
     updateWebsiteIcon(); // Load website icon
@@ -6677,7 +6677,8 @@ function loadAdminContent() {
     }
 }
 
-function saveContent() {
+async function saveContent() {
+    // Update websiteContent object from form
     websiteContent.heroTitle = document.getElementById('heroTitle').value;
     websiteContent.heroDescription = document.getElementById('heroDescription').value;
     const heroImageInput = document.getElementById('heroImage');
@@ -6686,39 +6687,118 @@ function saveContent() {
     }
     websiteContent.aboutText = document.getElementById('aboutText').value;
 
-    localStorage.setItem('websiteContent', JSON.stringify(websiteContent));
+    try {
+        // Try to save to backend first
+        if (apiService) {
+            try {
+                await apiService.saveWebsiteContent(websiteContent);
+                console.log('✅ Content saved to backend');
+            } catch (backendError) {
+                console.warn('⚠️ Backend save failed, will use local storage', backendError.message);
+            }
+        }
+    } catch (error) {
+        console.warn('⚠️ API Service error:', error.message);
+    }
+
+    // Always save to localStorage as backup
+    try {
+        localStorage.setItem('websiteContent', JSON.stringify(websiteContent));
+        console.log('✅ Content saved to localStorage (local backup)');
+    } catch (error) {
+        console.error('❌ Failed to save to localStorage:', error.message);
+        showNotification('Warning: Could not save content (storage full or limited)', 'warning');
+        return;
+    }
+
     updateWebsiteContent();
-    showNotification('Content saved successfully!');
+    showNotification('✅ Content saved successfully! (Backend + Local Storage)', 'success');
 }
 
-function saveSettings() {
+async function saveSettings() {
     websiteContent.contactPhone = document.getElementById('contactPhone').value;
     websiteContent.contactEmail = document.getElementById('contactEmail').value;
     websiteContent.contactAddress = document.getElementById('contactAddress').value;
 
     // Website icon is saved when uploaded, not here
 
-    localStorage.setItem('websiteContent', JSON.stringify(websiteContent));
+    try {
+        // Try to save to backend first
+        if (apiService) {
+            try {
+                await apiService.saveWebsiteContent(websiteContent);
+                console.log('✅ Settings saved to backend');
+            } catch (backendError) {
+                console.warn('⚠️ Backend save failed, will use local storage', backendError.message);
+            }
+        }
+    } catch (error) {
+        console.warn('⚠️ API Service error:', error.message);
+    }
+
+    // Always save to localStorage as backup
+    try {
+        localStorage.setItem('websiteContent', JSON.stringify(websiteContent));
+        console.log('✅ Settings saved to localStorage (local backup)');
+    } catch (error) {
+        console.error('❌ Failed to save to localStorage:', error.message);
+        showNotification('Warning: Could not save settings (storage full or limited)', 'warning');
+        return;
+    }
+
     updateContactDisplay();
     updateWebsiteIcon();
-    showNotification('Settings saved successfully!');
+    showNotification('✅ Settings saved successfully! (Backend + Local Storage)', 'success');
 }
 
-function loadWebsiteContent() {
-    const savedContent = localStorage.getItem('websiteContent');
-    if (savedContent) {
+async function loadWebsiteContent() {
+    let loadedContent = null;
+    let loadedFromBackend = false;
+
+    // Try to load from backend first
+    if (apiService) {
         try {
-            const parsedContent = JSON.parse(savedContent);
-            // If heroImage is not a remote URL, delete it from the object
-            if (parsedContent.heroImage && !parsedContent.heroImage.startsWith('http') && !parsedContent.heroImage.startsWith('data:')) {
-                delete parsedContent.heroImage;
+            const backendContent = await apiService.getWebsiteContent();
+            if (backendContent) {
+                loadedContent = backendContent;
+                loadedFromBackend = true;
+                console.log('✅ Loaded website content from backend');
             }
-            websiteContent = { ...websiteContent, ...parsedContent };
         } catch (error) {
-            console.error('Error parsing website content from localStorage:', error);
-            // Don't apply corrupted content
+            console.warn('⚠️ Could not load from backend:', error.message);
+            console.warn('   Falling back to local storage...');
         }
     }
+
+    // If backend failed, try localStorage
+    if (!loadedContent) {
+        try {
+            const savedContent = localStorage.getItem('websiteContent');
+            if (savedContent) {
+                loadedContent = JSON.parse(savedContent);
+                console.log('✅ Loaded website content from localStorage (local backup)');
+            }
+        } catch (error) {
+            console.error('❌ Error parsing website content from localStorage:', error);
+        }
+    }
+
+    // Apply loaded content
+    if (loadedContent) {
+        // Validate heroImage - only accept valid URLs
+        if (loadedContent.heroImage) {
+            // Accept: http://, https://, or data: URIs
+            if (!loadedContent.heroImage.startsWith('http') && !loadedContent.heroImage.startsWith('data:')) {
+                console.warn('⚠️ Invalid image URL format, removing:', loadedContent.heroImage);
+                delete loadedContent.heroImage;
+            }
+        }
+        websiteContent = { ...websiteContent, ...loadedContent };
+        console.log('✅ Website content loaded successfully', loadedFromBackend ? '(from backend)' : '(from local storage)');
+    } else {
+        console.log('ℹ️ No saved website content found, using defaults');
+    }
+
     updateWebsiteContent();
 }
 
