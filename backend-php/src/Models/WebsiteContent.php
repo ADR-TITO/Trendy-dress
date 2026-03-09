@@ -2,14 +2,18 @@
 /**
  * WebsiteContent Model
  * Handles hero image, title, description, about text, and contact info
+ * Using MariaDB/MySQL for storage
  */
 
 namespace App\Models;
 
+use PDO;
+use Exception;
+
 class WebsiteContent {
     private $db;
     
-    public function __construct($database) {
+    public function __construct($database = null) {
         $this->db = $database;
     }
 
@@ -18,20 +22,20 @@ class WebsiteContent {
      */
     public function getContent() {
         try {
-            $collection = $this->db->website_content;
+            if (!$this->db) {
+                $this->db = \Database::getConnection();
+            }
+            $stmt = $this->db->prepare("SELECT content FROM website_content WHERE id = 'main'");
+            $stmt->execute();
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
             
-            // Find the main content document (usually just one)
-            $content = $collection->findOne(['_id' => 'main']);
-            
-            if ($content) {
-                // Remove MongoDB _id field for cleaner response
-                unset($content['_id']);
-                return $content;
+            if ($row) {
+                return json_decode($row['content'], true);
             }
             
             // Return defaults if not found
             return $this->getDefaults();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             error_log('Error getting website content: ' . $e->getMessage());
             return $this->getDefaults();
         }
@@ -42,15 +46,18 @@ class WebsiteContent {
      */
     public function saveContent($data) {
         try {
-            $collection = $this->db->website_content;
-            
+            if (!$this->db) {
+                $this->db = \Database::getConnection();
+            }
             // Validate required fields
             if (!isset($data['heroTitle'])) {
-                throw new \Exception('Hero title is required');
+                // If we're updating just some parts, we might want to load existing first
+                $existing = $this->getContent();
+                $data = array_merge($existing, $data);
             }
             
             // Prepare content document
-            $content = [
+            $contentData = [
                 'heroTitle' => $data['heroTitle'] ?? '',
                 'heroDescription' => $data['heroDescription'] ?? '',
                 'heroImage' => $data['heroImage'] ?? '',
@@ -59,21 +66,32 @@ class WebsiteContent {
                 'contactEmail' => $data['contactEmail'] ?? '',
                 'contactAddress' => $data['contactAddress'] ?? '',
                 'websiteIcon' => $data['websiteIcon'] ?? '',
-                'updatedAt' => new \MongoDB\BSON\UTCDateTime(time() * 1000),
-                'updatedBy' => $_SESSION['username'] ?? 'admin'
+                'updatedAt' => date('Y-m-d H:i:s'),
+                'updatedBy' => $_SESSION['admin_username'] ?? 'admin'
             ];
             
-            // Upsert (update or insert)
-            $result = $collection->updateOne(
-                ['_id' => 'main'],
-                ['$set' => $content],
-                ['upsert' => true]
-            );
+            $jsonContent = json_encode($contentData);
+            $updatedBy = $contentData['updatedBy'];
+
+            // Upsert using MySQL syntax
+            $sql = "INSERT INTO website_content (id, content, updatedBy) 
+                    VALUES ('main', :content, :updatedBy) 
+                    ON DUPLICATE KEY UPDATE 
+                    content = :content_update, 
+                    updatedBy = :updatedBy_update";
             
-            return $content;
-        } catch (\Exception $e) {
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([
+                ':content' => $jsonContent,
+                ':updatedBy' => $updatedBy,
+                ':content_update' => $jsonContent,
+                ':updatedBy_update' => $updatedBy
+            ]);
+            
+            return $contentData;
+        } catch (Exception $e) {
             error_log('Error saving website content: ' . $e->getMessage());
-            throw new \Exception('Failed to save website content: ' . $e->getMessage());
+            throw new Exception('Failed to save website content: ' . $e->getMessage());
         }
     }
 

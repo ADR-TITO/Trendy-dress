@@ -4,24 +4,56 @@
  * Handle hero image, title, description, settings
  */
 
-require_once __DIR__ . '/../Models/WebsiteContent.php';
+// Autoload model
+spl_autoload_register(function ($class) {
+    if (strpos($class, 'App\\') === 0) {
+        $class = substr($class, 4);
+    }
+    $file = __DIR__ . '/../src/' . str_replace('\\', '/', $class) . '.php';
+    if (file_exists($file)) {
+        require_once $file;
+    }
+});
 
 use App\Models\WebsiteContent;
 
-$method = $_SERVER['REQUEST_METHOD'];
-$headers = getallheaders();
-
-try {
-    // Get database connection
-    $db = $GLOBALS['db'] ?? null;
-    
-    if (!$db) {
-        http_response_code(503);
-        echo json_encode(['error' => 'Database not connected']);
-        exit;
+/**
+ * Check if the current request is from an authenticated admin.
+ * Accepts EITHER a valid PHP session OR a Bearer token.
+ */
+function isAdminAuthenticated(): bool {
+    // Method 1: PHP session cookie
+    if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true) {
+        return true;
     }
 
-    $websiteContent = new WebsiteContent($db);
+    // Method 2: Bearer token from Authorization header
+    $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+    if (strpos($authHeader, 'Bearer ') === 0) {
+        $token = substr($authHeader, 7);
+        if (!empty($token) && isset($_SESSION['auth_token']) && hash_equals($_SESSION['auth_token'], $token)) {
+            return true;
+        }
+        $tokenFile = sys_get_temp_dir() . '/trendy_admin_' . hash('sha256', $token) . '.tok';
+        if (file_exists($tokenFile)) {
+            $storedData = json_decode(file_get_contents($tokenFile), true);
+            if ($storedData && isset($storedData['expires']) && $storedData['expires'] > time()) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+$method = $_SERVER['REQUEST_METHOD'];
+
+try {
+    // Start session to check auth
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+
+    $websiteContent = new WebsiteContent();
 
     switch ($method) {
         case 'GET':
@@ -35,8 +67,8 @@ try {
         case 'PUT':
             // Save website content (requires admin auth)
             
-            // Check authentication
-            if (empty($_SESSION['admin_logged_in'])) {
+            // Check authentication (consistent with admin routes)
+            if (!isAdminAuthenticated()) {
                 http_response_code(401);
                 echo json_encode(['error' => 'Unauthorized - Admin login required']);
                 exit;

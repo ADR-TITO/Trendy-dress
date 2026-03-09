@@ -168,6 +168,14 @@ class Database {
                 INDEX idx_checkoutRequestID (checkoutRequestID),
                 INDEX idx_orderId (orderId)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+            // Website content table (settings, hero image, about text)
+            $pdo->exec("CREATE TABLE IF NOT EXISTS website_content (
+                id VARCHAR(50) PRIMARY KEY,
+                content TEXT NOT NULL,
+                updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                updatedBy VARCHAR(255)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
             
             error_log("✅ Database tables created/verified");
         } catch (PDOException $e) {
