@@ -99,8 +99,8 @@ class Database {
             'connected' => self::$connected,
             'readyState' => self::$connected ? 1 : 0,
             'readyStateText' => self::$connected ? 'connected' : 'disconnected',
-            'host' => self::$connected ? ($_ENV['DB_HOST'] ?? 'localhost') : 'not connected',
-            'name' => self::$connected ? ($_ENV['DB_NAME'] ?? 'unknown') : 'not connected'
+            'host' => $_ENV['DB_HOST'] ?? getenv('DB_HOST') ?: 'localhost',
+            'name' => $_ENV['DB_NAME'] ?? getenv('DB_NAME') ?: 'trendydr_Shpo'
         ];
     }
     
@@ -176,6 +176,24 @@ class Database {
                 updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 updatedBy VARCHAR(255)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+            
+            // Admins table
+            $pdo->exec("CREATE TABLE IF NOT EXISTS admins (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                username VARCHAR(50) UNIQUE NOT NULL,
+                password_hash VARCHAR(255) NOT NULL,
+                createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+            // Check if default admin exists
+            $stmt = $pdo->query("SELECT COUNT(*) FROM admins");
+            if ($stmt->fetchColumn() == 0) {
+                $defaultPass = password_hash('admin123', PASSWORD_DEFAULT);
+                $stmt = $pdo->prepare("INSERT INTO admins (username, password_hash) VALUES (:username, :password)");
+                $stmt->execute([':username' => 'admin', ':password' => $defaultPass]);
+                error_log("✅ Default admin created (admin/admin123)");
+            }
             
             error_log("✅ Database tables created/verified");
         } catch (PDOException $e) {
