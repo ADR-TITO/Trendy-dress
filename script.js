@@ -23,6 +23,9 @@ let websiteContent = {
     contactAddress: 'Nairobi, Moi avenue, Imenti HSE Glory Exhibition Basement, Shop B4'
 };
 
+// Global status flags
+let useDatabase = false;
+
 // Initialize
 // Function to migrate ALL products from localStorage to MariaDB (preserves all data)
 async function migrateProductsToDatabase(overwrite = false) {
@@ -1183,8 +1186,7 @@ if (typeof window !== 'undefined') {
 document.addEventListener('DOMContentLoaded', async () => {
     // Check if Database backend is available
     const backendAvailable = await apiService.checkBackend();
-    let useDatabase = false;
-
+    
     if (backendAvailable) {
         console.log('✅ Database backend is available - using API');
         localStorage.setItem('useDatabase', 'true');

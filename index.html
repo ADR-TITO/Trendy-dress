@@ -15,10 +15,10 @@
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
     <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
     <!-- Font Awesome loaded async to not block rendering -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'" integrity="sha512-p7QjIKtLvNjJ2OwNs6mALWDvC9xQsT5sflf+h3N2SEIj4HmELIbXYdqVpLLuQmGQs2Ts2tMBkCpxH7f4Hzl0pQ==" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'">
     <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
     <!-- Cropper CSS loaded as print first, then on page load -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" media="print" onload="this.media='all'" integrity="sha512-NdMlm3ZNQCyycudbUHMqSt+G2zTh1QgUFGEPVADvZ7TH3NmH0tLp73BIVJj6Zo5bqiL8+L7YlmrAJcSVmO0YQ==" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" media="print" onload="this.media='all'">
     <style>
         @keyframes spin {
             0% {
@@ -36,8 +36,8 @@
     <link rel="sitemap" type="application/xml" href="/sitemap.xml">
     <meta name="robots" content="index, follow">
     <!-- Defer heavy scripts that are only used for admin features -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer integrity="sha512-fRm8IejLcCWMfTn4H/j+TjCQ7JK7CQ6i9QpmHKJ3pFXCOQCJ2qZtAnuWbIBd+dHw+hm4GQJJMsvWvzIMI/sTjA==" crossorigin="anonymous"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js" defer integrity="sha512-FU9BNg7spGDd0cOMcA7dYHQO1xdMX5BmUKGI1bz/dA7TF4sWpwpPv96g7JFHNc6wlkafCW6XvvAyFU1cq6z+Ow==" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js" defer></script>
 </head>
 
 <body>
@@ -589,7 +589,7 @@
                     </div>
                     <div id="heroImagePreview" style="margin-top: 10px; display: none;">
                         <label style="font-size: 0.9rem; color: #666;">Preview:</label>
-                        <img id="heroPreviewImg" src="" alt="Hero Preview" style="max-width: 100%; max-height: 200px; margin-top: 5px; border-radius: 5px; border: 1px solid #ddd;">
+                        <img id="heroPreviewImg" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Hero Preview" style="max-width: 100%; max-height: 200px; margin-top: 5px; border-radius: 5px; border: 1px solid #ddd;">
                         <button type="button" onclick="removeHeroImage()" style="margin-top: 10px; padding: 8px 16px; background: #f44336; color: white; border: none; border-radius: 5px; cursor: pointer;">
                             <i class="fas fa-trash"></i> Remove Image
                         </button>
@@ -655,7 +655,7 @@
                     <label style="font-size: 0.9rem; color: #666; font-weight: 500;">Current Icon
                         Preview:</label>
                     <div style="margin-top: 10px; display: flex; align-items: center; gap: 15px;">
-                        <img id="websiteIconPreviewImg" src="" alt="Icon Preview"
+                        <img id="websiteIconPreviewImg" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Icon Preview"
                             style="width: 64px; height: 64px; border-radius: 5px; border: 1px solid #ddd; object-fit: cover;">
                         <div>
                             <p style="margin: 0; font-size: 0.9rem; color: #666;">This icon appears
@@ -764,7 +764,7 @@
                         <div id="imagePreview" style="margin-top: 15px; display: none;">
                             <label style="font-size: 0.9rem; color: #666; font-weight: 500;">Preview:</label>
                             <div style="margin-top: 10px; position: relative; display: inline-block;">
-                                <img id="previewImg" src="" alt="Preview"
+                                <img id="previewImg" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Preview"
                                     style="max-width: 100%; max-height: 200px; border-radius: 5px; border: 1px solid #ddd; display: block;">
                                 <button type="button" onclick="removeProductImage()"
                                     style="position: absolute; top: 5px; right: 5px; background: rgba(244, 67, 54, 0.9); color: white; border: none; border-radius: 50%; width: 30px; height: 30px; cursor: pointer; font-size: 0.9rem;">
@@ -822,7 +822,7 @@
                     </div>
                 </div>
                 <div style="max-width: 100%; margin: 0 auto; position: relative;">
-                    <img id="cropperImage" src="" alt="Crop" style="max-width: 100%; display: block; max-height: 70vh;">
+                    <img id="cropperImage" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Crop" style="max-width: 100%; display: block; max-height: 70vh;">
                 </div>
                 <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
                     <button type="button" class="btn-secondary" onclick="closeImageCropper()">Cancel</button>
