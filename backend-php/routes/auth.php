@@ -63,9 +63,28 @@ try {
                 $_SESSION['admin_username'] = $admin['username'];
                 $_SESSION['admin_id'] = $admin['id'];
                 
+                // Generate a secure token tied to this session
+                // This allows the frontend to authenticate via Bearer token
+                // as a fallback when session cookies don't work cross-origin
+                $token = bin2hex(random_bytes(32));
+                $_SESSION['auth_token'] = $token;
+                
+                // Also persist the token to a temp file so it can be verified
+                // by other PHP requests even when session state isn't shared.
+                // This is critical on shared cPanel hosting where each request
+                // may get a different PHP process/session unless the cookie is sent.
+                $tokenFile = sys_get_temp_dir() . '/trendy_admin_' . hash('sha256', $token) . '.tok';
+                file_put_contents($tokenFile, json_encode([
+                    'admin_id'   => $admin['id'],
+                    'username'   => $admin['username'],
+                    'expires'    => time() + (8 * 3600), // 8 hours
+                    'created_at' => time()
+                ]));
+                
                 echo json_encode([
                     'success' => true,
                     'message' => 'Login successful',
+                    'token' => $token,
                     'user' => [
                         'username' => $admin['username']
                     ]
@@ -80,6 +99,15 @@ try {
             break;
 
         case 'auth/logout':
+            // Clean up the persistent token file if a Bearer token was sent
+            $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+            if (strpos($authHeader, 'Bearer ') === 0) {
+                $token = substr($authHeader, 7);
+                $tokenFile = sys_get_temp_dir() . '/trendy_admin_' . hash('sha256', $token) . '.tok';
+                if (file_exists($tokenFile)) {
+                    @unlink($tokenFile);
+                }
+            }
             // Clear session
             $_SESSION = array();
             if (ini_get("session.use_cookies")) {

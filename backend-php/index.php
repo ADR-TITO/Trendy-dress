@@ -34,9 +34,27 @@ if (file_exists(__DIR__ . '/.env')) {
 
 // Set headers
 header('Content-Type: application/json; charset=utf-8');
-header('Access-Control-Allow-Origin: *');
+
+// CORS: Reflect the requesting origin instead of wildcard (*)
+// Wildcard CORS blocks cookies/sessions, so we must reflect the origin for credentials to work
+$allowedOrigins = [
+    'https://trendydresses.co.ke',
+    'https://www.trendydresses.co.ke',
+    'http://localhost',
+    'http://localhost:3000',
+    'http://localhost:8000',
+    'http://127.0.0.1',
+];
+$requestOrigin = $_SERVER['HTTP_ORIGIN'] ?? '';
+if (in_array($requestOrigin, $allowedOrigins) || strpos($requestOrigin, 'localhost') !== false || strpos($requestOrigin, '127.0.0.1') !== false) {
+    header("Access-Control-Allow-Origin: $requestOrigin");
+    header('Access-Control-Allow-Credentials: true');
+} else {
+    // Fallback for non-browser calls (Postman, cURL, etc.)
+    header('Access-Control-Allow-Origin: *');
+}
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, PATCH, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
 
 // Handle preflight requests
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
