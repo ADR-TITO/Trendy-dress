@@ -1377,35 +1377,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.log('🔍 After loadProducts - products array length:', products.length);
     console.log('🔍 After loadProducts - product IDs:', products.map(p => p.id));
 
-    // CRITICAL FIX: Ensure products are always available for display
+    // If no products exist in database, show empty state — do NOT reinitialize fake products
     if (products.length === 0) {
-        console.error('❌ CRITICAL: No products loaded! Products array is empty.');
-        console.log('✅ Reinitializing default products...');
-        // Reinitialize default products immediately
-        products.length = 0;
-        products.push(
-            { id: 13, name: 'Floral Summer Dress', category: 'dresses', price: 6000, icon: '👗', image: '', size: 'M', discount: 0, quantity: 1 },
-            { id: 14, name: 'Little Black Dress', category: 'dresses', price: 6500, icon: '👗', image: '', size: 'S', discount: 0, quantity: 1 },
-            { id: 15, name: 'Maxi Evening Dress', category: 'dresses', price: 7500, icon: '👗', image: '', size: 'L', discount: 0, quantity: 1 },
-            { id: 16, name: 'Casual Midi Dress', category: 'dresses', price: 5000, icon: '👗', image: '', size: 'M', discount: 0, quantity: 1 },
-            { id: 17, name: 'A-Line Dress', category: 'dresses', price: 5500, icon: '👗', image: '', size: 'S', discount: 0, quantity: 1 },
-            { id: 18, name: 'Wrap Dress', category: 'dresses', price: 5800, icon: '👗', image: '', size: 'M', discount: 0, quantity: 1 },
-            { id: 19, name: 'Classic Tracksuit Set', category: 'tracksuits', price: 7000, icon: '👟', image: '', size: 'L', discount: 0, quantity: 1 },
-            { id: 20, name: 'Sporty Tracksuit', category: 'tracksuits', price: 6500, icon: '👟', image: '', size: 'M', discount: 0, quantity: 1 },
-            { id: 21, name: 'Premium Tracksuit', category: 'tracksuits', price: 8500, icon: '👟', image: '', size: 'XL', discount: 0, quantity: 1 },
-            { id: 22, name: 'Casual Tracksuit', category: 'tracksuits', price: 6000, icon: '👟', image: '', size: 'M', discount: 0, quantity: 1 },
-            { id: 23, name: 'Designer Tracksuit', category: 'tracksuits', price: 9500, icon: '👟', image: '', size: 'L', discount: 0, quantity: 1 },
-            { id: 24, name: 'Athletic Tracksuit', category: 'tracksuits', price: 7500, icon: '👟', image: '', size: 'M', discount: 0, quantity: 1 }
-        );
-        console.log('✅ Default products reinitialized:', products.length, 'products');
-        // Save to storage
-        try {
-            await saveProducts();
-            localStorage.setItem('productsInitialized', 'true');
-            console.log('✅ Default products saved to storage');
-        } catch (error) {
-            console.error('❌ Error saving products:', error);
-        }
+        console.log('ℹ️ No products found in storage. Products grid will show empty state.');
     }
 
     // Always display products - this ensures visibility
@@ -6440,31 +6414,9 @@ async function loadProducts() {
             console.log('⚠️ No products found in storage');
             console.log('⚠️ Current products array has', products.length, 'items');
 
-            // CRITICAL FIX: If products array is empty, reinitialize with default products
+            // Products array is empty — show empty state, do NOT reinitialize fake products
             if (products.length === 0) {
-                console.log('✅ Products array is empty - reinitializing with default products...');
-                // Reinitialize default products
-                products.length = 0;
-                products.push(
-                    { id: 13, name: 'Floral Summer Dress', category: 'dresses', price: 6000, icon: '👗', image: '', size: 'M', discount: 0, quantity: 1 },
-                    { id: 14, name: 'Little Black Dress', category: 'dresses', price: 6500, icon: '👗', image: '', size: 'S', discount: 0, quantity: 1 },
-                    { id: 15, name: 'Maxi Evening Dress', category: 'dresses', price: 7500, icon: '👗', image: '', size: 'L', discount: 0, quantity: 1 },
-                    { id: 16, name: 'Casual Midi Dress', category: 'dresses', price: 5000, icon: '👗', image: '', size: 'M', discount: 0, quantity: 1 },
-                    { id: 17, name: 'A-Line Dress', category: 'dresses', price: 5500, icon: '👗', image: '', size: 'S', discount: 0, quantity: 1 },
-                    { id: 18, name: 'Wrap Dress', category: 'dresses', price: 5800, icon: '👗', image: '', size: 'M', discount: 0, quantity: 1 },
-                    { id: 19, name: 'Classic Tracksuit Set', category: 'tracksuits', price: 7000, icon: '👟', image: '', size: 'L', discount: 0, quantity: 1 },
-                    { id: 20, name: 'Sporty Tracksuit', category: 'tracksuits', price: 6500, icon: '👟', image: '', size: 'M', discount: 0, quantity: 1 },
-                    { id: 21, name: 'Premium Tracksuit', category: 'tracksuits', price: 8500, icon: '👟', image: '', size: 'XL', discount: 0, quantity: 1 },
-                    { id: 22, name: 'Casual Tracksuit', category: 'tracksuits', price: 6000, icon: '👟', image: '', size: 'M', discount: 0, quantity: 1 },
-                    { id: 23, name: 'Designer Tracksuit', category: 'tracksuits', price: 9500, icon: '👟', image: '', size: 'L', discount: 0, quantity: 1 },
-                    { id: 24, name: 'Athletic Tracksuit', category: 'tracksuits', price: 7500, icon: '👟', image: '', size: 'M', discount: 0, quantity: 1 }
-                );
-                console.log('✅ Default products reinitialized:', products.length, 'products');
-                // Save to storage
-                await saveProducts();
-                localStorage.setItem('productsInitialized', 'true');
-                console.log('✅ Default products saved to storage');
-                return; // Exit early after reinitializing
+                console.log('ℹ️ No products in storage. Admin can add products via the admin panel.');
             }
 
             // Check if this is truly the first load by checking for a flag
