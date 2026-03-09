@@ -1734,8 +1734,15 @@ function displayProducts(filterCategory = 'all') {
 
         // Check if image exists and is valid
         const imageValue = mainProduct.image || '';
+        const isFromDatabase = useDatabase && mainProduct.id && !isNaN(mainProduct.id);
+        
+        // A product needs lazy loading if:
+        // 1. It came from the Database AND we don't have the image data yet
+        // 2. OR it has a valid-looking URL but isn't loaded
         const hasValidImage = imageValue && imageValue.trim().length > 0 &&
             (imageValue.startsWith('data:image/') || imageValue.startsWith('http://') || imageValue.startsWith('https://'));
+            
+        const needsLazyLoad = isFromDatabase && !hasValidImage;
 
         if (hasValidImage) {
             // Escape single quotes in image URL to prevent CSS issues
@@ -1853,26 +1860,89 @@ function displayProducts(filterCategory = 'all') {
         </div>
         `;
 
-        // Schedule product rendering with staggered delay
-        setTimeout(() => {
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = productHTML.trim();
-            const productCard = tempDiv.firstChild;
-            
-            // Add fade-in animation
-            productCard.style.opacity = '0';
-            productCard.style.transform = 'translateY(10px)';
-            productCard.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
-            
-            // Append to grid
-            productsGrid.appendChild(productCard);
-            
-            // Trigger animation
-            requestAnimationFrame(() => {
-                productCard.style.opacity = '1';
-                productCard.style.transform = 'translateY(0)';
+        // Render immediately — no stagger delay
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = productHTML.trim();
+        const productCard = tempDiv.firstChild;
+
+        // Fade-in on first paint (no delay)
+        productCard.style.opacity = '0';
+        productCard.style.transition = 'opacity 0.25s ease';
+        productsGrid.appendChild(productCard);
+        requestAnimationFrame(() => { productCard.style.opacity = '1'; });
+
+        // Lazy-load the actual image only when the card enters the viewport
+        if (hasValidImage || needsLazyLoad) {
+            // Store actual image URL OR marker for API fetch as a data attribute
+            productCard.dataset.bgImage = hasValidImage ? imageValue : 'fetch-from-api';
+            productCard.dataset.productId = mainProduct.id;
+            productCard.style.backgroundImage = '';
+            productCard.style.background = 'linear-gradient(135deg, #e0e0e0 25%, #f5f5f5 50%, #e0e0e0 75%)';
+            productCard.style.backgroundSize = '400% 400%';
+            productCard.style.animation = 'shimmer 1.5s infinite';
+            productCard.classList.add('img-lazy-pending');
+        }
+    });
+
+    // Intersection Observer: load image when card scrolls into view
+    if (!window._lazyImgObserver) {
+        window._lazyImgObserver = new IntersectionObserver((entries) => {
+            entries.forEach(async (entry) => {
+                if (entry.isIntersecting) {
+                    const card = entry.target;
+                    let imgSrc = card.dataset.bgImage;
+                    const productId = card.dataset.productId;
+                    
+                    if (imgSrc) {
+                        try {
+                            // If we need to fetch from API, do it now
+                            if (imgSrc === 'fetch-from-api' && productId) {
+                                console.log(`🖼️ Lazy fetching image for product#${productId}...`);
+                                const productData = await apiService.getProduct(productId);
+                                if (productData && productData.image) {
+                                    imgSrc = productData.image;
+                                    // Cache it in the main products array for future filter/re-render
+                                    const pIndex = products.findIndex(p => p.id == productId);
+                                    if (pIndex !== -1) products[pIndex].image = imgSrc;
+                                } else {
+                                    imgSrc = ''; // No image available
+                                }
+                            }
+                            
+                            if (imgSrc) {
+                                // Preload via Image object, then apply — prevents FOUC
+                                const img = new Image();
+                                img.onload = () => {
+                                    card.style.animation = '';
+                                    card.style.backgroundSize = 'cover';
+                                    card.style.backgroundPosition = 'center';
+                                    card.style.backgroundRepeat = 'no-repeat';
+                                    card.style.backgroundImage = `url('${imgSrc.replace(/'/g, "\\'")}')`;
+                                    card.classList.remove('img-lazy-pending');
+                                };
+                                img.src = imgSrc;
+                            } else {
+                                // No image found - use fallback gradient
+                                card.style.animation = '';
+                                card.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                                card.classList.remove('img-lazy-pending');
+                            }
+                        } catch (error) {
+                            console.error('❌ Error lazy-loading image:', error);
+                            card.style.animation = '';
+                        }
+                        
+                        delete card.dataset.bgImage;
+                        delete card.dataset.productId;
+                    }
+                    window._lazyImgObserver.unobserve(card);
+                }
             });
-        }, index * 40); // 40ms delay between each product
+        }, { rootMargin: '200px' }); // start loading 200px before card enters view
+    }
+    // Observe all lazy-pending cards
+    productsGrid.querySelectorAll('.img-lazy-pending').forEach(card => {
+        window._lazyImgObserver.observe(card);
     });
 }
 
@@ -6196,9 +6266,9 @@ async function loadProducts() {
             localStorage.setItem('preferredStorage', 'database');
 
             try {
-                // Step 1: Load products from Database (PERMANENT, CENTRALIZED storage) - WITH images
-                const dbProducts = await apiService.getProducts('all', true);
-                console.log(`📦 Loaded ${dbProducts.length} products from Database (permanent, centralized storage)`);
+                // Step 1: Load products from Database (PERMANENT, CENTRALIZED storage) - WITHOUT images for speed
+                const dbProducts = await apiService.getProducts('all', false);
+                console.log(`📦 Loaded ${dbProducts.length} product records from Database (metadata only)`);
 
                 // Step 1.5: Cache Database data to IndexedDB for offline access
                 try {
