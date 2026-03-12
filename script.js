@@ -4251,7 +4251,7 @@ async function processSTKPushPayment(customerName, customerPhone, customerEmail,
             total: total,
             totalPaid: 0,
             paymentMethod: 'M-Pesa STK Push',
-            mpesaCode: 'PENDING_STK',
+            mpesaCode: `PENDING_STK_${orderId}`,
             paymentStatus: 'pending', // Add paymentStatus
             skipTransactionCheck: true // Skip M-Pesa code verification for STK Push orders
         };
@@ -4439,7 +4439,7 @@ async function createOrderFromSTKPush(orderId, customerName, customerPhone, cust
             total: total,
             totalPaid: total,
             paymentMethod: 'M-Pesa STK Push',
-            mpesaCode: mpesaCode || 'PENDING',
+            mpesaCode: mpesaCode || `PENDING_${orderId}`,
             mpesaCodes: mpesaCode ? [{ code: mpesaCode, amount: total }] : [],
             mpesaCodesString: mpesaCode || 'Pending'
         };

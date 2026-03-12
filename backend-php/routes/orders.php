@@ -194,16 +194,18 @@ try {
                     }
                 }
                 
-                // Check for duplicate
-                $existingOrder = $orderModel->findByMpesaCode($mpesaCode);
-                if ($existingOrder) {
-                    http_response_code(400);
-                    echo json_encode([
-                        'error' => 'M-Pesa code already used',
-                        'orderId' => $existingOrder['orderId'],
-                        'reason' => 'duplicate'
-                    ]);
-                    exit;
+                // Check for duplicate (skip if it's a pending placeholder)
+                if (strpos($mpesaCode, 'PENDING_') === false) {
+                    $existingOrder = $orderModel->findByMpesaCode($mpesaCode);
+                    if ($existingOrder) {
+                        http_response_code(400);
+                        echo json_encode([
+                            'error' => 'M-Pesa code already used',
+                            'orderId' => $existingOrder['orderId'],
+                            'reason' => 'duplicate'
+                        ]);
+                        exit;
+                    }
                 }
             }
             
