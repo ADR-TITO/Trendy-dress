@@ -17,12 +17,13 @@ if ($conn->connect_error) {
 // Daraja API configuration
 $consumer_key = getenv('MPESA_CONSUMER_KEY') ?: 'nk16Y74eSbTaGQgc9WF8j6FigApqOMWr';
 $consumer_secret = getenv('MPESA_CONSUMER_SECRET') ?: '40fD1vRXCq90XFaU';
-$business_short_code = getenv('MPESA_SHORTCODE') ?: '174379';
+$business_short_code = getenv('MPESA_SHORTCODE') ?: '177104';
 $passkey = getenv('MPESA_PASSKEY') ?: 'bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919';
-$callback_url = getenv('MPESA_CALLBACK_URL') ?: 'https://655a-196-250-209-180.ngrok-free.app/callback.php';
+$callback_url = getenv('MPESA_CALLBACK_URL') ?: 'http://www.trendydresses.co.ke/callback.php';
 
 // Function to generate access token
-function getAccessToken($consumer_key, $consumer_secret) {
+function getAccessToken($consumer_key, $consumer_secret)
+{
     $url = 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials';
     $curl = curl_init();
     curl_setopt($curl, CURLOPT_URL, $url);
@@ -38,15 +39,16 @@ function getAccessToken($consumer_key, $consumer_secret) {
 }
 
 // Function to initiate STK Push
-function initiateSTKPush($access_token, $business_short_code, $passkey, $amount, $phone_number, $callback_url) {
+function initiateSTKPush($access_token, $business_short_code, $passkey, $amount, $phone_number, $callback_url)
+{
     $url = 'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest';
     $timestamp = date('YmdHis');
     $password = base64_encode($business_short_code . $passkey . $timestamp);
-    
+
     $curl = curl_init();
     curl_setopt($curl, CURLOPT_URL, $url);
     curl_setopt($curl, CURLOPT_HTTPHEADER, array('Content-Type:application/json', 'Authorization:Bearer ' . $access_token));
-    
+
     $curl_post_data = array(
         'BusinessShortCode' => $business_short_code,
         'Password' => $password,
@@ -58,9 +60,9 @@ function initiateSTKPush($access_token, $business_short_code, $passkey, $amount,
         'PhoneNumber' => $phone_number,
         'CallBackURL' => $callback_url,
         'AccountReference' => 'CompanyXLTD',
-        'TransactionDesc' => 'Payment of X' 
+        'TransactionDesc' => 'Payment of X'
     );
-    
+
     $data_string = json_encode($curl_post_data);
     curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($curl, CURLOPT_POST, true);
@@ -74,24 +76,24 @@ function initiateSTKPush($access_token, $business_short_code, $passkey, $amount,
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $phone_number = $_POST['phoneNumber'];
     $amount = $_POST['amount'];
-    
+
     // Get access token
     $access_token = getAccessToken($consumer_key, $consumer_secret);
-    
+
     // Initiate STK Push
     $stk_push_response = initiateSTKPush($access_token, $business_short_code, $passkey, $amount, $phone_number, $callback_url);
-    
+
     if (isset($stk_push_response->ResponseCode) && $stk_push_response->ResponseCode == "0") {
         // Payment request successful, save to database
         $checkout_request_id = $stk_push_response->CheckoutRequestID;
-        
+
         try {
             $sql = "INSERT INTO mpesa_transactions (phoneNumber, amount, checkoutRequestID, transactionDate, resultCode, resultDesc) VALUES (?, ?, ?, NOW(), 999, 'PENDING')";
             $stmt = $pdo->prepare($sql);
             $stmt->execute([$phone_number, $amount, $checkout_request_id]);
 
             echo json_encode([
-                'success' => true, 
+                'success' => true,
                 'message' => 'Payment request sent. Please check your phone to complete the transaction.',
                 'checkout_request_id' => $checkout_request_id
             ]);
