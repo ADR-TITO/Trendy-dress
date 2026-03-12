@@ -5,7 +5,8 @@
 
 namespace App\Services;
 
-class MpesaService {
+class MpesaService
+{
     private $consumerKey;
     private $consumerSecret;
     private $shortCode;
@@ -14,8 +15,9 @@ class MpesaService {
     private $baseURL;
     private $accessToken;
     private $tokenExpiry;
-    
-    public function __construct() {
+
+    public function __construct()
+    {
         // M-Pesa Daraja API Credentials
         // Can be overridden by .env file if present
         $this->consumerKey = $_ENV['MPESA_CONSUMER_KEY'] ?? 'DVbZeuGGcOQKtRL1Kr4WCV6mOAHoEDwrUGzWgIN2myGN5CFI';
@@ -23,81 +25,83 @@ class MpesaService {
         $this->shortCode = $_ENV['MPESA_SHORTCODE'] ?? '177104'; // Till Number
         $this->passkey = $_ENV['MPESA_PASSKEY'] ?? 'bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919'; // Sandbox passkey
         $this->environment = $_ENV['MPESA_ENVIRONMENT'] ?? 'sandbox';
-        $this->baseURL = $this->environment === 'production' 
+        $this->baseURL = $this->environment === 'production'
             ? 'https://api.safaricom.co.ke'
             : 'https://sandbox.safaricom.co.ke';
     }
-    
+
     /**
      * Get OAuth access token
      */
-    private function getAccessToken() {
+    private function getAccessToken()
+    {
         if ($this->accessToken && $this->tokenExpiry && time() < $this->tokenExpiry) {
             return $this->accessToken;
         }
-        
+
         if (!$this->consumerKey || !$this->consumerSecret) {
             throw new \Exception('M-Pesa credentials not configured');
         }
-        
+
         $auth = base64_encode($this->consumerKey . ':' . $this->consumerSecret);
-        
+
         $ch = curl_init($this->baseURL . '/oauth/v1/generate?grant_type=client_credentials');
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             'Authorization: Basic ' . $auth
         ]);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        
+
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
-        
+
         if ($httpCode !== 200) {
             throw new \Exception('Failed to authenticate with M-Pesa API');
         }
-        
+
         $data = json_decode($response, true);
         $this->accessToken = $data['access_token'] ?? '';
         $this->tokenExpiry = time() + (55 * 60); // 55 minutes
-        
+
         return $this->accessToken;
     }
-    
+
     /**
      * Initiate STK Push
      */
-    public function initiateSTKPush($phoneNumber, $orderId, $accountReference, $transactionDesc) {
+    public function initiateSTKPush($phoneNumber, $orderId, $accountReference, $transactionDesc)
+    {
         try {
             $token = $this->getAccessToken();
-            
+
             // Get database connection
             $pdo = \Database::getConnection();
-            
+
             // Fetch the total amount for the given orderId
             $stmt = $pdo->prepare("SELECT totalAmount FROM orders WHERE orderId = :orderId");
             $stmt->execute([':orderId' => $orderId]);
             $order = $stmt->fetch(\PDO::FETCH_ASSOC);
-            
+
             if (!$order) {
                 throw new \Exception("Order with ID $orderId not found for STK Push.");
             }
-            
-            $amount = (float)$order['totalAmount'];
-            
+
+            $amount = (float) $order['totalAmount'];
+
             // Format phone number (254XXXXXXXXX)
             $phone = preg_replace('/^0/', '254', $phoneNumber);
             $phone = preg_replace('/^\+/', '', $phone);
-            
+
             $timestamp = date('YmdHis');
             $password = base64_encode($this->shortCode . $this->passkey . $timestamp);
-            
+
             // Robust callback URL detection
             $protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') ? 'https' : 'http';
             $host = $_SERVER['HTTP_HOST'] ?? 'trendydresses.co.ke';
             $defaultCallback = "$protocol://$host/backend-php/api";
-            
+
             $callbackURL = $_ENV['MPESA_CALLBACK_URL'] ?? $defaultCallback;
-            
+
             $data = [
                 'BusinessShortCode' => $this->shortCode,
                 'Password' => $password,
@@ -111,7 +115,7 @@ class MpesaService {
                 'AccountReference' => $accountReference . '_' . $orderId,
                 'TransactionDesc' => $transactionDesc
             ];
-            
+
             $ch = curl_init($this->baseURL . '/mpesa/stkpush/v1/processrequest');
             curl_setopt($ch, CURLOPT_HTTPHEADER, [
                 'Authorization: Bearer ' . $token,
@@ -120,38 +124,39 @@ class MpesaService {
             curl_setopt($ch, CURLOPT_POST, true);
             curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            
+
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
-            
+
             if ($httpCode !== 200) {
                 throw new \Exception('Failed to initiate STK Push');
             }
-            
+
             return json_decode($response, true);
         } catch (\Exception $e) {
             error_log("❌ Error initiating STK Push: " . $e->getMessage());
             throw $e;
         }
     }
-    
+
     /**
      * Query STK Push status
      */
-    public function querySTKPushStatus($checkoutRequestID) {
+    public function querySTKPushStatus($checkoutRequestID)
+    {
         try {
             $token = $this->getAccessToken();
             $timestamp = date('YmdHis');
             $password = base64_encode($this->shortCode . $this->passkey . $timestamp);
-            
+
             $data = [
                 'BusinessShortCode' => $this->shortCode,
                 'Password' => $password,
                 'Timestamp' => $timestamp,
                 'CheckoutRequestID' => $checkoutRequestID
             ];
-            
+
             $ch = curl_init($this->baseURL . '/mpesa/stkpushquery/v1/query');
             curl_setopt($ch, CURLOPT_HTTPHEADER, [
                 'Authorization: Bearer ' . $token,
@@ -160,15 +165,15 @@ class MpesaService {
             curl_setopt($ch, CURLOPT_POST, true);
             curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            
+
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
-            
+
             if ($httpCode !== 200) {
                 throw new \Exception('Failed to query STK Push status');
             }
-            
+
             return json_decode($response, true);
         } catch (\Exception $e) {
             error_log("❌ Error querying STK Push status: " . $e->getMessage());
