@@ -596,6 +596,9 @@ class ApiService {
             const formData = new FormData();
             formData.append('phoneNumber', phoneNumber);
             formData.append('amount', amount);
+            if (accountReference) formData.append('orderId', accountReference);
+            if (accountReference) formData.append('accountReference', accountReference);
+            if (transactionDesc) formData.append('transactionDesc', transactionDesc);
 
             const response = await fetch('process_payment.php', {
                 method: 'POST',
