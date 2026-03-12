@@ -8,17 +8,23 @@
     <!-- Modern Typography -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
     <!-- Critical Path CSS -->
     <link rel="stylesheet" href="styles.css?v=2.0">
     <!-- Preconnect to CDN for faster loading -->
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
     <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
     <!-- Font Awesome loaded async to not block rendering -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'">
-    <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+        media="print" onload="this.media='all'">
+    <noscript>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    </noscript>
     <!-- Cropper CSS loaded as print first, then on page load -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" media="print"
+        onload="this.media='all'">
     <style>
         @keyframes spin {
             0% {
@@ -104,7 +110,9 @@
             <div class="products-grid" id="productsGrid">
                 <!-- Default Loading Spinner (Visible immediately on load) -->
                 <div style="grid-column: 1/-1; text-align: center; padding: 60px 20px; color: #666;">
-                    <div class="spinner" style="border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
+                    <div class="spinner"
+                        style="border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 20px;">
+                    </div>
                     <p style="font-size: 1.1rem;">Loading products...</p>
                 </div>
             </div>
@@ -538,16 +546,21 @@
 
             <!-- Products Tab -->
             <div class="admin-tab-content active" id="productsTab">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+                <div
+                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
                     <h3 style="margin: 0;">Manage Products</h3>
-                    <div id="adminProductCount" style="color: var(--primary-color); font-weight: bold; font-size: 1rem;">
+                    <div id="adminProductCount"
+                        style="color: var(--primary-color); font-weight: bold; font-size: 1rem;">
                         Total: <span id="adminTotalCount">0</span> products
                     </div>
                 </div>
                 <div style="display: flex; gap: 10px; margin-bottom: 20px; align-items: center; flex-wrap: wrap;">
                     <div style="flex: 1; min-width: 250px; position: relative;">
-                        <i class="fas fa-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #666; z-index: 1;"></i>
-                        <input type="text" id="adminProductSearch" placeholder="Search products by name, category, size..." oninput="searchAdminProducts(this.value)" class="admin-search-input">
+                        <i class="fas fa-search"
+                            style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #666; z-index: 1;"></i>
+                        <input type="text" id="adminProductSearch"
+                            placeholder="Search products by name, category, size..."
+                            oninput="searchAdminProducts(this.value)" class="admin-search-input">
                     </div>
                     <button class="btn-primary" onclick="openAddProductModal()">
                         <i class="fas fa-plus"></i> Add Product
@@ -575,116 +588,128 @@
                 </div>
                 <div class="form-group">
                     <label>Hero Description</label>
-                    <textarea id="heroDescription" rows="3">Discover the latest trends in dresses and tracksuits</textarea>
+                    <textarea id="heroDescription"
+                        rows="3">Discover the latest trends in dresses and tracksuits</textarea>
                 </div>
                 <div class="form-group">
                     <label>Hero Background Image</label>
                     <div style="margin-bottom: 10px;">
-                        <input type="file" id="heroImageFile" accept="image/*" onchange="handleHeroImageUpload(event)" style="margin-bottom: 10px;">
-                        <small style="color: #666; font-size: 0.85rem; display: block;">Upload an image file or enter URL below</small>
+                        <input type="file" id="heroImageFile" accept="image/*" onchange="handleHeroImageUpload(event)"
+                            style="margin-bottom: 10px;">
+                        <small style="color: #666; font-size: 0.85rem; display: block;">Upload an image file or enter
+                            URL below</small>
                     </div>
                     <div style="margin-top: 10px;">
                         <label style="font-size: 0.9rem; color: #666;">Or enter image URL:</label>
-                        <input type="url" id="heroImage" placeholder="https://example.com/hero-image.jpg" oninput="previewHeroImage(this.value)" style="margin-top: 5px;">
+                        <input type="url" id="heroImage" placeholder="https://example.com/hero-image.jpg"
+                            oninput="previewHeroImage(this.value)" style="margin-top: 5px;">
                     </div>
                     <div id="heroImagePreview" style="margin-top: 10px; display: none;">
                         <label style="font-size: 0.9rem; color: #666;">Preview:</label>
-                        <img id="heroPreviewImg" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Hero Preview" style="max-width: 100%; max-height: 200px; margin-top: 5px; border-radius: 5px; border: 1px solid #ddd;">
-                        <button type="button" onclick="removeHeroImage()" style="margin-top: 10px; padding: 8px 16px; background: #f44336; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                        <img id="heroPreviewImg"
+                            src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+                            alt="Hero Preview"
+                            style="max-width: 100%; max-height: 200px; margin-top: 5px; border-radius: 5px; border: 1px solid #ddd;">
+                        <button type="button" onclick="removeHeroImage()"
+                            style="margin-top: 10px; padding: 8px 16px; background: #f44336; color: white; border: none; border-radius: 5px; cursor: pointer;">
                             <i class="fas fa-trash"></i> Remove Image
                         </button>
                     </div>
                 </div>
                 <div class="form-group">
                     <label>About Us Text</label>
-                    <textarea id="aboutText" rows="5">Welcome to Trendy Dresses, your one-stop shop for the latest fashion trends. We offer a wide selection of high-quality dresses and tracksuits that combine style, comfort, and affordability. Our mission is to help you express your unique style with confidence.</textarea>
+                    <textarea id="aboutText"
+                        rows="5">Welcome to Trendy Dresses, your one-stop shop for the latest fashion trends. We offer a wide selection of high-quality dresses and tracksuits that combine style, comfort, and affordability. Our mission is to help you express your unique style with confidence.</textarea>
                 </div>
                 <button class="btn-primary" onclick="saveContent()">Save Content</button>
             </div>
-        <!-- Settings Tab -->
-        <div class="admin-tab-content" id="settingsTab">
-            <h3>Website Settings</h3>
+            <!-- Settings Tab -->
+            <div class="admin-tab-content" id="settingsTab">
+                <h3>Website Settings</h3>
 
-            <!-- Admin Credentials Section -->
-            <div class="settings-section"
-                style="background: #f9f9f9; padding: 20px; border-radius: 5px; margin-bottom: 20px;">
-                <h4 style="margin-bottom: 15px; color: var(--dark-color);">
-                    <i class="fas fa-user-shield"></i> Admin Credentials
-                </h4>
-                <form id="changeCredentialsForm" onsubmit="changeAdminCredentials(event)">
-                    <div class="form-group">
-                        <label>Current Password *</label>
-                        <input type="password" id="currentPassword" required placeholder="Enter current password">
-                        <small style="color: #666; font-size: 0.85rem;">Required to verify your
-                            identity</small>
-                    </div>
-                    <div class="form-group">
-                        <label>New Username</label>
-                        <input type="text" id="newUsername" placeholder="Leave empty to keep current username">
-                        <small style="color: #666; font-size: 0.85rem;">Current: <strong
-                                id="currentUsernameDisplay">admin</strong></small>
-                    </div>
-                    <div class="form-group">
-                        <label>New Password</label>
-                        <input type="password" id="newPassword" placeholder="Leave empty to keep current password">
-                        <small style="color: #666; font-size: 0.85rem;">Minimum 6 characters</small>
-                    </div>
-                    <div class="form-group">
-                        <label>Confirm New Password</label>
-                        <input type="password" id="confirmNewPassword" placeholder="Re-enter new password">
-                    </div>
-                    <button type="submit" class="btn-primary">
-                        <i class="fas fa-save"></i> Update Credentials
-                    </button>
-                </form>
-            </div>
-
-            <div class="form-group">
-                <label>Website Icon (Favicon)</label>
-                <div style="margin-bottom: 10px;">
-                    <label for="websiteIconFile" class="file-upload-label" style="width: auto; display: inline-block;">
-                        <i class="fas fa-upload"></i> Browse & Upload Icon
-                    </label>
-                    <input type="file" id="websiteIconFile" accept="image/*" onchange="handleWebsiteIconUpload(event)"
-                        style="display: none;">
-                    <small style="color: #666; font-size: 0.85rem; display: block; margin-top: 5px;">Upload
-                        a square
-                        image (recommended: 32x32 or 64x64 pixels)</small>
+                <!-- Admin Credentials Section -->
+                <div class="settings-section"
+                    style="background: #f9f9f9; padding: 20px; border-radius: 5px; margin-bottom: 20px;">
+                    <h4 style="margin-bottom: 15px; color: var(--dark-color);">
+                        <i class="fas fa-user-shield"></i> Admin Credentials
+                    </h4>
+                    <form id="changeCredentialsForm" onsubmit="changeAdminCredentials(event)">
+                        <div class="form-group">
+                            <label>Current Password *</label>
+                            <input type="password" id="currentPassword" required placeholder="Enter current password">
+                            <small style="color: #666; font-size: 0.85rem;">Required to verify your
+                                identity</small>
+                        </div>
+                        <div class="form-group">
+                            <label>New Username</label>
+                            <input type="text" id="newUsername" placeholder="Leave empty to keep current username">
+                            <small style="color: #666; font-size: 0.85rem;">Current: <strong
+                                    id="currentUsernameDisplay">admin</strong></small>
+                        </div>
+                        <div class="form-group">
+                            <label>New Password</label>
+                            <input type="password" id="newPassword" placeholder="Leave empty to keep current password">
+                            <small style="color: #666; font-size: 0.85rem;">Minimum 6 characters</small>
+                        </div>
+                        <div class="form-group">
+                            <label>Confirm New Password</label>
+                            <input type="password" id="confirmNewPassword" placeholder="Re-enter new password">
+                        </div>
+                        <button type="submit" class="btn-primary">
+                            <i class="fas fa-save"></i> Update Credentials
+                        </button>
+                    </form>
                 </div>
-                <div id="websiteIconPreview" style="margin-top: 10px; display: none;">
-                    <label style="font-size: 0.9rem; color: #666; font-weight: 500;">Current Icon
-                        Preview:</label>
-                    <div style="margin-top: 10px; display: flex; align-items: center; gap: 15px;">
-                        <img id="websiteIconPreviewImg" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Icon Preview"
-                            style="width: 64px; height: 64px; border-radius: 5px; border: 1px solid #ddd; object-fit: cover;">
-                        <div>
-                            <p style="margin: 0; font-size: 0.9rem; color: #666;">This icon appears
-                                in browser tabs
-                            </p>
-                            <button type="button" onclick="removeWebsiteIcon()"
-                                style="margin-top: 5px; padding: 5px 15px; background: #f44336; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 0.85rem;">
-                                <i class="fas fa-trash"></i> Remove Icon
-                            </button>
+
+                <div class="form-group">
+                    <label>Website Icon (Favicon)</label>
+                    <div style="margin-bottom: 10px;">
+                        <label for="websiteIconFile" class="file-upload-label"
+                            style="width: auto; display: inline-block;">
+                            <i class="fas fa-upload"></i> Browse & Upload Icon
+                        </label>
+                        <input type="file" id="websiteIconFile" accept="image/*"
+                            onchange="handleWebsiteIconUpload(event)" style="display: none;">
+                        <small style="color: #666; font-size: 0.85rem; display: block; margin-top: 5px;">Upload
+                            a square
+                            image (recommended: 32x32 or 64x64 pixels)</small>
+                    </div>
+                    <div id="websiteIconPreview" style="margin-top: 10px; display: none;">
+                        <label style="font-size: 0.9rem; color: #666; font-weight: 500;">Current Icon
+                            Preview:</label>
+                        <div style="margin-top: 10px; display: flex; align-items: center; gap: 15px;">
+                            <img id="websiteIconPreviewImg"
+                                src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+                                alt="Icon Preview"
+                                style="width: 64px; height: 64px; border-radius: 5px; border: 1px solid #ddd; object-fit: cover;">
+                            <div>
+                                <p style="margin: 0; font-size: 0.9rem; color: #666;">This icon appears
+                                    in browser tabs
+                                </p>
+                                <button type="button" onclick="removeWebsiteIcon()"
+                                    style="margin-top: 5px; padding: 5px 15px; background: #f44336; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 0.85rem;">
+                                    <i class="fas fa-trash"></i> Remove Icon
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
+                <div class="form-group">
+                    <label>Contact Phone</label>
+                    <input type="text" id="contactPhone" value="254724904692">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="contactEmail" value="Trendy dresses790@gmail.com">
+                </div>
+                <div class="form-group">
+                    <label>Address</label>
+                    <input type="text" id="contactAddress"
+                        value="Nairobi, Moi avenue, Imenti HSE Glory Exhibition Basement, Shop B4">
+                </div>
+                <button class="btn-primary" onclick="saveSettings()">Save Settings</button>
             </div>
-            <div class="form-group">
-                <label>Contact Phone</label>
-                <input type="text" id="contactPhone" value="254724904692">
-            </div>
-            <div class="form-group">
-                <label>Email</label>
-                <input type="email" id="contactEmail" value="Trendy dresses790@gmail.com">
-            </div>
-            <div class="form-group">
-                <label>Address</label>
-                <input type="text" id="contactAddress"
-                    value="Nairobi, Moi avenue, Imenti HSE Glory Exhibition Basement, Shop B4">
-            </div>
-            <button class="btn-primary" onclick="saveSettings()">Save Settings</button>
         </div>
-    </div>
     </div>
     <div class="admin-overlay" id="adminOverlay" onclick="closeAdminPanel()"></div>
 
@@ -764,7 +789,9 @@
                         <div id="imagePreview" style="margin-top: 15px; display: none;">
                             <label style="font-size: 0.9rem; color: #666; font-weight: 500;">Preview:</label>
                             <div style="margin-top: 10px; position: relative; display: inline-block;">
-                                <img id="previewImg" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Preview"
+                                <img id="previewImg"
+                                    src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+                                    alt="Preview"
                                     style="max-width: 100%; max-height: 200px; border-radius: 5px; border: 1px solid #ddd; display: block;">
                                 <button type="button" onclick="removeProductImage()"
                                     style="position: absolute; top: 5px; right: 5px; background: rgba(244, 67, 54, 0.9); color: white; border: none; border-radius: 50%; width: 30px; height: 30px; cursor: pointer; font-size: 0.9rem;">
@@ -822,7 +849,9 @@
                     </div>
                 </div>
                 <div style="max-width: 100%; margin: 0 auto; position: relative;">
-                    <img id="cropperImage" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Crop" style="max-width: 100%; display: block; max-height: 70vh;">
+                    <img id="cropperImage"
+                        src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Crop"
+                        style="max-width: 100%; display: block; max-height: 70vh;">
                 </div>
                 <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
                     <button type="button" class="btn-secondary" onclick="closeImageCropper()">Cancel</button>
@@ -923,7 +952,7 @@
         </div>
     </footer>
     <!-- Performance monitoring (non-critical, deferred) -->
-    <script src=\"performance-monitor.js\" defer></script>    <!-- Defer main scripts to not block rendering -->
+    <script src=\"performance-monitor.js\" defer></script> <!-- Defer main scripts to not block rendering -->
     <script src="storage-manager.js?v=1.1" defer></script>
     <script src="api-service.js?v=1.1" defer></script>
     <script src="script.js?v=1.2" defer></script>
