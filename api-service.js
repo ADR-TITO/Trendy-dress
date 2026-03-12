@@ -603,11 +603,22 @@ class ApiService {
             });
 
             if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(errorText || 'Failed to initiate M-Pesa payment prompt');
+                let errorMsg = 'Failed to initiate M-Pesa payment prompt';
+                try {
+                    const errorData = await response.json();
+                    errorMsg = errorData.message || errorData.error || errorMsg;
+                } catch (e) {
+                    const errorText = await response.text();
+                    errorMsg = errorText || errorMsg;
+                }
+                throw new Error(errorMsg);
             }
 
-            return await response.json();
+            const data = await response.json();
+            if (!data.success) {
+                throw new Error(data.message || 'Payment initiation failed');
+            }
+            return data;
         } catch (error) {
             console.error('Error initiating STK Push:', error);
             throw error;
