@@ -4299,7 +4299,7 @@ async function processSTKPushPayment(customerName, customerPhone, customerEmail,
         console.log('📱 Customer message:', stkResult.customerMessage);
 
         // Poll for payment completion
-        const checkoutRequestID = stkResult.checkoutRequestID;
+        const checkoutRequestID = stkResult.checkout_request_id || stkResult.checkoutRequestID;
         let attempts = 0;
         const maxAttempts = 60; // Poll for up to 2 minutes (60 * 2 seconds)
 
@@ -4310,52 +4310,14 @@ async function processSTKPushPayment(customerName, customerPhone, customerEmail,
                 // Query STK Push status
                 const statusResult = await apiService.querySTKPushStatus(checkoutRequestID);
 
-                if (statusResult.resultCode === '0') {
+                if (statusResult.status === 'COMPLETED' || statusResult.resultCode === '0') {
                     // Payment successful! Check for transaction in database
                     console.log('✅ Payment completed via STK Push');
 
-                    // Wait a moment for webhook to process
-                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    const receiptNumber = statusResult.mpesa_receipt || statusResult.mpesaReceiptNumber;
+                    const transactionAmount = statusResult.amount;
 
-                    // Check for transaction in database by checking recent transactions
-                    if (useDatabase) {
-                        try {
-                            // Try to get transactions from API
-                            const response = await fetch(`${apiService.baseURL}/mpesa/transactions?phoneNumber=${customerPhone.replace(/^0/, '254')}&limit=1`);
-                            if (response.ok) {
-                                const data = await response.json();
-                                if (data.success && data.transactions && data.transactions.length > 0) {
-                                    const transaction = data.transactions[0];
-                                    const receiptNumber = transaction.receiptNumber;
-                                    const transactionAmount = transaction.amount;
-
-                                    // Verify amount matches
-                                    if (Math.abs(transactionAmount - total) < 1) {
-                                        // Create order with the receipt number
-                                        await createOrderFromSTKPush(
-                                            orderId,
-                                            customerName,
-                                            customerPhone,
-                                            customerEmail,
-                                            total,
-                                            deliveryOption,
-                                            deliveryAddress,
-                                            subtotal,
-                                            deliveryCost,
-                                            deliveryOptionText,
-                                            receiptNumber
-                                        );
-                                        return; // Exit polling
-                                    }
-                                }
-                            }
-                        } catch (checkError) {
-                            console.error('Error checking transaction:', checkError);
-                        }
-                    }
-
-                    // If we couldn't find transaction, still create order (transaction will be linked via webhook)
-                    // Note: createOrderFromSTKPush will save to localStorage even if Database fails
+                    // Create order with the receipt number
                     await createOrderFromSTKPush(
                         orderId,
                         customerName,
@@ -4367,21 +4329,21 @@ async function processSTKPushPayment(customerName, customerPhone, customerEmail,
                         subtotal,
                         deliveryCost,
                         deliveryOptionText,
-                        null // Receipt number will come from webhook
+                        receiptNumber
                     );
                     return; // Exit polling
-                } else if (statusResult.resultCode === '1032') {
-                    // User cancelled or timeout - keep polling
+                } else if (statusResult.status === 'PENDING' || statusResult.resultCode === '1032' || statusResult.status === 'WAITING') {
+                    // Payment still pending - keep polling
                     if (attempts < maxAttempts) {
                         setTimeout(pollPaymentStatus, 2000);
                     } else {
                         hidePaymentVerificationModal();
-                        alert('Payment timeout. Please try again or use Till Number payment method.');
+                        alert('Payment timeout. Please check your M-Pesa messages or use Till Number payment method.');
                     }
                 } else {
                     // Payment failed or error
                     hidePaymentVerificationModal();
-                    alert(`Payment failed:\n\n${statusResult.resultDesc || 'Unknown error'}`);
+                    alert(`Payment failed:\n\n${statusResult.message || statusResult.resultDesc || 'Unknown error'}`);
                 }
             } catch (error) {
                 console.error('Error polling STK Push status:', error);

@@ -2,23 +2,24 @@
 // process_payment.php
 
 // Database connection
-$servername = "localhost";
-$username = "root";
-$password = "";
-$dbname = "daraja_fullstack";
+require_once __DIR__ . '/backend-php/config/database.php';
 
-$conn = new mysqli($servername, $username, $password, $dbname);
+try {
+    $pdo = Database::getConnection();
+} catch (Exception $e) {
+    die(json_encode(['success' => false, 'message' => "Connection failed: " . $e->getMessage()]));
+}
 
 if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
 // Daraja API configuration
-$consumer_key = 'nk16Y74eSbTaGQgc9WF8j6FigApqOMWr';
-$consumer_secret = '40fD1vRXCq90XFaU';
-$business_short_code = '174379';
-$passkey = 'bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919';
-$callback_url = 'https://655a-196-250-209-180.ngrok-free.app/callback.php';
+$consumer_key = getenv('MPESA_CONSUMER_KEY') ?: 'nk16Y74eSbTaGQgc9WF8j6FigApqOMWr';
+$consumer_secret = getenv('MPESA_CONSUMER_SECRET') ?: '40fD1vRXCq90XFaU';
+$business_short_code = getenv('MPESA_SHORTCODE') ?: '174379';
+$passkey = getenv('MPESA_PASSKEY') ?: 'bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919';
+$callback_url = getenv('MPESA_CALLBACK_URL') ?: 'https://655a-196-250-209-180.ngrok-free.app/callback.php';
 
 // Function to generate access token
 function getAccessToken($consumer_key, $consumer_secret) {
@@ -83,18 +84,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if (isset($stk_push_response->ResponseCode) && $stk_push_response->ResponseCode == "0") {
         // Payment request successful, save to database
         $checkout_request_id = $stk_push_response->CheckoutRequestID;
-        $sql = "INSERT INTO payments (phone_number, amount, checkout_request_id, status) VALUES (?, ?, ?, 'PENDING')";
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param("sds", $phone_number, $amount, $checkout_request_id);
         
-        if ($stmt->execute()) {
+        try {
+            $sql = "INSERT INTO mpesa_transactions (phoneNumber, amount, checkoutRequestID, transactionDate, resultCode, resultDesc) VALUES (?, ?, ?, NOW(), 999, 'PENDING')";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([$phone_number, $amount, $checkout_request_id]);
+
             echo json_encode([
                 'success' => true, 
                 'message' => 'Payment request sent. Please check your phone to complete the transaction.',
                 'checkout_request_id' => $checkout_request_id
             ]);
-        } else {
-            echo json_encode(['success' => false, 'message' => 'Error saving payment details.']);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => 'Error saving payment details: ' . $e->getMessage()]);
         }
     } else {
         echo json_encode(['success' => false, 'message' => 'Failed to initiate payment. Please try again.']);

@@ -2,15 +2,12 @@
 // callback.php
 
 // Database connection
-$servername = "localhost";
-$username = "root";
-$password = "";
-$dbname = "daraja_fullstack";
+require_once __DIR__ . '/backend-php/config/database.php';
 
-$conn = new mysqli($servername, $username, $password, $dbname);
-
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
+try {
+    $pdo = Database::getConnection();
+} catch (Exception $e) {
+    die("Connection failed: " . $e->getMessage());
 }
 
 
@@ -33,25 +30,34 @@ if (isset($callbackContent->Body->stkCallback->ResultCode)) {
 
     if ($result_code == 0) {
         // Payment successful
-        $status = 'COMPLETED';
-        $mpesa_receipt_number = $callbackContent->Body->stkCallback->CallbackMetadata->Item[1]->Value;
+        $status = 0;
+        // Attempt to find the Receipt Number in the metadata
+        $mpesa_receipt_number = null;
+        if (isset($callbackContent->Body->stkCallback->CallbackMetadata->Item)) {
+            foreach ($callbackContent->Body->stkCallback->CallbackMetadata->Item as $item) {
+                if ($item->Name === 'MpesaReceiptNumber') {
+                    $mpesa_receipt_number = $item->Value;
+                    break;
+                }
+            }
+        }
         logMessage("Payment successful: CheckoutRequestID: $checkout_request_id, M-Pesa Receipt: $mpesa_receipt_number");
     } else {
         // Payment failed
-        $status = 'FAILED';
+        $status = $result_code;
         $mpesa_receipt_number = null;
         logMessage("Payment failed: CheckoutRequestID: $checkout_request_id, Result Code: $result_code");
     }
 
     // Update the payment status in the database
-    $sql = "UPDATE payments SET status = ?, mpesa_receipt = ? WHERE checkout_request_id = ?";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("sss", $status, $mpesa_receipt_number, $checkout_request_id);
+    $sql = "UPDATE mpesa_transactions SET resultCode = ?, receiptNumber = ? WHERE checkoutRequestID = ?";
+    $stmt = $pdo->prepare($sql);
     
-    if ($stmt->execute()) {
+    if ($stmt->execute([$status, $mpesa_receipt_number, $checkout_request_id])) {
         logMessage("Payment status updated in database: $checkout_request_id - $status");
     } else {
-        logMessage("Error updating payment status: " . $stmt->error);
+        $errorInfo = $stmt->errorInfo();
+        logMessage("Error updating payment status: " . ($errorInfo[2] ?? 'Unknown error'));
     }
 } else {
     logMessage("Invalid callback content received");

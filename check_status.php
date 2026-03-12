@@ -5,28 +5,24 @@
 header('Content-Type: application/json');
 
 // Database connection
-$servername = "localhost";
-$username = "root";
-$password = "";
-$dbname = "daraja_fullstack";
+require_once __DIR__ . '/backend-php/config/database.php';
 
-$conn = new mysqli($servername, $username, $password, $dbname);
-
-if ($conn->connect_error) {
-    die(json_encode(['success' => false, 'message' => "Connection failed: " . $conn->connect_error]));
+try {
+    $pdo = Database::getConnection();
+} catch (Exception $e) {
+    die(json_encode(['success' => false, 'message' => "Connection failed: " . $e->getMessage()]));
 }
 
 if (isset($_GET['checkout_request_id'])) {
     $checkout_request_id = $_GET['checkout_request_id'];
     
-    $sql = "SELECT status, mpesa_receipt, amount FROM payments WHERE checkout_request_id = ?";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("s", $checkout_request_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
+    $sql = "SELECT resultCode as status, receiptNumber as mpesa_receipt, amount FROM mpesa_transactions WHERE checkoutRequestID = ?";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$checkout_request_id]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
     
-    if ($row = $result->fetch_assoc()) {
-        if ($row['status'] == 'COMPLETED') {
+    if ($row) {
+        if ($row['status'] == '0' && !empty($row['mpesa_receipt']) && $row['mpesa_receipt'] !== 'PENDING') {
             echo json_encode([
                 'success' => true,
                 'status' => 'COMPLETED',

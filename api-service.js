@@ -590,25 +590,21 @@ class ApiService {
         }
     }
 
-    // Initiate STK Push (M-Pesa Prompt) payment
+    // Initiate STK Push (M-Pesa Prompt) payment using repo script
     async initiateSTKPush(phoneNumber, amount, accountReference, transactionDesc) {
         try {
-            const response = await fetch(`${this.baseURL}/mpesa/stk-push`, {
+            const formData = new FormData();
+            formData.append('phoneNumber', phoneNumber);
+            formData.append('amount', amount);
+
+            const response = await fetch('process_payment.php', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    phoneNumber,
-                    amount,
-                    accountReference: accountReference || 'TrendyDresses',
-                    transactionDesc: transactionDesc || 'Payment for order'
-                })
+                body: formData
             });
 
             if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || error.message || 'Failed to initiate M-Pesa payment prompt');
+                const errorText = await response.text();
+                throw new Error(errorText || 'Failed to initiate M-Pesa payment prompt');
             }
 
             return await response.json();
@@ -618,22 +614,16 @@ class ApiService {
         }
     }
 
-    // Query STK Push status
+    // Query STK Push status using repo script
     async querySTKPushStatus(checkoutRequestID) {
         try {
-            const response = await fetch(`${this.baseURL}/mpesa/stk-push-status`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    checkoutRequestID
-                })
+            const response = await fetch(`check_status.php?checkout_request_id=${checkoutRequestID}`, {
+                method: 'GET'
             });
 
             if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || error.message || 'Failed to query STK Push status');
+                const errorText = await response.text();
+                throw new Error(errorText || 'Failed to query STK Push status');
             }
 
             return await response.json();
