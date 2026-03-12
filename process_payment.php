@@ -1,16 +1,12 @@
 <?php
 // process_payment.php
 
-// Database connection
-require_once __DIR__ . '/backend-php/config/database.php';
-
 try {
+    // Database connection
+    require_once __DIR__ . '/backend-php/config/database.php';
     $pdo = Database::getConnection();
-} catch (Exception $e) {
-    die(json_encode(['success' => false, 'message' => "Connection failed: " . $e->getMessage()]));
-}
 
-// $conn check removed as we are using $pdo
+    // $conn check removed as we are using $pdo
 
 // Daraja API configuration
 $consumer_key = getenv('MPESA_CONSUMER_KEY') ?: 'DVbZeuGGcOQKtRL1Kr4WCV6mOAHoEDwrUGzWgIN2myGN5CFI';
@@ -99,10 +95,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             echo json_encode(['success' => false, 'message' => 'Error saving payment details: ' . $e->getMessage()]);
         }
     } else {
-        echo json_encode(['success' => false, 'message' => 'Failed to initiate payment. Please try again.']);
+        $errorMessage = 'Failed to initiate payment. Please try again.';
+        if (isset($stk_push_response->errorMessage)) {
+            $errorMessage = $stk_push_response->errorMessage;
+        } elseif (isset($stk_push_response->faultString)) {
+            $errorMessage = $stk_push_response->faultString;
+        }
+        echo json_encode(['success' => false, 'message' => $errorMessage, 'debug' => $stk_push_response]);
     }
 } else {
     echo json_encode(['success' => false, 'message' => 'Invalid request method.']);
 }
-
+} catch (Throwable $e) {
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Internal server error: ' . $e->getMessage()
+    ]);
+}
 ?>
