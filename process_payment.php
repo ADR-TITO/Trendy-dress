@@ -23,18 +23,18 @@ function getAccessToken($consumer_key, $consumer_secret)
     }
 
     $url = 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials';
-    $curl = curl_init($url);
+    $curl = curl_init();
     
-    $auth = base64_encode(trim($consumer_key) . ':' . trim($consumer_secret));
-    $headers = [
-        'Authorization: Basic ' . $auth,
-        'Accept: application/json'
-    ];
-    
-    curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
-    curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($curl, CURLOPT_TIMEOUT, 30);
+    curl_setopt_array($curl, [
+        CURLOPT_URL => $url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_USERPWD => trim($consumer_key) . ":" . trim($consumer_secret),
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_ENCODING => "",
+        CURLOPT_HTTPHEADER => ['Accept: application/json']
+    ]);
     
     $result = curl_exec($curl);
     $status = curl_getinfo($curl, CURLINFO_HTTP_CODE);
