@@ -10,13 +10,11 @@ try {
     die(json_encode(['success' => false, 'message' => "Connection failed: " . $e->getMessage()]));
 }
 
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
+// $conn check removed as we are using $pdo
 
 // Daraja API configuration
-$consumer_key = getenv('MPESA_CONSUMER_KEY') ?: 'nk16Y74eSbTaGQgc9WF8j6FigApqOMWr';
-$consumer_secret = getenv('MPESA_CONSUMER_SECRET') ?: '40fD1vRXCq90XFaU';
+$consumer_key = getenv('MPESA_CONSUMER_KEY') ?: 'DVbZeuGGcOQKtRL1Kr4WCV6mOAHoEDwrUGzWgIN2myGN5CFI';
+$consumer_secret = getenv('MPESA_CONSUMER_SECRET') ?: 'tlplomAQhV46CojmgO4nN8wykLA6HCtrRAG6hzWmdX7woPUXpnhN3yPN0LwTgJLJ';
 $business_short_code = getenv('MPESA_SHORTCODE') ?: '177104';
 $passkey = getenv('MPESA_PASSKEY') ?: 'bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919';
 $callback_url = getenv('MPESA_CALLBACK_URL') ?: 'http://www.trendydresses.co.ke/callback.php';
@@ -54,7 +52,7 @@ function initiateSTKPush($access_token, $business_short_code, $passkey, $amount,
         'Password' => $password,
         'Timestamp' => $timestamp,
         'TransactionType' => 'CustomerPayBillOnline',
-        'Amount' => $amount,
+        'Amount' => (int)ceil($amount),
         'PartyA' => $phone_number,
         'PartyB' => $business_short_code,
         'PhoneNumber' => $phone_number,
@@ -107,5 +105,4 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     echo json_encode(['success' => false, 'message' => 'Invalid request method.']);
 }
 
-$conn->close();
 ?>

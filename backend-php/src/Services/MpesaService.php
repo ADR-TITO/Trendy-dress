@@ -107,7 +107,7 @@ class MpesaService
                 'Password' => $password,
                 'Timestamp' => $timestamp,
                 'TransactionType' => 'CustomerPayBillOnline',
-                'Amount' => round($amount, 2), // Ensure exactly 2 decimal places if needed or rounded
+                'Amount' => (int)ceil($amount), // Daraja API expects STK push amounts to be integers without decimals
                 'PartyA' => $phone,
                 'PartyB' => $this->shortCode,
                 'PhoneNumber' => $phone,
