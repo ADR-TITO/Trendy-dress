@@ -83,12 +83,14 @@ try {
             amount DECIMAL(10, 2) NOT NULL,
             merchantRequestID VARCHAR(255),
             checkoutRequestID VARCHAR(255),
+            orderId VARCHAR(255),
             resultCode INT,
             resultDesc VARCHAR(255),
             createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             INDEX idx_receiptNumber (receiptNumber),
             INDEX idx_transactionDate (transactionDate),
-            INDEX idx_checkoutRequestID (checkoutRequestID)
+            INDEX idx_checkoutRequestID (checkoutRequestID),
+            INDEX idx_orderId (orderId)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
         $result['tables_created'][] = 'mpesa_transactions';
     } catch (Exception $e) {

@@ -91,19 +91,24 @@ class MpesaService {
             $timestamp = date('YmdHis');
             $password = base64_encode($this->shortCode . $this->passkey . $timestamp);
             
-            $callbackURL = $_ENV['MPESA_CALLBACK_URL'] ?? 'https://trendydresses.co.ke/api/mpesa/callback';
+            // Robust callback URL detection
+            $protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') ? 'https' : 'http';
+            $host = $_SERVER['HTTP_HOST'] ?? 'trendydresses.co.ke';
+            $defaultCallback = "$protocol://$host/backend-php/api";
+            
+            $callbackURL = $_ENV['MPESA_CALLBACK_URL'] ?? $defaultCallback;
             
             $data = [
                 'BusinessShortCode' => $this->shortCode,
                 'Password' => $password,
                 'Timestamp' => $timestamp,
                 'TransactionType' => 'CustomerPayBillOnline',
-                'Amount' => (int)$amount,
+                'Amount' => round($amount, 2), // Ensure exactly 2 decimal places if needed or rounded
                 'PartyA' => $phone,
                 'PartyB' => $this->shortCode,
                 'PhoneNumber' => $phone,
-                'CallBackURL' => $callbackURL . '/webhook',
-                'AccountReference' => $accountReference . '_' . $orderId, // Append orderId for traceability
+                'CallBackURL' => rtrim($callbackURL, '/') . '/mpesa/webhook',
+                'AccountReference' => $accountReference . '_' . $orderId,
                 'TransactionDesc' => $transactionDesc
             ];
             

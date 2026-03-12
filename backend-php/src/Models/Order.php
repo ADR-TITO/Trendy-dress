@@ -132,6 +132,59 @@ class Order {
     }
     
     /**
+     * Update order by internal ID
+     */
+    public function update($id, $data) {
+        try {
+            $pdo = Database::getConnection();
+            
+            $fields = [];
+            $params = [':id' => $id];
+            
+            // Map array keys to database columns
+            $map = [
+                'orderId' => 'orderId',
+                'customerName' => 'customerName',
+                'customerPhone' => 'customerPhone',
+                'customerEmail' => 'customerEmail',
+                'items' => 'items',
+                'totalAmount' => 'totalAmount',
+                'totalPaid' => 'totalPaid', // Assume this column might exist or be added
+                'paymentMethod' => 'paymentMethod',
+                'paymentStatus' => 'paymentStatus', // Assume this column might exist
+                'mpesaCode' => 'mpesaCode',
+                'deliveryStatus' => 'deliveryStatus',
+                'deliveredBy' => 'deliveredBy',
+                'verified' => 'verified' // Assume this column might exist
+            ];
+
+            foreach ($map as $key => $column) {
+                if (isset($data[$key])) {
+                    $value = $data[$key];
+                    if ($key === 'items' && is_array($value)) {
+                        $value = json_encode($value);
+                    }
+                    $fields[] = "$column = :$key";
+                    $params[":$key"] = $value;
+                }
+            }
+            
+            if (empty($fields)) {
+                return false;
+            }
+            
+            $sql = "UPDATE orders SET " . implode(', ', $fields) . " WHERE id = :id";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            
+            return true;
+        } catch (\Exception $e) {
+            error_log("Error updating order: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    /**
      * Update delivery status
      */
     public function updateDeliveryStatus($orderId, $status, $deliveredBy = null) {
