@@ -43,24 +43,39 @@ class MpesaService
             throw new \Exception('M-Pesa credentials not configured');
         }
 
-        $auth = base64_encode($this->consumerKey . ':' . $this->consumerSecret);
+        $auth = base64_encode(trim($this->consumerKey) . ':' . trim($this->consumerSecret));
 
         $ch = curl_init($this->baseURL . '/oauth/v1/generate?grant_type=client_credentials');
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Authorization: Basic ' . $auth
+            'Authorization: Basic ' . $auth,
+            'Accept: application/json'
         ]);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 60);
 
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
         curl_close($ch);
 
+        if ($response === false) {
+            throw new \Exception("M-Pesa Auth Connection Error: " . $curlError);
+        }
+
         if ($httpCode !== 200) {
-            throw new \Exception('Failed to authenticate with M-Pesa API');
+            $data = json_decode($response, true);
+            $error = $data['errorMessage'] ?? $data['faultString'] ?? $response ?? 'Unknown Error';
+            throw new \Exception("M-Pesa Auth Failed (HTTP $httpCode): " . $error);
         }
 
         $data = json_decode($response, true);
         $this->accessToken = $data['access_token'] ?? '';
+        
+        if (!$this->accessToken) {
+             throw new \Exception('Failed to extract access token from M-Pesa response');
+        }
+
         $this->tokenExpiry = time() + (55 * 60); // 55 minutes
 
         return $this->accessToken;
