@@ -28,10 +28,17 @@ function getAccessToken($consumer_key, $consumer_secret)
     curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
     $result = curl_exec($curl);
     $status = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+    $curl_error = curl_error($curl);
+    
+    if ($result === false) {
+        throw new Exception("cURL Error generating token: " . $curl_error);
+    }
+    
     $result_decoded = json_decode($result);
     
     if ($status !== 200 || !isset($result_decoded->access_token)) {
-        throw new Exception("Auth Failed: " . ($result_decoded->errorMessage ?? $result_decoded->faultString ?? $result));
+        throw new Exception("Auth Failed. Status: $status. Response: " . 
+            ($result_decoded->errorMessage ?? $result_decoded->faultString ?? $result ?? 'Empty Response'));
     }
     
     return $result_decoded->access_token;
