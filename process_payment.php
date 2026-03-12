@@ -9,39 +9,50 @@ try {
     // $conn check removed as we are using $pdo
 
 // Daraja API configuration
-$consumer_key = getenv('MPESA_CONSUMER_KEY') ?: 'DVbZeuGGcOQKtRL1Kr4WCV6mOAHoEDwrUGzWgIN2myGN5CFI';
-$consumer_secret = getenv('MPESA_CONSUMER_SECRET') ?: 'tlplomAQhV46CojmgO4nN8wykLA6HCtrRAG6hzWmdX7woPUXpnhN3yPN0LwTgJLJ';
-$business_short_code = getenv('MPESA_SHORTCODE') ?: '177104';
-$passkey = getenv('MPESA_PASSKEY') ?: 'bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919';
-$callback_url = getenv('MPESA_CALLBACK_URL') ?: 'http://www.trendydresses.co.ke/callback.php';
+$consumer_key = $_ENV['MPESA_CONSUMER_KEY'] ?? 'DVbZeuGGcOQKtRL1Kr4WCV6mOAHoEDwrUGzWgIN2myGN5CFI';
+$consumer_secret = $_ENV['MPESA_CONSUMER_SECRET'] ?? 'tlplomAQhV46CojmgO4nN8wykLA6HCtrRAG6hzWmdX7woPUXpnhN3yPN0LwTgJLJ';
+$business_short_code = $_ENV['MPESA_SHORTCODE'] ?? '177104';
+$passkey = $_ENV['MPESA_PASSKEY'] ?? 'bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919';
+$callback_url = $_ENV['MPESA_CALLBACK_URL'] ?? 'https://trendydresses.co.ke/callback.php';
 
 // Function to generate access token
 function getAccessToken($consumer_key, $consumer_secret)
 {
     $url = 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials';
     $curl = curl_init();
+    
+    // Explicitly set headers and method
+    $auth = base64_encode($consumer_key . ':' . $consumer_secret);
+    $headers = [
+        'Authorization: Basic ' . $auth,
+        'Content-Type: application/json; charset=utf-8',
+        'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    ];
+    
     curl_setopt($curl, CURLOPT_URL, $url);
-    $credentials = base64_encode($consumer_key . ':' . $consumer_secret);
-    curl_setopt($curl, CURLOPT_HTTPHEADER, array('Authorization: Basic ' . $credentials));
-    curl_setopt($curl, CURLOPT_HEADER, false);
+    curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
     curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($curl, CURLOPT_HTTPGET, true); // Ensure GET request
+    curl_setopt($curl, CURLOPT_TIMEOUT, 30);
+    
     $result = curl_exec($curl);
     $status = curl_getinfo($curl, CURLINFO_HTTP_CODE);
     $curl_error = curl_error($curl);
+    curl_close($curl);
     
     if ($result === false) {
         throw new Exception("cURL Error generating token: " . $curl_error);
     }
     
-    $result_decoded = json_decode($result);
+    $result_decoded = json_decode($result, true);
     
-    if ($status !== 200 || !isset($result_decoded->access_token)) {
-        throw new Exception("Auth Failed. Status: $status. Response: " . 
-            ($result_decoded->errorMessage ?? $result_decoded->faultString ?? $result ?? 'Empty Response'));
+    if ($status !== 200 || !isset($result_decoded['access_token'])) {
+        $errorMessage = $result_decoded['errorMessage'] ?? $result_decoded['faultString'] ?? $result ?? 'Empty Response';
+        throw new Exception("Auth Failed. Status: $status. Detail: $errorMessage");
     }
     
-    return $result_decoded->access_token;
+    return $result_decoded['access_token'];
 }
 
 // Function to initiate STK Push
