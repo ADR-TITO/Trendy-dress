@@ -18,22 +18,22 @@ $callback_url = $_ENV['MPESA_CALLBACK_URL'] ?? 'https://trendydresses.co.ke/call
 // Function to generate access token
 function getAccessToken($consumer_key, $consumer_secret)
 {
+    if (empty($consumer_key) || empty($consumer_secret)) {
+        throw new Exception("M-Pesa credentials (key/secret) are missing or empty.");
+    }
+
     $url = 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials';
-    $curl = curl_init();
+    $curl = curl_init($url);
     
-    // Explicitly set headers and method
-    $auth = base64_encode($consumer_key . ':' . $consumer_secret);
+    $auth = base64_encode(trim($consumer_key) . ':' . trim($consumer_secret));
     $headers = [
         'Authorization: Basic ' . $auth,
-        'Content-Type: application/json; charset=utf-8',
-        'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        'Accept: application/json'
     ];
     
-    curl_setopt($curl, CURLOPT_URL, $url);
     curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
     curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($curl, CURLOPT_HTTPGET, true); // Ensure GET request
     curl_setopt($curl, CURLOPT_TIMEOUT, 30);
     
     $result = curl_exec($curl);
@@ -42,14 +42,19 @@ function getAccessToken($consumer_key, $consumer_secret)
     curl_close($curl);
     
     if ($result === false) {
-        throw new Exception("cURL Error generating token: " . $curl_error);
+        throw new Exception("cURL Error: " . $curl_error);
     }
     
     $result_decoded = json_decode($result, true);
     
     if ($status !== 200 || !isset($result_decoded['access_token'])) {
-        $errorMessage = $result_decoded['errorMessage'] ?? $result_decoded['faultString'] ?? $result ?? 'Empty Response';
-        throw new Exception("Auth Failed. Status: $status. Detail: $errorMessage");
+        $detail = "";
+        if (is_array($result_decoded)) {
+            $detail = $result_decoded['errorMessage'] ?? $result_decoded['faultString'] ?? json_encode($result_decoded);
+        } else {
+            $detail = !empty($result) ? $result : "Empty Response Body";
+        }
+        throw new Exception("Auth Failed (HTTP $status). Detail: $detail");
     }
     
     return $result_decoded['access_token'];
