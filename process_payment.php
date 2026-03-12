@@ -28,8 +28,13 @@ function getAccessToken($consumer_key, $consumer_secret)
     curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
     $result = curl_exec($curl);
     $status = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-    $result = json_decode($result);
-    return $result->access_token;
+    $result_decoded = json_decode($result);
+    
+    if ($status !== 200 || !isset($result_decoded->access_token)) {
+        throw new Exception("Auth Failed: " . ($result_decoded->errorMessage ?? $result_decoded->faultString ?? $result));
+    }
+    
+    return $result_decoded->access_token;
 }
 
 // Function to initiate STK Push
