@@ -154,6 +154,7 @@ class MpesaService
             if (isset($responseData['ResponseCode']) && $responseData['ResponseCode'] == "0") {
                 try {
                     $insertSql = "INSERT INTO mpesa_transactions (
+                        receiptNumber,
                         checkoutRequestID, 
                         merchantRequestID, 
                         orderId, 
@@ -162,10 +163,12 @@ class MpesaService
                         transactionDate, 
                         resultDesc,
                         resultCode
-                    ) VALUES (?, ?, ?, ?, ?, NOW(), ?, NULL)";
+                    ) VALUES (?, ?, ?, ?, ?, ?, NOW(), ?, NULL)";
                     
+                    $pendingReceipt = 'PENDING_' . $responseData['CheckoutRequestID'];
                     $stmt = $pdo->prepare($insertSql);
                     $stmt->execute([
+                        $pendingReceipt,
                         $responseData['CheckoutRequestID'],
                         $responseData['MerchantRequestID'],
                         $orderId,
@@ -173,7 +176,7 @@ class MpesaService
                         $phone,
                         'Initiated - Waiting for customer'
                     ]);
-                    error_log("✅ Registered pending transaction for CheckoutRequestID: " . $responseData['CheckoutRequestID']);
+                    error_log("✅ Registered pending transaction: $pendingReceipt");
                 } catch (\Exception $dbEx) {
                     error_log("⚠️ Warning: Failed to register pending transaction: " . $dbEx->getMessage());
                     // Don't fail the whole request even if DB log fails
