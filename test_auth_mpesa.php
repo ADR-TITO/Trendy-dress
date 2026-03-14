@@ -6,7 +6,7 @@ require_once __DIR__ . '/backend-php/config/database.php';
 // Load environment variables
 Database::init();
 
-$consumer_key = $_ENV['MPESA_CONSUMER_KEY'] ?? 'j9G6DA6JQwqv7poyeCMTXTyDscFLZoV4vEaswwMLmOCGmK2y';
+$consumer_key = $_ENV['MPESA_CONSUMER_KEY'] ?? 'DVbZeuGGcOQKtRL1Kr4WCV6mOAHoEDwrUGzWgIN2myGN5CFI';
 $consumer_secret = $_ENV['MPESA_CONSUMER_SECRET'] ?? 'AlCA04HIrvRhK9VogcJqXITzFmvQ0JUlMYOwGPG814m2bbUXF4EZEJzprW7B1BIf';
 
 $environment = $_ENV['MPESA_ENVIRONMENT'] ?? 'production';

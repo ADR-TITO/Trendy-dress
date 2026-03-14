@@ -20,7 +20,7 @@ class MpesaService
     {
         // M-Pesa Daraja API Credentials
         // Can be overridden by .env file if present
-        $this->consumerKey = $_ENV['MPESA_CONSUMER_KEY'] ?? 'j9G6DA6JQwqv7poyeCMTXTyDscFLZoV4vEaswwMLmOCGmK2y';
+        $this->consumerKey = $_ENV['MPESA_CONSUMER_KEY'] ?? 'DVbZeuGGcOQKtRL1Kr4WCV6mOAHoEDwrUGzWgIN2myGN5CFI';
         $this->consumerSecret = $_ENV['MPESA_CONSUMER_SECRET'] ?? 'AlCA04HIrvRhK9VogcJqXITzFmvQ0JUlMYOwGPG814m2bbUXF4EZEJzprW7B1BIf';
         $this->shortCode = $_ENV['MPESA_SHORTCODE'] ?? '3576761'; // Till Number
         $this->passkey = $_ENV['MPESA_PASSKEY'] ?? 'a48a4833b7b881cd22535945a0c61ce835af45be1169a6852c23a4f6136538e0'; // Sandbox passkey

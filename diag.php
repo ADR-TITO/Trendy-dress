@@ -4,14 +4,19 @@ require_once __DIR__ . '/backend-php/config/database.php';
 
 header('Content-Type: text/html');
 
-// Try to load .env manually if not already loaded (though it should be in production via other means)
-if (file_exists(__DIR__ . '/backend-php/.env')) {
-    $lines = file(__DIR__ . '/backend-php/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+// Load .env manually with better parsing
+$envFile = __DIR__ . '/backend-php/.env';
+if (file_exists($envFile)) {
+    $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     foreach ($lines as $line) {
         if (strpos(trim($line), '#') === 0) continue;
-        list($name, $value) = explode('=', $line, 2);
-        $_ENV[trim($name)] = trim($value);
+        if (strpos($line, '=') !== false) {
+            list($name, $value) = explode('=', $line, 2);
+            $_ENV[trim($name)] = trim(trim($value), '"\'');
+        }
     }
+} else {
+    echo "⚠️ Warning: .env file not found at $envFile\n";
 }
 
 $mpesa_env = $_ENV['MPESA_ENVIRONMENT'] ?? 'production';
