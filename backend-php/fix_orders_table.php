@@ -36,6 +36,13 @@ try {
             $result['added_columns'][] = $column;
         }
     }
+
+    // Check for index
+    $stmt = $pdo->query("SHOW INDEX FROM orders WHERE Key_name = 'idx_paymentStatus'");
+    if ($stmt->rowCount() === 0) {
+        $pdo->exec("CREATE INDEX idx_paymentStatus ON orders(paymentStatus)");
+        $result['added_columns'][] = 'index:idx_paymentStatus';
+    }
     
     // Also check mpesa_transactions for orderId just in case
     $stmt = $pdo->query("DESCRIBE mpesa_transactions");

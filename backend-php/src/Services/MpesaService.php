@@ -43,7 +43,7 @@ class MpesaService
             throw new \Exception('M-Pesa credentials not configured');
         }
 
-        $auth = base64_encode(trim($this->consumerKey) . ':' . trim($this->consumerSecret));
+        $auth = base64_encode(trim($this->consumerKey ?? '') . ':' . trim($this->consumerSecret ?? ''));
 
         $ch = curl_init($this->baseURL . '/oauth/v1/generate?grant_type=client_credentials');
         curl_setopt($ch, CURLOPT_HTTPHEADER, [

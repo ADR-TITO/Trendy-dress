@@ -226,8 +226,11 @@ class Order {
             'items' => $items,
             'total' => isset($order['totalAmount']) ? (float)$order['totalAmount'] : 0.0,
             'totalAmount' => isset($order['totalAmount']) ? (float)$order['totalAmount'] : 0.0,
+            'totalPaid' => isset($order['totalPaid']) ? (float)$order['totalPaid'] : 0.0,
+            'paymentStatus' => $order['paymentStatus'] ?? 'pending',
             'paymentMethod' => $order['paymentMethod'] ?? '',
             'mpesaCode' => $order['mpesaCode'] ?? '',
+            'verified' => (bool)($order['verified'] ?? false),
             'delivery' => [
                 'status' => $order['deliveryStatus'] ?? 'pending',
                 'deliveredBy' => $order['deliveredBy'] ?? null

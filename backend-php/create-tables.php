@@ -58,14 +58,18 @@ try {
             customerEmail VARCHAR(255),
             items LONGTEXT NOT NULL,
             totalAmount DECIMAL(10, 2) NOT NULL,
+            totalPaid DECIMAL(10, 2) DEFAULT 0.00,
             paymentMethod VARCHAR(50),
+            paymentStatus VARCHAR(50) DEFAULT 'pending',
             mpesaCode VARCHAR(100),
             deliveryStatus VARCHAR(50) DEFAULT 'pending',
             deliveredBy VARCHAR(255),
+            verified BOOLEAN DEFAULT FALSE,
             createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             INDEX idx_orderId (orderId),
             INDEX idx_deliveryStatus (deliveryStatus),
+            INDEX idx_paymentStatus (paymentStatus),
             INDEX idx_createdAt (createdAt)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
         $result['tables_created'][] = 'orders';

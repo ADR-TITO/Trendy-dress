@@ -229,8 +229,8 @@ try {
                                             'verified' => true
                                         ];
                                         // Merge with existing order data to preserve other fields
-                                        $updatedOrder = array_merge($existingOrder, $updateOrderData);
-                                        $orderModel->update($existingOrder['_id'], $updatedOrder); // Assuming order model update by _id
+                                        // Note: convertToArray returns '_id' as the row ID
+                                        $orderModel->update($existingOrder['_id'], $updateOrderData);
                                         error_log("✅ Order $orderId updated with successful STK Push payment. Receipt: $receiptNumber, Amount: $mpesaAmount");
                                     } else {
                                         error_log("⚠️ Webhook: Order $orderId not found for update after successful STK Push.");
