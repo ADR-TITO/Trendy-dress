@@ -24,20 +24,26 @@ try {
     $idInfo = $pdo->query("SHOW COLUMNS FROM mpesa_transactions WHERE Field = 'id'")->fetch(PDO::FETCH_ASSOC);
     if (strpos($idInfo['Type'], 'int') === false || strpos($idInfo['Extra'], 'auto_increment') === false) {
         echo "- Fixing 'id' column to INT AUTO_INCREMENT...\n";
-        // We might need to drop primary key and re-add if it's already a primary key but varchar
+        
         try {
-            // Step 1: Remove existing Primary Key if necessary
-            // (Assuming 'id' is currently the PK based on normal patterns)
+            // Step 1: Drop primary key if exists (to avoid "Multiple primary key" error)
+            if (!empty($idInfo['Key'])) {
+                echo "  - Dropping existing Primary Key...\n";
+                // In MySQL/MariaDB, we drop the PK constraint
+                $pdo->exec("ALTER TABLE mpesa_transactions DROP PRIMARY KEY");
+            }
             
-            // Step 2: Change type
+            // Step 2: Convert id to INT AUTO_INCREMENT and set as PRIMARY KEY
+            // Note: We use CHANGE if we want to change name/type, but MODIFY is fine for changing type of existing column
             $pdo->exec("ALTER TABLE mpesa_transactions MODIFY id INT AUTO_INCREMENT PRIMARY KEY");
             echo "  Done.\n";
         } catch (Exception $pkEx) {
-            echo "  ⚠️ Could not modify 'id' automatically: " . $pkEx->getMessage() . "\n";
-            echo "  Trying alternative fix (rename old id and create new one)...\n";
+            echo "  ⚠️ Automatic fix failed: " . $pkEx->getMessage() . "\n";
+            echo "  Trying manual multi-step fix...\n";
+            // If modify fails, try renaming and adding fresh
             $pdo->exec("ALTER TABLE mpesa_transactions CHANGE id old_id VARCHAR(255)");
             $pdo->exec("ALTER TABLE mpesa_transactions ADD COLUMN id INT AUTO_INCREMENT PRIMARY KEY FIRST");
-            echo "  Done (Old IDs preserved in 'old_id' column).\n";
+            echo "  Done (New column created, old column kept as 'old_id').\n";
         }
     } else {
         echo "- 'id' column is already INT AUTO_INCREMENT.\n";
