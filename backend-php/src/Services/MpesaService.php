@@ -20,11 +20,11 @@ class MpesaService
     {
         // M-Pesa Daraja API Credentials
         // Can be overridden by .env file if present
-        $this->consumerKey = $_ENV['MPESA_CONSUMER_KEY'] ?? 'DVbZeuGGcOQKtRL1Kr4WCV6mOAHoEDwrUGzWgIN2myGN5CFI';
-        $this->consumerSecret = $_ENV['MPESA_CONSUMER_SECRET'] ?? 'tlplomAQhV46CojmgO4nN8wykLA6HCtrRAG6hzWmdX7woPUXpnhN3yPN0LwTgJLJ';
-        $this->shortCode = $_ENV['MPESA_SHORTCODE'] ?? '177104'; // Till Number
-        $this->passkey = $_ENV['MPESA_PASSKEY'] ?? 'bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919'; // Sandbox passkey
-        $this->environment = $_ENV['MPESA_ENVIRONMENT'] ?? 'sandbox';
+        $this->consumerKey = $_ENV['MPESA_CONSUMER_KEY'] ?? 'j9G6DA6JQwqv7poyeCMTXTyDscFLZoV4vEaswwMLmOCGmK2y';
+        $this->consumerSecret = $_ENV['MPESA_CONSUMER_SECRET'] ?? 'AlCA04HIrvRhK9VogcJqXITzFmvQ0JUlMYOwGPG814m2bbUXF4EZEJzprW7B1BIf';
+        $this->shortCode = $_ENV['MPESA_SHORTCODE'] ?? '3576761'; // Till Number
+        $this->passkey = $_ENV['MPESA_PASSKEY'] ?? 'a48a4833b7b881cd22535945a0c61ce835af45be1169a6852c23a4f6136538e0'; // Sandbox passkey
+        $this->environment = $_ENV['MPESA_ENVIRONMENT'] ?? 'production';
         $this->baseURL = $this->environment === 'production'
             ? 'https://api.safaricom.co.ke'
             : 'https://sandbox.safaricom.co.ke';

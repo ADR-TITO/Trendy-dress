@@ -6,14 +6,15 @@ require_once __DIR__ . '/backend-php/config/database.php';
 // Load environment variables
 Database::init();
 
-$consumer_key = $_ENV['MPESA_CONSUMER_KEY'] ?? 'DVbZeuGGcOQKtRL1Kr4WCV6mOAHoEDwrUGzWgIN2myGN5CFI';
-$consumer_secret = $_ENV['MPESA_CONSUMER_SECRET'] ?? 'tlplomAQhV46CojmgO4nN8wykLA6HCtrRAG6hzWmdX7woPUXpnhN3yPN0LwTgJLJ';
+$consumer_key = $_ENV['MPESA_CONSUMER_KEY'] ?? 'j9G6DA6JQwqv7poyeCMTXTyDscFLZoV4vEaswwMLmOCGmK2y';
+$consumer_secret = $_ENV['MPESA_CONSUMER_SECRET'] ?? 'AlCA04HIrvRhK9VogcJqXITzFmvQ0JUlMYOwGPG814m2bbUXF4EZEJzprW7B1BIf';
 
-echo "Testing M-Pesa Auth Connection...\n";
-echo "URL: https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials\n";
-echo "Consumer Key (first 5): " . substr($consumer_key, 0, 5) . "\n";
+$environment = $_ENV['MPESA_ENVIRONMENT'] ?? 'production';
+$baseUrl = ($environment === 'production') ? 'https://api.safaricom.co.ke' : 'https://sandbox.safaricom.co.ke';
+$url = $baseUrl . '/oauth/v1/generate?grant_type=client_credentials';
 
-$url = 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials';
+echo "Testing M-Pesa Auth Connection ($environment)...\n";
+echo "URL: $url\n";
 $ch = curl_init($url);
 
 $auth = base64_encode(trim($consumer_key) . ':' . trim($consumer_secret));
