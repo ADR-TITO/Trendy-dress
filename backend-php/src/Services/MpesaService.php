@@ -117,18 +117,29 @@ class MpesaService
 
             $callbackURL = $_ENV['MPESA_CALLBACK_URL'] ?? $defaultCallback;
 
+            // Safaricom Production Requirements:
+            // 1. TransactionType: CustomerBuyGoodsOnline for Till Numbers (Buy Goods)
+            // 2. AccountReference: Max 12 characters (Recommended to use the Till Number or Order Number)
+            // 3. Amount: Must be an integer for some Daraja versions
+            
+            $transactionType = $_ENV['MPESA_TRANSACTION_TYPE'] ?? 'CustomerBuyGoodsOnline';
+            $displayTill = $_ENV['MPESA_TILL_NUMBER'] ?? '177104';
+            
+            // Truncate AccountReference to 12 characters to avoid rejection
+            $accRef = substr($displayTill, 0, 12); 
+
             $data = [
                 'BusinessShortCode' => $this->shortCode,
                 'Password' => $password,
                 'Timestamp' => $timestamp,
-                'TransactionType' => 'CustomerPayBillOnline',
-                'Amount' => (int)ceil($amount), // Daraja API expects STK push amounts to be integers without decimals
+                'TransactionType' => $transactionType,
+                'Amount' => (int)ceil($amount), 
                 'PartyA' => $phone,
                 'PartyB' => $this->shortCode,
                 'PhoneNumber' => $phone,
                 'CallBackURL' => rtrim($callbackURL, '/') . '/mpesa/webhook',
-                'AccountReference' => $accountReference . '_' . $orderId,
-                'TransactionDesc' => $transactionDesc
+                'AccountReference' => $accRef,
+                'TransactionDesc' => substr($transactionDesc, 0, 12) // Also truncate description
             ];
 
             $ch = curl_init($this->baseURL . '/mpesa/stkpush/v1/processrequest');
