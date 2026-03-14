@@ -84,7 +84,7 @@ class MpesaService
     /**
      * Initiate STK Push
      */
-    public function initiateSTKPush($phoneNumber, $orderId, $accountReference, $transactionDesc)
+    public function initiateSTKPush($phoneNumber, $orderId, $accountReference, $transactionDesc, $amount = null)
     {
         try {
             $token = $this->getAccessToken();
@@ -97,11 +97,11 @@ class MpesaService
             $stmt->execute([':orderId' => $orderId]);
             $order = $stmt->fetch(\PDO::FETCH_ASSOC);
 
-            if (!$order) {
-                throw new \Exception("Order with ID $orderId not found for STK Push.");
+            if (!$order && $amount === null) {
+                throw new \Exception("Order with ID $orderId not found and no amount provided for STK Push.");
             }
 
-            $amount = (float) $order['totalAmount'];
+            $amount = $amount ?? (float) $order['totalAmount'];
 
             // Format phone number (254XXXXXXXXX)
             $phone = preg_replace('/^0/', '254', $phoneNumber);
@@ -148,7 +148,39 @@ class MpesaService
                 throw new \Exception('Failed to initiate STK Push');
             }
 
-            return json_decode($response, true);
+            $responseData = json_decode($response, true);
+            
+            // If successfully initiated, store a PENDING record so check_status.php can poll it
+            if (isset($responseData['ResponseCode']) && $responseData['ResponseCode'] == "0") {
+                try {
+                    $insertSql = "INSERT INTO mpesa_transactions (
+                        checkoutRequestID, 
+                        merchantRequestID, 
+                        orderId, 
+                        amount, 
+                        phoneNumber, 
+                        transactionDate, 
+                        resultDesc,
+                        resultCode
+                    ) VALUES (?, ?, ?, ?, ?, NOW(), ?, NULL)";
+                    
+                    $stmt = $pdo->prepare($insertSql);
+                    $stmt->execute([
+                        $responseData['CheckoutRequestID'],
+                        $responseData['MerchantRequestID'],
+                        $orderId,
+                        $amount,
+                        $phone,
+                        'Initiated - Waiting for customer'
+                    ]);
+                    error_log("✅ Registered pending transaction for CheckoutRequestID: " . $responseData['CheckoutRequestID']);
+                } catch (\Exception $dbEx) {
+                    error_log("⚠️ Warning: Failed to register pending transaction: " . $dbEx->getMessage());
+                    // Don't fail the whole request even if DB log fails
+                }
+            }
+
+            return $responseData;
         } catch (\Exception $e) {
             error_log("❌ Error initiating STK Push: " . $e->getMessage());
             throw $e;

@@ -55,5 +55,4 @@ if (isset($_GET['checkout_request_id'])) {
         'message' => 'Missing checkout_request_id parameter'
     ]);
 }
-
-$conn->close();
+?>

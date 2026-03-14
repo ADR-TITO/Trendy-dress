@@ -35,7 +35,8 @@ try {
         $phone_number,
         $order_id,
         'TrendyDresses',
-        'Payment for order ' . $order_id
+        'Payment for order ' . $order_id,
+        (float)$amount
     );
 
     if (isset($result['ResponseCode']) && $result['ResponseCode'] == "0") {
