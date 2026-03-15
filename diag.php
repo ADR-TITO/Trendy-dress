@@ -4,19 +4,38 @@ require_once __DIR__ . '/backend-php/config/database.php';
 
 header('Content-Type: text/html');
 
-// Load .env manually with better parsing
-$envFile = __DIR__ . '/backend-php/.env';
-if (file_exists($envFile)) {
+// Search for .env in multiple possible locations
+$possibleEnvPaths = [
+    __DIR__ . '/backend-php/.env',
+    __DIR__ . '/.env',
+    dirname(__DIR__) . '/.env'
+];
+
+$envFile = null;
+foreach ($possibleEnvPaths as $path) {
+    if (file_exists($path)) {
+        $envFile = $path;
+        break;
+    }
+}
+
+if ($envFile) {
+    echo "<!-- Found .env at $envFile -->\n";
     $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     foreach ($lines as $line) {
-        if (strpos(trim($line), '#') === 0) continue;
+        $line = trim($line);
+        if (empty($line) || strpos($line, '#') === 0) continue;
         if (strpos($line, '=') !== false) {
             list($name, $value) = explode('=', $line, 2);
             $_ENV[trim($name)] = trim(trim($value), '"\'');
         }
     }
 } else {
-    echo "⚠️ Warning: .env file not found at $envFile\n";
+    echo "<div style='background: #fee; border: 1px solid #f99; padding: 10px; margin-bottom: 20px;'>";
+    echo "⚠️ <strong>Diagnostic Error:</strong> .env file not found.<br>";
+    echo "Checked locations:<br><ul>";
+    foreach ($possibleEnvPaths as $path) echo "<li>$path</li>";
+    echo "</ul><strong>Action Required:</strong> Please ensure your .env file is uploaded to the <code>backend-php/</code> directory on your server.</div>";
 }
 
 $mpesa_env = $_ENV['MPESA_ENVIRONMENT'] ?? 'production';
