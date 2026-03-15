@@ -18,16 +18,21 @@ class MpesaService
 
     public function __construct()
     {
-        // M-Pesa Daraja API Credentials
-        // Can be overridden by .env file if present
-        $this->consumerKey = $_ENV['MPESA_CONSUMER_KEY'] ?? 'DVbZeuGGcOQKtRL1Kr4WCV6mOAHoEDwrUGzWgIN2myGN5CFI';
-        $this->consumerSecret = $_ENV['MPESA_CONSUMER_SECRET'] ?? 'AlCA04HIrvRhK9VogcJqXITzFmvQ0JUlMYOwGPG814m2bbUXF4EZEJzprW7B1BIf';
-        $this->shortCode = $_ENV['MPESA_SHORTCODE'] ?? '3576761'; // Till Number
-        $this->passkey = $_ENV['MPESA_PASSKEY'] ?? 'a48a4833b7b881cd22535945a0c61ce835af45be1169a6852c23a4f6136538e0'; // Sandbox passkey
+        // M-Pesa Daraja API Credentials from environment variables
+        $this->consumerKey = $_ENV['MPESA_CONSUMER_KEY'] ?? null;
+        $this->consumerSecret = $_ENV['MPESA_CONSUMER_SECRET'] ?? null;
+        $this->shortCode = $_ENV['MPESA_SHORTCODE'] ?? null;
+        $this->passkey = $_ENV['MPESA_PASSKEY'] ?? null;
         $this->environment = $_ENV['MPESA_ENVIRONMENT'] ?? 'production';
+        
         $this->baseURL = $this->environment === 'production'
             ? 'https://api.safaricom.co.ke'
             : 'https://sandbox.safaricom.co.ke';
+
+        // Log configuration status (hidden sensitive parts)
+        if (!$this->consumerKey || !$this->consumerSecret || !$this->shortCode || !$this->passkey) {
+            error_log("⚠️ M-Pesa Warning: Some credentials are missing in the environment configuration.");
+        }
     }
 
     /**
@@ -156,7 +161,9 @@ class MpesaService
             curl_close($ch);
 
             if ($httpCode !== 200) {
-                throw new \Exception('Failed to initiate STK Push');
+                $errorData = json_decode($response, true);
+                $errorMsg = $errorData['errorMessage'] ?? $errorData['CustomerMessage'] ?? "HTTP $httpCode: " . ($response ?: 'Empty response');
+                throw new \Exception('Failed to initiate STK Push: ' . $errorMsg);
             }
 
             $responseData = json_decode($response, true);
