@@ -4338,6 +4338,9 @@ async function processSTKPushPayment(customerName, customerPhone, customerEmail,
                         deliveryOptionText,
                         receiptNumber
                     );
+                    
+                    // Force hide modal just in case createOrderFromSTKPush didn't or had an internal error
+                    hidePaymentVerificationModal();
                     return; // Exit polling
                 } else if (statusResult.status === 'PENDING' || statusResult.resultCode === '1032' || statusResult.status === 'WAITING') {
                     // Payment still pending - keep polling
