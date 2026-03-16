@@ -91,6 +91,7 @@ $transaction_type = $_ENV['MPESA_TRANSACTION_TYPE'] ?? 'CustomerBuyGoodsOnline';
             echo "<p class='success'>✅ Auth Success (200 OK)</p>";
             $token_data = json_decode($auth_result, true);
             $access_token = $token_data['access_token'];
+            echo "<p><strong>Access Token:</strong> <code style='word-break: break-all;'>$access_token</code></p>";
         } else {
             echo "<p class='error'>❌ Auth Failed ($auth_status)</p>";
             echo "<pre>$auth_result</pre>";
