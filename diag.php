@@ -182,44 +182,63 @@ $transaction_type = $envVars['MPESA_TRANSACTION_TYPE'] ?? $_ENV['MPESA_TRANSACTI
             ];
         }
 
-        $prod_url = 'https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials';
-        echo "<h4>Node.js Fetch Test</h4>";
-        if (shell_exec('node -v')) {
-            $cmd = "node fetch_token.js 2>&1";
-            $output = shell_exec($cmd);
-            echo "<pre>" . (htmlspecialchars($output) ?: 'NODE_EXEC RETURNED NULL') . "</pre>";
-        } else {
-            echo "<p>Node.js not found on system path.</p>";
-        }
+        echo "<h4>Raw Credential Byte Check</h4>";
+        echo "Key Len: " . strlen($consumer_key) . " bytes<br>";
+        echo "Secret Len: " . strlen($consumer_secret) . " bytes<br>";
+        echo "Key Hex: " . bin2hex($consumer_key) . "<br>";
 
-        $prod_url = 'https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials';
+        echo "<h4>Sandbox System Curl Test (Shell)</h4>";
+        $creds = trim($consumer_key) . ':' . trim($consumer_secret);
+        $cmd = "curl -v -G \"https://sandbox.safaricom.co.ke/oauth/v1/generate\" --data-urlencode \"grant_type=client_credentials\" -u \"$creds\" 2>&1";
+        $output = shell_exec($cmd);
+        echo "<pre>" . (htmlspecialchars($output) ?: 'SHELL_EXEC RETURNED NULL') . "</pre>";
+
         $scenarios = [
-            'Standard GET' => ['url' => $prod_url],
-            'GET - Accept */*' => ['url' => $prod_url, 'headers' => ['Accept: */*']],
-            'GET - Postman Headers' => [
-                'url' => $prod_url, 
-                'headers' => [
-                    'Accept: */*',
-                    'Cache-Control: no-cache',
-                    'Connection: keep-alive'
-                ]
-            ],
-            'Sandbox GET - Accept */*' => ['url' => 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials', 'headers' => ['Accept: */*']],
+            'Sandbox No-Auth Baseline' => ['url' => 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials', 'no_auth' => true],
+            'Sandbox GET (Standard)' => ['url' => 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials'],
+            'Sandbox POST (Form Body)' => ['url' => 'https://sandbox.safaricom.co.ke/oauth/v1/generate', 'post' => ['grant_type' => 'client_credentials']],
         ];
+
+        function testAuthFinal($url, $key, $secret, $options = []) {
+            $curl = curl_init();
+            $headers = ['Accept: application/json'];
+            
+            if (!isset($options['no_auth'])) {
+                $credentials = base64_encode(trim($key) . ':' . trim($secret));
+                $headers[] = 'Authorization: Basic ' . $credentials;
+            }
+
+            curl_setopt($curl, CURLOPT_URL, $url);
+            curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
+            curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($curl, CURLOPT_HEADER, true);
+            curl_setopt($curl, CURLOPT_TIMEOUT, 15);
+            curl_setopt($curl, CURLOPT_USERAGENT, 'Mozilla/5.0');
+            
+            if (isset($options['post'])) {
+                curl_setopt($curl, CURLOPT_POST, true);
+                curl_setopt($curl, CURLOPT_POSTFIELDS, http_build_query($options['post']));
+            }
+
+            $response = curl_exec($curl);
+            $status = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+            $header_size = curl_getinfo($curl, CURLINFO_HEADER_SIZE);
+            $res_headers = substr($response, 0, $header_size);
+            $body = substr($response, $header_size);
+            curl_close($curl);
+            
+            return ['status' => $status, 'headers' => $res_headers, 'body' => $body];
+        }
 
         foreach ($scenarios as $desc => $opt) {
             echo "<h4>Scenario: $desc</h4>";
-            $key = $opt['user'] ?? $consumer_key;
-            $secret = $opt['pass'] ?? $consumer_secret;
-            $res = testAuthAdvanced($opt['url'], $key, $secret, $opt);
+            $res = testAuthFinal($opt['url'], $consumer_key, $consumer_secret, $opt);
+            echo "<p>Status: " . $res['status'] . "</p>";
+            echo "<strong>Body:</strong><pre>" . (htmlspecialchars($res['body']) ?: '[EMPTY]') . "</pre>";
             if ($res['status'] === 200) {
-                echo "<p class='success'>✅ Success</p>";
-                echo "<strong>Body:</strong><pre>" . (htmlspecialchars($res['body']) ?: '[EMPTY]') . "</pre>";
-            } else {
-                echo "<p class='error'>❌ Failed (" . $res['status'] . ")</p>";
-                if ($res['error']) echo "<strong>Curl Error:</strong> " . htmlspecialchars($res['error']) . "<br>";
-                echo "<strong>Raw Body:</strong><pre>" . (htmlspecialchars($res['body']) ?: '[EMPTY]') . "</pre>";
-                echo "<strong>Headers:</strong><pre>" . htmlspecialchars($res['headers']) . "</pre>";
+                $json = json_decode($res['body'], true);
+                if (isset($json['access_token'])) $access_token = $json['access_token'];
             }
         }
         ?>
