@@ -117,6 +117,9 @@ $transaction_type = $_ENV['MPESA_TRANSACTION_TYPE'] ?? 'CustomerBuyGoodsOnline';
             
             $stk_url = $base_url . '/mpesa/stkpush/v1/processrequest';
             
+            $display_till = $_ENV['MPESA_TILL_NUMBER'] ?? '177104';
+            $party_b = ($transaction_type === 'CustomerBuyGoodsOnline') ? $display_till : $short_code;
+            
             $data = [
                 'BusinessShortCode' => $short_code,
                 'Password' => $password,
@@ -124,7 +127,7 @@ $transaction_type = $_ENV['MPESA_TRANSACTION_TYPE'] ?? 'CustomerBuyGoodsOnline';
                 'TransactionType' => $transaction_type,
                 'Amount' => 1,
                 'PartyA' => $phone,
-                'PartyB' => $short_code,
+                'PartyB' => $party_b,
                 'PhoneNumber' => $phone,
                 'CallBackURL' => 'https://trendydresses.co.ke/backend-php/api/mpesa/webhook',
                 'AccountReference' => 'DIAG_TEST',

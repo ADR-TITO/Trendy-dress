@@ -130,6 +130,10 @@ class MpesaService
             $transactionType = $_ENV['MPESA_TRANSACTION_TYPE'] ?? 'CustomerBuyGoodsOnline';
             $displayTill = $_ENV['MPESA_TILL_NUMBER'] ?? '177104';
             
+            // For CustomerBuyGoodsOnline (Buy Goods), PartyB must be the Till Number, 
+            // while BusinessShortCode must be the Store Number (Shortcode).
+            $partyB = ($transactionType === 'CustomerBuyGoodsOnline') ? $displayTill : $this->shortCode;
+            
             // Truncate AccountReference to 12 characters to avoid rejection
             $accRef = substr($displayTill, 0, 12); 
 
@@ -140,7 +144,7 @@ class MpesaService
                 'TransactionType' => $transactionType,
                 'Amount' => (int)ceil($amount), 
                 'PartyA' => $phone,
-                'PartyB' => $this->shortCode,
+                'PartyB' => $partyB,
                 'PhoneNumber' => $phone,
                 'CallBackURL' => rtrim($callbackURL, '/') . '/mpesa/webhook',
                 'AccountReference' => $accRef,
