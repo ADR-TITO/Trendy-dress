@@ -148,7 +148,9 @@ try {
                 }
             } elseif ($action === 'webhook') {
                 // M-Pesa webhook for STK Push Callbacks
-                $data = json_decode(file_get_contents('php://input'), true);
+                $rawInput = file_get_contents('php://input');
+                error_log("📥 Webhook Received: " . ($rawInput ?: 'EMPTY_BODY'));
+                $data = json_decode($rawInput, true);
                 
                 if (isset($data['Body']['stkCallback'])) {
                     $callback = $data['Body']['stkCallback'];

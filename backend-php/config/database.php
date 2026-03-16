@@ -223,23 +223,23 @@ class Database {
     private static function loadEnvFile() {
         $envFile = __DIR__ . '/../.env';
         if (!file_exists($envFile)) {
+            $envFile = dirname(__DIR__, 2) . '/.env'; // Try root if not in backend-php
+        }
+        if (!file_exists($envFile)) {
+            $envFile = $_SERVER['DOCUMENT_ROOT'] . '/backend-php/.env'; // Try absolute path
+        }
+        if (!file_exists($envFile)) {
             return;
         }
         
         $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
         foreach ($lines as $line) {
             $line = trim($line);
-            // Skip comments
-            if (strpos($line, '#') === 0) {
-                continue;
-            }
-            // Parse KEY=VALUE
+            if (strpos($line, '#') === 0) continue;
             if (strpos($line, '=') !== false) {
                 list($key, $value) = explode('=', $line, 2);
                 $key = trim($key);
-                $value = trim($value);
-                // Remove quotes if present
-                $value = trim($value, '"\'');
+                $value = trim(trim($value), '"\'');
                 $_ENV[$key] = $value;
                 putenv("$key=$value");
             }
