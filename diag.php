@@ -11,6 +11,26 @@ $possibleEnvPaths = [
     dirname(__DIR__) . '/.env'
 ];
 
+echo "<div class='box' style='background: #fdf; border: 1px solid #d9d;'>";
+echo "<h3>Server File Discovery</h3>";
+echo "<strong>Current Dir content (" . __DIR__ . "):</strong><br>";
+$files = scandir(__DIR__);
+foreach ($files as $f) {
+    if ($f === '.' || $f === '..') continue;
+    echo (is_dir(__DIR__ . '/' . $f) ? "[DIR] " : "") . "$f, ";
+}
+echo "<br><br><strong>backend-php content:</strong><br>";
+if (is_dir(__DIR__ . '/backend-php')) {
+    $files = scandir(__DIR__ . '/backend-php');
+    foreach ($files as $f) {
+        if ($f === '.' || $f === '..') continue;
+        echo (is_dir(__DIR__ . '/backend-php/' . $f) ? "[DIR] " : "") . "$f, ";
+    }
+} else {
+    echo "<em>backend-php directory not found!</em>";
+}
+echo "</div>";
+
 $envFile = null;
 foreach ($possibleEnvPaths as $path) {
     if (file_exists($path)) {
