@@ -189,7 +189,7 @@ class Order {
      */
     public function updateDeliveryStatus($orderId, $status, $deliveredBy = null) {
         try {
-            $pdo = Database::getConnection();
+            $pdo = \Database::getConnection();
             
             $sql = "UPDATE orders SET deliveryStatus = :status, deliveredBy = :deliveredBy WHERE orderId = :orderId";
             $stmt = $pdo->prepare($sql);
@@ -202,6 +202,23 @@ class Order {
             return $stmt->rowCount() > 0;
         } catch (\Exception $e) {
             error_log("Error updating delivery status: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    /**
+     * Delete order
+     */
+    public function delete($orderId) {
+        try {
+            $pdo = \Database::getConnection();
+            
+            $stmt = $pdo->prepare("DELETE FROM orders WHERE orderId = :orderId");
+            $stmt->execute([':orderId' => $orderId]);
+            
+            return $stmt->rowCount() > 0;
+        } catch (\Exception $e) {
+            error_log("Error deleting order: " . $e->getMessage());
             throw $e;
         }
     }

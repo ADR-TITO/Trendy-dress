@@ -235,6 +235,22 @@ try {
                 echo json_encode(['error' => 'Invalid request']);
             }
             break;
+            
+        case 'DELETE':
+            if ($id) {
+                // Delete order
+                $deleted = $orderModel->delete($id);
+                if (!$deleted) {
+                    http_response_code(404);
+                    echo json_encode(['error' => 'Order not found']);
+                    exit;
+                }
+                echo json_encode(['success' => true, 'message' => 'Order deleted successfully']);
+            } else {
+                http_response_code(400);
+                echo json_encode(['error' => 'Order ID is required']);
+            }
+            break;
 
         default:
             http_response_code(405);
