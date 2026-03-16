@@ -119,7 +119,11 @@ $transaction_type = $envVars['MPESA_TRANSACTION_TYPE'] ?? $_ENV['MPESA_TRANSACTI
 
     <div class="box">
         <h2>2. Auth Connectivity Test</h2>
-         function testAuth($url, $key, $secret, $method = 'GET') {
+        <?php
+        $base_url = ($mpesa_env === 'production') ? 'https://api.safaricom.co.ke' : 'https://sandbox.safaricom.co.ke';
+        $access_token = null;
+
+        function testAuth($url, $key, $secret, $method = 'GET') {
             $curl = curl_init();
             $credentials = base64_encode(trim($key) . ':' . trim($secret));
             
@@ -174,7 +178,9 @@ $transaction_type = $envVars['MPESA_TRANSACTION_TYPE'] ?? $_ENV['MPESA_TRANSACTI
                 echo "<p class='success'>✅ $name Auth Success!</p>";
                 $data = json_decode($res['body'], true);
                 echo "<p><strong>Token:</strong> <code>" . ($data['access_token'] ?? 'N/A') . "</code></p>";
-                $access_token = $data['access_token'] ?? $access_token;
+                if ($url === $base_url . '/oauth/v1/generate?grant_type=client_credentials') {
+                    $access_token = $data['access_token'] ?? null;
+                }
             } else {
                 echo "<p class='error'>❌ $name Auth Failed (" . $res['status'] . ")</p>";
                 if ($res['error']) echo "<strong>Curl Error:</strong> <code style='color:red;'>" . htmlspecialchars($res['error']) . "</code><br>";
@@ -189,14 +195,15 @@ $transaction_type = $envVars['MPESA_TRANSACTION_TYPE'] ?? $_ENV['MPESA_TRANSACTI
                     echo "<p class='success'>✅ $name POST Success!</p>";
                     $data = json_decode($resPost['body'], true);
                     echo "<p><strong>Token:</strong> <code>" . ($data['access_token'] ?? 'N/A') . "</code></p>";
-                    $access_token = $data['access_token'] ?? $access_token;
+                    if ($url === $base_url . '/oauth/v1/generate?grant_type=client_credentials') {
+                        $access_token = $data['access_token'] ?? null;
+                    }
                 } else {
                     echo "<p class='error'>❌ $name POST Failed (" . $resPost['status'] . ")</p>";
                 }
             }
         }
         ?>
-    </div>    ?>
     </div>
 
     <div class="box">
