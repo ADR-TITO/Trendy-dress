@@ -73,30 +73,52 @@ $transaction_type = $_ENV['MPESA_TRANSACTION_TYPE'] ?? 'CustomerBuyGoodsOnline';
     <div class="box">
         <h2>2. Auth Connectivity Test</h2>
         <?php
-        $base_url = ($mpesa_env === 'production') ? 'https://api.safaricom.co.ke' : 'https://sandbox.safaricom.co.ke';
-        $auth_url = $base_url . '/oauth/v1/generate?grant_type=client_credentials';
-        
-        $curl = curl_init();
-        curl_setopt($curl, CURLOPT_URL, $auth_url);
-        $credentials = base64_encode(trim($consumer_key) . ':' . trim($consumer_secret));
-        curl_setopt($curl, CURLOPT_HTTPHEADER, array('Authorization: Basic ' . $credentials));
-        curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
-        
-        $auth_result = curl_exec($curl);
-        $auth_status = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-        curl_close($curl);
-
-        if ($auth_status === 200) {
-            echo "<p class='success'>✅ Auth Success (200 OK)</p>";
-            $token_data = json_decode($auth_result, true);
-            $access_token = $token_data['access_token'];
-            echo "<p><strong>Access Token:</strong> <code style='word-break: break-all;'>$access_token</code></p>";
-        } else {
-            echo "<p class='error'>❌ Auth Failed ($auth_status)</p>";
-            echo "<pre>$auth_result</pre>";
-            $access_token = null;
+        function testAuth($url, $key, $secret) {
+            $curl = curl_init();
+            curl_setopt($curl, CURLOPT_URL, $url);
+            $credentials = base64_encode(trim($key) . ':' . trim($secret));
+            curl_setopt($curl, CURLOPT_HTTPHEADER, array(
+                'Authorization: Basic ' . $credentials,
+                'Accept: application/json'
+            ));
+            curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($curl, CURLOPT_USERAGENT, 'Mozilla/5.0');
+            
+            $result = curl_exec($curl);
+            $status = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+            curl_close($curl);
+            return ['status' => $status, 'result' => $result];
         }
+
+        $prod_url = 'https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials';
+        $sand_url = 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials';
+
+        echo "<h4>Testing Production...</h4>";
+        $prod_res = testAuth($prod_url, $consumer_key, $consumer_secret);
+        if ($prod_res['status'] === 200) {
+            echo "<p class='success'>✅ Production Auth Success!</p>";
+            $data = json_decode($prod_res['result'], true);
+            echo "<p><strong>Token:</strong> <code>" . $data['access_token'] . "</code></p>";
+        } else {
+            echo "<p class='error'>❌ Production Auth Failed (" . $prod_res['status'] . ")</p>";
+            echo "<pre>" . htmlspecialchars($prod_res['result']) . "</pre>";
+        }
+
+        echo "<h4>Testing Sandbox...</h4>";
+        $sand_res = testAuth($sand_url, $consumer_key, $consumer_secret);
+        if ($sand_res['status'] === 200) {
+            echo "<p class='success'>✅ Sandbox Auth Success!</p>";
+            $data = json_decode($sand_res['result'], true);
+            echo "<p><strong>Token:</strong> <code>" . $data['access_token'] . "</code></p>";
+        } else {
+            echo "<p class='error'>❌ Sandbox Auth Failed (" . $sand_res['status'] . ")</p>";
+            echo "<pre>" . htmlspecialchars($sand_res['result']) . "</pre>";
+        }
+        
+        $access_token = ($mpesa_env === 'production') ? 
+            ($prod_res['status'] === 200 ? json_decode($prod_res['result'], true)['access_token'] : null) :
+            ($sand_res['status'] === 200 ? json_decode($sand_res['result'], true)['access_token'] : null);
         ?>
     </div>
 
