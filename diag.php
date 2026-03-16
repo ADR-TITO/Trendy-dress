@@ -84,41 +84,49 @@ $transaction_type = $_ENV['MPESA_TRANSACTION_TYPE'] ?? 'CustomerBuyGoodsOnline';
             curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
             curl_setopt($curl, CURLOPT_USERAGENT, 'Mozilla/5.0');
+            curl_setopt($curl, CURLOPT_VERBOSE, true);
+            curl_setopt($curl, CURLOPT_HEADER, true); // Include headers in output
             
-            $result = curl_exec($curl);
+            $response = curl_exec($curl);
             $status = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+            $header_size = curl_getinfo($curl, CURLINFO_HEADER_SIZE);
+            $headers = substr($response, 0, $header_size);
+            $body = substr($response, $header_size);
             curl_close($curl);
-            return ['status' => $status, 'result' => $result];
+            
+            return [
+                'status' => $status,
+                'headers' => $headers,
+                'body' => $body,
+                'url' => $url,
+                'auth_header' => 'Basic ' . $credentials
+            ];
         }
 
         $prod_url = 'https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials';
         $sand_url = 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials';
 
-        echo "<h4>Testing Production...</h4>";
-        $prod_res = testAuth($prod_url, $consumer_key, $consumer_secret);
-        if ($prod_res['status'] === 200) {
-            echo "<p class='success'>✅ Production Auth Success!</p>";
-            $data = json_decode($prod_res['result'], true);
-            echo "<p><strong>Token:</strong> <code>" . $data['access_token'] . "</code></p>";
-        } else {
-            echo "<p class='error'>❌ Production Auth Failed (" . $prod_res['status'] . ")</p>";
-            echo "<pre>" . htmlspecialchars($prod_res['result']) . "</pre>";
-        }
-
-        echo "<h4>Testing Sandbox...</h4>";
-        $sand_res = testAuth($sand_url, $consumer_key, $consumer_secret);
-        if ($sand_res['status'] === 200) {
-            echo "<p class='success'>✅ Sandbox Auth Success!</p>";
-            $data = json_decode($sand_res['result'], true);
-            echo "<p><strong>Token:</strong> <code>" . $data['access_token'] . "</code></p>";
-        } else {
-            echo "<p class='error'>❌ Sandbox Auth Failed (" . $sand_res['status'] . ")</p>";
-            echo "<pre>" . htmlspecialchars($sand_res['result']) . "</pre>";
+        foreach (['Production' => $prod_url, 'Sandbox' => $sand_url] as $name => $url) {
+            echo "<h4>Testing $name...</h4>";
+            $res = testAuth($url, $consumer_key, $consumer_secret);
+            if ($res['status'] === 200) {
+                echo "<p class='success'>✅ $name Auth Success!</p>";
+                $data = json_decode($res['body'], true);
+                echo "<p><strong>Token:</strong> <code>" . ($data['access_token'] ?? 'N/A') . "</code></p>";
+            } else {
+                echo "<p class='error'>❌ $name Auth Failed (" . $res['status'] . ")</p>";
+                echo "<strong>URL:</strong> <code>" . htmlspecialchars($res['url']) . "</code><br>";
+                echo "<strong>Auth Header Prefix:</strong> <code>" . substr($res['auth_header'], 0, 15) . "...</code><br>";
+                echo "<strong>Raw Response Body:</strong><pre>" . htmlspecialchars($res['body'] ?: '[Empty]') . "</pre>";
+                echo "<strong>Response Headers:</strong><pre>" . htmlspecialchars($res['headers']) . "</pre>";
+            }
         }
         
-        $access_token = ($mpesa_env === 'production') ? 
-            ($prod_res['status'] === 200 ? json_decode($prod_res['result'], true)['access_token'] : null) :
-            ($sand_res['status'] === 200 ? json_decode($sand_res['result'], true)['access_token'] : null);
+        // Use result from current env for later steps
+        $final_res = ($mpesa_env === 'production') ? 
+            testAuth($prod_url, $consumer_key, $consumer_secret) : 
+            testAuth($sand_url, $consumer_key, $consumer_secret);
+        $access_token = ($final_res['status'] === 200) ? json_decode($final_res['body'], true)['access_token'] : null;
         ?>
     </div>
 
