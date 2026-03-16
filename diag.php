@@ -109,11 +109,15 @@ $transaction_type = $envVars['MPESA_TRANSACTION_TYPE'] ?? $_ENV['MPESA_TRANSACTI
     <div class="box">
         <h2>1. Environment Status</h2>
         <p><strong>Environment:</strong> <?php echo $mpesa_env; ?></p>
-        <p><strong>Consumer Key:</strong> <?php echo !empty($consumer_key) ? substr($consumer_key, 0, 5) . '...' : '<span class="error">MISSING</span>'; ?></p>
+        <p><strong>Consumer Key:</strong> <?php echo !empty($consumer_key) ? substr($consumer_key, 0, 5) . '...' : '<span class="error">MISSING</span>'; ?> (Len: <?php echo strlen($consumer_key); ?>)</p>
         <p><strong>Shortcode:</strong> <?php echo !empty($short_code) ? $short_code : '<span class="error">MISSING</span>'; ?></p>
-        <p><strong>Transaction Type:</strong> <?php echo $transaction_type; ?></p>
         <hr>
-        <p><strong>Loaded Keys from .env:</strong> <?php echo implode(', ', array_keys($envVars)); ?></p>
+        <p><strong>PHP Version:</strong> <?php echo PHP_VERSION; ?></p>
+        <p><strong>cURL Version:</strong> <?php echo curl_version()['version']; ?></p>
+        <p><strong>SSL Version:</strong> <?php echo curl_version()['ssl_version']; ?></p>
+        <p><strong>allow_url_fopen:</strong> <?php echo ini_get('allow_url_fopen') ? 'Enabled' : 'Disabled'; ?></p>
+        <p><strong>Outgoing IP:</strong> <?php echo @file_get_contents('https://api.ipify.org') ?: 'Could not detect (allow_url_fopen disabled)'; ?></p>
+        <hr>
         <p><strong>.env Path Used:</strong> <?php echo $envFile; ?></p>
     </div>
 
@@ -139,15 +143,28 @@ $transaction_type = $envVars['MPESA_TRANSACTION_TYPE'] ?? $_ENV['MPESA_TRANSACTI
             curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
             curl_setopt($curl, CURLOPT_HEADER, true);
-            curl_setopt($curl, CURLOPT_TIMEOUT, 20);
+            curl_setopt($curl, CURLOPT_TIMEOUT, 15);
             curl_setopt($curl, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
             
-            if (isset($options['post'])) {
-                curl_setopt($curl, CURLOPT_POST, true);
-                if (is_array($options['post'])) curl_setopt($curl, CURLOPT_POSTFIELDS, http_build_query($options['post']));
+            if (isset($options['tls'])) {
+                curl_setopt($curl, CURLOPT_SSLVERSION, $options['tls']);
             }
 
-            if (isset($options['useragent'])) curl_setopt($curl, CURLOPT_USERAGENT, $options['useragent']);
+            if (isset($options['post'])) {
+                curl_setopt($curl, CURLOPT_POST, true);
+                if (is_array($options['post'])) {
+                    curl_setopt($curl, CURLOPT_POSTFIELDS, http_build_query($options['post']));
+                    // Safaricom sometimes expects x-www-form-urlencoded
+                    $headers[] = 'Content-Type: application/x-www-form-urlencoded';
+                    curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
+                }
+            }
+
+            if (isset($options['useragent'])) {
+                curl_setopt($curl, CURLOPT_USERAGENT, $options['useragent']);
+            } else {
+                curl_setopt($curl, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebkit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+            }
 
             $response = curl_exec($curl);
             $error = curl_error($curl);
@@ -161,59 +178,34 @@ $transaction_type = $envVars['MPESA_TRANSACTION_TYPE'] ?? $_ENV['MPESA_TRANSACTI
                 'status' => $status,
                 'headers' => $res_headers,
                 'body' => $body,
-                'error' => $error,
-                'creds_debug' => substr($credentials, 0, 10) . '...' . substr($credentials, -5)
+                'error' => $error
             ];
         }
 
         $prod_url = 'https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials';
-        $sand_url = 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials';
-
         $scenarios = [
-            'Production Standard GET' => ['url' => $prod_url],
-            'Production No-User-Agent GET' => ['url' => $prod_url, 'useragent' => ''],
-            'Production Browser UA GET' => ['url' => $prod_url, 'useragent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'],
-            'Sandbox Standard GET' => ['url' => $sand_url]
+            'Production GET' => ['url' => $prod_url],
+            'Production GET TLS 1.2' => ['url' => $prod_url, 'tls' => 6], // 6 = CURL_SSLVERSION_TLSv1_2
+            'Production POST (Body)' => ['url' => 'https://api.safaricom.co.ke/oauth/v1/generate', 'post' => ['grant_type' => 'client_credentials']],
+            'Production GET No-UA' => ['url' => $prod_url, 'useragent' => ' '],
+            'Sandbox GET' => ['url' => 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials']
         ];
-
-        echo "<h4>Raw Connectivity Sniffer (Full Response)</h4>";
-        $ch = curl_init($prod_url);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Basic ' . base64_encode(trim($consumer_key) . ':' . trim($consumer_secret))]);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_HEADER, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        $raw = curl_exec($ch);
-        echo "<pre>" . (htmlspecialchars($raw) ?: 'CURL EXEC RETURNED FALSE') . "</pre>";
-        curl_close($ch);
-
-        echo "<h4>file_get_contents (Stream) Test</h4>";
-        $creds = base64_encode(trim($consumer_key) . ':' . trim($consumer_secret));
-        $opts = [
-            'http' => [
-                'method' => 'GET',
-                'header' => "Authorization: Basic $creds\r\nAccept: application/json\r\nUser-Agent: Mozilla/5.0\r\n",
-                'ignore_errors' => true
-            ]
-        ];
-        $context = stream_context_create($opts);
-        $stream_res = file_get_contents($prod_url, false, $context);
-        echo "<pre>" . (htmlspecialchars($stream_res) ?: 'STREAM RETURNED FALSE') . "</pre>";
 
         foreach ($scenarios as $desc => $opt) {
             echo "<h4>Scenario: $desc</h4>";
             $res = testAuthAdvanced($opt['url'], $consumer_key, $consumer_secret, $opt);
             if ($res['status'] === 200) {
-                echo "<p class='success'>✅ Success ($desc)</p>";
-                echo "<strong>Raw Body:</strong><pre>" . (htmlspecialchars($res['body']) ?: '[EMPTY BODY]') . "</pre>";
+                echo "<p class='success'>✅ Success</p>";
+                echo "<strong>Body:</strong><pre>" . (htmlspecialchars($res['body']) ?: '[EMPTY]') . "</pre>";
                 if (!$access_token) {
-                    $token_data = json_decode($res['body'], true);
-                    $access_token = $token_data['access_token'] ?? null;
+                    $json = json_decode($res['body'], true);
+                    $access_token = $json['access_token'] ?? null;
                 }
             } else {
-                echo "<p class='error'>❌ Failed ($desc) - Status: " . $res['status'] . "</p>";
-                if ($res['error']) echo "<strong>Curl Error:</strong> <code style='color:red;'>" . htmlspecialchars($res['error']) . "</code><br>";
-                echo "<strong>Response Headers:</strong><pre>" . htmlspecialchars($res['headers']) . "</pre>";
-                echo "<strong>Raw Body:</strong><pre>" . (htmlspecialchars($res['body']) ?: '[EMPTY BODY]') . "</pre>";
+                echo "<p class='error'>❌ Failed (" . $res['status'] . ")</p>";
+                if ($res['error']) echo "<strong>Curl Error:</strong> " . htmlspecialchars($res['error']) . "<br>";
+                echo "<strong>Raw Body:</strong><pre>" . (htmlspecialchars($res['body']) ?: '[EMPTY]') . "</pre>";
+                echo "<strong>Headers:</strong><pre>" . htmlspecialchars($res['headers']) . "</pre>";
             }
         }
         ?>
