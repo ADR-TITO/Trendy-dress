@@ -631,8 +631,15 @@ class ApiService {
     // Query STK Push status using repo script
     async querySTKPushStatus(checkoutRequestID) {
         try {
-            const response = await fetch(`check_status.php?checkout_request_id=${checkoutRequestID}`, {
-                method: 'GET'
+            const timestamp = Date.now();
+            const response = await fetch(`check_status.php?checkout_request_id=${checkoutRequestID}&_t=${timestamp}`, {
+                method: 'GET',
+                cache: 'no-store',
+                headers: {
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
+                }
             });
 
             if (!response.ok) {

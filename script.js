@@ -4310,9 +4310,16 @@ async function processSTKPushPayment(customerName, customerPhone, customerEmail,
                 // Query STK Push status
                 const statusResult = await apiService.querySTKPushStatus(checkoutRequestID);
 
-                if (statusResult.status === 'COMPLETED' || statusResult.resultCode === '0') {
+                if (statusResult.status === 'COMPLETED' || statusResult.resultCode === '0' || statusResult.success === true) {
                     // Payment successful! Check for transaction in database
                     console.log('✅ Payment completed via STK Push');
+                    
+                    // Immediately feedback to user
+                    if (verificationText) {
+                        verificationText.innerHTML = '<span style="color: #4caf50; font-weight: bold; font-size: 1.2rem;">✅ Payment Verified!</span><br><br>Processing your order, please wait...';
+                        const spinner = verificationModal?.querySelector('.spinner');
+                        if (spinner) spinner.style.borderTopColor = '#4caf50';
+                    }
 
                     const receiptNumber = statusResult.mpesa_receipt || statusResult.mpesaReceiptNumber;
                     const transactionAmount = statusResult.amount;
@@ -4484,7 +4491,15 @@ async function createOrderFromSTKPush(orderId, customerName, customerPhone, cust
         cart = [];
         updateCartUI();
         saveCart();
-        toggleCart();
+        
+        // Final Success feedback
+        showNotification('Success! Your order has been placed and payment confirmed.', 'success');
+        
+        // Small delay before closing everything for visual feedback
+        setTimeout(() => {
+            if (typeof toggleCart === 'function') toggleCart();
+            // If they are on cart page, redirect or stay
+        }, 1500);
 
     } catch (error) {
         console.error('❌ Error creating order from STK Push:', error);

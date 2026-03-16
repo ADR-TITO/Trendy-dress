@@ -361,26 +361,20 @@ $transaction_type = $envVars['MPESA_TRANSACTION_TYPE'] ?? $_ENV['MPESA_TRANSACTI
             }
 
             echo "<h4>Recent Orders (M-Pesa Only)</h4>";
-            $stmt = $pdo->query("SELECT orderId, customerName, totalAmount, paymentStatus, mpesaCode, createdAt FROM orders WHERE (paymentMethod LIKE '%mpesa%' OR paymentMethod LIKE '%M%Pesa%') ORDER BY createdAt DESC LIMIT 10");
-            $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            if ($orders) {
-                echo "<table border='1' cellpadding='5' style='width:100%; border-collapse: collapse;'>";
-                echo "<tr><th>OrderID</th><th>Customer</th><th>Amount</th><th>Status</th><th>M-Pesa Code</th><th>Date</th></tr>";
-                foreach ($orders as $o) {
-                    echo "<tr>";
-                    echo "<td>" . $o['orderId'] . "</td>";
-                    echo "<td>" . $o['customerName'] . "</td>";
-                    echo "<td>" . $o['totalAmount'] . "</td>";
-                    echo "<td>" . $o['paymentStatus'] . "</td>";
-                    echo "<td>" . ($o['mpesaCode'] ?? '-') . "</td>";
-                    echo "<td>" . $o['createdAt'] . "</td>";
-                    echo "</tr>";
-                }
-                echo "</table>";
-            } else {
-                echo "<p>No M-Pesa orders found.</p>";
+            $stmt = $pdo->query("SELECT orderId, customerName, totalAmount, paymentStatus, mpesaCode, verified, createdAt FROM orders WHERE (paymentMethod LIKE '%mpesa%' OR paymentMethod LIKE '%M%Pesa%') ORDER BY createdAt DESC LIMIT 10");
+            echo "<table border='1' cellpadding='5' style='width:100%; border-collapse:collapse; background:white;'>
+                    <tr style='background:#f3f3f3'><th>OrderID</th><th>Customer</th><th>Amount</th><th>Status</th><th>Verified</th><th>M-Pesa Code</th><th>Date</th></tr>";
+            $found_orders = false;
+            while($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $found_orders = true;
+                $v = ($row['verified'] ?? 0) ? '✅ Yes' : '❌ No';
+                $s = ($row['paymentStatus'] ?? 'pending') === 'paid' ? '<span style="color:green;font-weight:bold;">paid</span>' : $row['paymentStatus'];
+                echo "<tr><td>{$row['orderId']}</td><td>{$row['customerName']}</td><td>" . number_format($row['totalAmount'], 2) . "</td><td>{$s}</td><td>{$v}</td><td>" . ($row['mpesaCode'] ?: '-') . "</td><td>{$row['createdAt']}</td></tr>";
             }
-
+            if (!$found_orders) {
+                echo "<tr><td colspan='7' style='text-align:center'>No M-Pesa orders found.</td></tr>";
+            }
+            echo "</table>";
         } catch (Exception $e) {
             echo "<p class='error'>DB Error: " . $e->getMessage() . "</p>";
         }
