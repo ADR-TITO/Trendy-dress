@@ -185,22 +185,24 @@ $transaction_type = $envVars['MPESA_TRANSACTION_TYPE'] ?? $_ENV['MPESA_TRANSACTI
         $prod_url = 'https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials';
         $scenarios = [
             'Production GET' => ['url' => $prod_url],
-            'Production GET TLS 1.2' => ['url' => $prod_url, 'tls' => 6], // 6 = CURL_SSLVERSION_TLSv1_2
-            'Production POST (Body)' => ['url' => 'https://api.safaricom.co.ke/oauth/v1/generate', 'post' => ['grant_type' => 'client_credentials']],
-            'Production GET No-UA' => ['url' => $prod_url, 'useragent' => ' '],
-            'Sandbox GET' => ['url' => 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials']
+            'Sandbox GET' => ['url' => 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials'],
+            'HttpBin Auth Test' => ['url' => 'https://httpbin.org/basic-auth/user/passwd', 'user' => 'user', 'pass' => 'passwd'],
         ];
+
+        echo "<h4>System Curl Test</h4>";
+        $creds = trim($consumer_key) . ':' . trim($consumer_secret);
+        $cmd = "curl -v -G \"https://api.safaricom.co.ke/oauth/v1/generate\" --data-urlencode \"grant_type=client_credentials\" -u \"$creds\" 2>&1";
+        $output = shell_exec($cmd);
+        echo "<pre>" . (htmlspecialchars($output) ?: 'SHELL_EXEC RETURNED NULL') . "</pre>";
 
         foreach ($scenarios as $desc => $opt) {
             echo "<h4>Scenario: $desc</h4>";
-            $res = testAuthAdvanced($opt['url'], $consumer_key, $consumer_secret, $opt);
+            $key = $opt['user'] ?? $consumer_key;
+            $secret = $opt['pass'] ?? $consumer_secret;
+            $res = testAuthAdvanced($opt['url'], $key, $secret, $opt);
             if ($res['status'] === 200) {
                 echo "<p class='success'>✅ Success</p>";
                 echo "<strong>Body:</strong><pre>" . (htmlspecialchars($res['body']) ?: '[EMPTY]') . "</pre>";
-                if (!$access_token) {
-                    $json = json_decode($res['body'], true);
-                    $access_token = $json['access_token'] ?? null;
-                }
             } else {
                 echo "<p class='error'>❌ Failed (" . $res['status'] . ")</p>";
                 if ($res['error']) echo "<strong>Curl Error:</strong> " . htmlspecialchars($res['error']) . "<br>";
