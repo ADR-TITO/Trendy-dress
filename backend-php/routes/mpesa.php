@@ -165,7 +165,7 @@ try {
                         $metadata = $callback['CallbackMetadata']['Item'] ?? [];
                         
                         $receiptNumber = '';
-                        $mpesaAmount = 0; // Renamed to mpesaAmount to avoid conflict
+                        $mpesaAmount = 0;
                         $phoneNumber = '';
                         
                         foreach ($metadata as $item) {
@@ -183,7 +183,6 @@ try {
                             $expectedAmount = 0;
                             
                             if ($orderId) {
-                                // Fetch expected amount from orders table
                                 try {
                                     $pdo = Database::getConnection();
                                     $stmt = $pdo->prepare("SELECT totalAmount FROM orders WHERE orderId = :orderId");
@@ -205,42 +204,32 @@ try {
                                 'resultDesc' => 'Success'
                             ];
                             
-                            // Perform amount validation
-                            if ($expectedAmount > 0 && abs($expectedAmount - $mpesaAmount) > 0.01) { // Allow for float precision
-                                error_log("Amount mismatch for CheckoutRequestID $checkoutRequestID. Expected: $expectedAmount, Received: $mpesaAmount");
-                                $statusUpdate['resultCode'] = 1; // Custom code for amount mismatch
+                            if ($expectedAmount > 0 && abs($expectedAmount - $mpesaAmount) > 0.01) {
+                                $statusUpdate['resultCode'] = 1;
                                 $statusUpdate['resultDesc'] = 'Payment successful but amount mismatch. Expected ' . $expectedAmount . ', received ' . $mpesaAmount;
                             }
                             
-                            // Update existing pending transaction
                             $transactionModel->update($existingTransaction['_id'], $statusUpdate);
 
-                            // --- Update the corresponding Order ---
                             if ($orderId) {
                                 try {
                                     $orderModel = new App\Models\Order();
                                     $existingOrder = $orderModel->findByOrderId($orderId);
 
                                     if ($existingOrder) {
-                                        $updateOrderData = [
+                                        $orderModel->update($existingOrder['_id'], [
                                             'paymentStatus' => 'paid',
                                             'mpesaCode' => $receiptNumber,
                                             'totalPaid' => $mpesaAmount,
                                             'verified' => true
-                                        ];
-                                        // Merge with existing order data to preserve other fields
-                                        // Note: convertToArray returns '_id' as the row ID
-                                        $orderModel->update($existingOrder['_id'], $updateOrderData);
-                                        error_log("✅ Order $orderId updated with successful STK Push payment. Receipt: $receiptNumber, Amount: $mpesaAmount");
-                                    } else {
-                                        error_log("⚠️ Webhook: Order $orderId not found for update after successful STK Push.");
+                                        ]);
+                                        error_log("✅ Order $orderId updated with successful STK Push payment.");
                                     }
                                 } catch (\Exception $e) {
-                                    error_log('❌ Webhook: Error updating order after successful STK Push: ' . $e->getMessage());
+                                    error_log('❌ Webhook: Error updating order: ' . $e->getMessage());
                                 }
                             }
                         } else {
-                            // Create new transaction (fallback, though unlikely for STK Push callback without existing pending)
                             $transactionModel->create([
                                 'receiptNumber' => $receiptNumber,
                                 'amount' => $mpesaAmount,
@@ -252,22 +241,59 @@ try {
                                 'transactionDate' => date('Y-m-d H:i:s')
                             ]);
                         }
-                    } else {
-                        // Payment failed or cancelled
-                        if ($existingTransaction) {
-                            $transactionModel->update($existingTransaction['_id'], [
-                                'resultCode' => $resultCode,
-                                'resultDesc' => $callback['ResultDesc'] ?? 'Failed'
-                            ]);
+                    } else if ($existingTransaction) {
+                        $transactionModel->update($existingTransaction['_id'], [
+                            'resultCode' => $resultCode,
+                            'resultDesc' => $callback['ResultDesc'] ?? 'Failed'
+                        ]);
+                    }
+                } elseif (isset($data['TransID'])) {
+                    // C2B Confirmation or Validation
+                    $receiptNumber = $data['TransID'];
+                    $mpesaAmount = (float)$data['TransAmount'];
+                    $phoneNumber = $data['MSISDN'];
+                    $orderId = $data['BillRefNumber']; // Usually contains order ID
+
+                    error_log("💰 C2B Notification Received: Receipt $receiptNumber, Amount $mpesaAmount, Order $orderId");
+
+                    $transactionModel = new MpesaTransaction();
+                    
+                    // Check if already processed
+                    $existing = $transactionModel->findByReceiptNumber($receiptNumber);
+                    if (!$existing) {
+                        $transactionModel->create([
+                            'receiptNumber' => $receiptNumber,
+                            'amount' => $mpesaAmount,
+                            'phoneNumber' => $phoneNumber,
+                            'orderId' => $orderId,
+                            'resultCode' => 0,
+                            'resultDesc' => 'C2B Payment',
+                            'transactionDate' => date('Y-m-d H:i:s')
+                        ]);
+
+                        // Update order if orderId matches
+                        if (!empty($orderId)) {
+                            try {
+                                $orderModel = new App\Models\Order();
+                                $existingOrder = $orderModel->findByOrderId($orderId);
+                                if ($existingOrder) {
+                                    $orderModel->update($existingOrder['_id'], [
+                                        'paymentStatus' => 'paid',
+                                        'mpesaCode' => $receiptNumber,
+                                        'totalPaid' => $mpesaAmount,
+                                        'verified' => true
+                                    ]);
+                                    error_log("✅ Order $orderId updated with successful C2B payment.");
+                                }
+                            } catch (\Exception $e) {
+                                error_log('❌ C2B Webhook: Error updating order: ' . $e->getMessage());
+                            }
                         }
                     }
                 }
                 
                 // Always respond success to M-Pesa
-                echo json_encode([
-                    'ResultCode' => 0,
-                    'ResultDesc' => 'Success'
-                ]);
+                echo json_encode(['ResultCode' => 0, 'ResultDesc' => 'Success']);     ]);
             } elseif ($action === 'stk-push') {
                 // Initiate STK Push
                 $data = json_decode(file_get_contents('php://input'), true);

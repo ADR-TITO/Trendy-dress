@@ -252,5 +252,46 @@ class MpesaService
             throw $e;
         }
     }
+    /**
+     * Register C2B URLs
+     */
+    public function registerC2BURLs($confirmationURL, $validationURL, $responseType = 'Completed')
+    {
+        try {
+            $token = $this->getAccessToken();
+            $url = $this->baseURL . '/mpesa/c2b/v2/registerurl';
+
+            $data = [
+                'ShortCode' => $this->shortCode,
+                'ResponseType' => $responseType,
+                'ConfirmationURL' => $confirmationURL,
+                'ValidationURL' => $validationURL
+            ];
+
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'Authorization: Bearer ' . $token,
+                'Content-Type: application/json'
+            ]);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($httpCode !== 200) {
+                $errorData = json_decode($response, true);
+                $errorMsg = $errorData['errorMessage'] ?? $errorData['CustomerMessage'] ?? "HTTP $httpCode: " . ($response ?: 'Empty response');
+                throw new \Exception('Failed to register C2B URLs: ' . $errorMsg);
+            }
+
+            return json_decode($response, true);
+        } catch (\Exception $e) {
+            error_log("❌ Error registering C2B URLs: " . $e->getMessage());
+            throw $e;
+        }
+    }
 }
 
