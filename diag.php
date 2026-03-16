@@ -19,6 +19,7 @@ foreach ($possibleEnvPaths as $path) {
     }
 }
 
+$envVars = [];
 if ($envFile) {
     echo "<!-- Found .env at $envFile -->\n";
     $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
@@ -27,7 +28,10 @@ if ($envFile) {
         if (empty($line) || strpos($line, '#') === 0) continue;
         if (strpos($line, '=') !== false) {
             list($name, $value) = explode('=', $line, 2);
-            $_ENV[trim($name)] = trim(trim($value), '"\'');
+            $key = trim($name);
+            $val = trim(trim($value), '"\' ');
+            $envVars[$key] = $val;
+            $_ENV[$key] = $val; // Try to set it here too
         }
     }
 } else {
@@ -38,12 +42,12 @@ if ($envFile) {
     echo "</ul><strong>Action Required:</strong> Please ensure your .env file is uploaded to the <code>backend-php/</code> directory on your server.</div>";
 }
 
-$mpesa_env = $_ENV['MPESA_ENVIRONMENT'] ?? 'production';
-$consumer_key = $_ENV['MPESA_CONSUMER_KEY'] ?? '';
-$consumer_secret = $_ENV['MPESA_CONSUMER_SECRET'] ?? '';
-$short_code = $_ENV['MPESA_SHORTCODE'] ?? '';
-$passkey = $_ENV['MPESA_PASSKEY'] ?? '';
-$transaction_type = $_ENV['MPESA_TRANSACTION_TYPE'] ?? 'CustomerBuyGoodsOnline';
+$mpesa_env = $envVars['MPESA_ENVIRONMENT'] ?? $_ENV['MPESA_ENVIRONMENT'] ?? 'production';
+$consumer_key = $envVars['MPESA_CONSUMER_KEY'] ?? $_ENV['MPESA_CONSUMER_KEY'] ?? '';
+$consumer_secret = $envVars['MPESA_CONSUMER_SECRET'] ?? $_ENV['MPESA_CONSUMER_SECRET'] ?? '';
+$short_code = $envVars['MPESA_SHORTCODE'] ?? $_ENV['MPESA_SHORTCODE'] ?? '';
+$passkey = $envVars['MPESA_PASSKEY'] ?? $_ENV['MPESA_PASSKEY'] ?? '';
+$transaction_type = $envVars['MPESA_TRANSACTION_TYPE'] ?? $_ENV['MPESA_TRANSACTION_TYPE'] ?? 'CustomerBuyGoodsOnline';
 
 ?>
 <!DOCTYPE html>
@@ -65,9 +69,12 @@ $transaction_type = $_ENV['MPESA_TRANSACTION_TYPE'] ?? 'CustomerBuyGoodsOnline';
     <div class="box">
         <h2>1. Environment Status</h2>
         <p><strong>Environment:</strong> <?php echo $mpesa_env; ?></p>
-        <p><strong>Consumer Key:</strong> <?php echo substr($consumer_key, 0, 5); ?>...</p>
-        <p><strong>Shortcode:</strong> <?php echo $short_code; ?></p>
+        <p><strong>Consumer Key:</strong> <?php echo !empty($consumer_key) ? substr($consumer_key, 0, 5) . '...' : '<span class="error">MISSING</span>'; ?></p>
+        <p><strong>Shortcode:</strong> <?php echo !empty($short_code) ? $short_code : '<span class="error">MISSING</span>'; ?></p>
         <p><strong>Transaction Type:</strong> <?php echo $transaction_type; ?></p>
+        <hr>
+        <p><strong>Loaded Keys from .env:</strong> <?php echo implode(', ', array_keys($envVars)); ?></p>
+        <p><strong>.env Path Used:</strong> <?php echo $envFile; ?></p>
     </div>
 
     <div class="box">
