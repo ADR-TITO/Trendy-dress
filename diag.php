@@ -268,6 +268,44 @@ $transaction_type = $envVars['MPESA_TRANSACTION_TYPE'] ?? $_ENV['MPESA_TRANSACTI
         echo "<pre>" . htmlspecialchars($res2) . "</pre>";
         curl_close($ch2);
 
+        echo "<h4>Imperva Bypass & Benchmark Tests</h4>";
+        $creds = base64_encode(trim($consumer_key) . ':' . trim($consumer_secret));
+        
+        $bypass_scenarios = [
+            'Bench: httpbin.org/get (Verify Headers)' => ['url' => 'https://httpbin.org/get'],
+            'Sandbox: Junk Auth (Should give JSON 401)' => ['url' => $sand_url, 'junk_auth' => true],
+            'Sandbox: Reordered Headers (Auth last)' => ['url' => $sand_url, 'reorder' => true],
+            'Sandbox: Different User-Agent (iPhone)' => ['url' => $sand_url, 'ua' => 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Mobile/15E148 Safari/604.1'],
+        ];
+
+        foreach ($bypass_scenarios as $desc => $opt) {
+            echo "<h4>$desc</h4>";
+            $ch = curl_init($opt['url']);
+            $headers = ['Accept: application/json'];
+            
+            if (isset($opt['junk_auth'])) {
+                $headers[] = 'Authorization: Basic SVNfVEhJU19KVU5L'; // "IS_THIS_JUNK"
+            } elseif (!isset($opt['no_auth'])) {
+                if (isset($opt['reorder'])) {
+                    $headers = ['Accept: application/json', 'Authorization: Basic ' . $creds];
+                } else {
+                    $headers[] = 'Authorization: Basic ' . $creds;
+                }
+            }
+
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_HEADER, true);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            curl_setopt($ch, CURLOPT_USERAGENT, $opt['ua'] ?? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0.4472.124');
+            
+            $res = curl_exec($ch);
+            $st = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            echo "<p>Status: $st</p>";
+            echo "<pre>" . htmlspecialchars($res) . "</pre>";
+            curl_close($ch);
+        }
+
         $scenarios = [
             'Sandbox No-Auth Baseline' => ['url' => 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials', 'no_auth' => true],
             'Production No-Auth Baseline' => ['url' => 'https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials', 'no_auth' => true],
