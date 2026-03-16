@@ -231,6 +231,48 @@ $transaction_type = $envVars['MPESA_TRANSACTION_TYPE'] ?? $_ENV['MPESA_TRANSACTI
             return ['status' => $status, 'headers' => $res_headers, 'body' => $body];
         }
 
+        echo "<h4>Cookie-Aware & Capitalized Header Test</h4>";
+        $creds = base64_encode(trim($consumer_key) . ':' . trim($consumer_secret));
+        $sand_url = 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials';
+        
+        // 1. Get cookies first
+        $ch1 = curl_init($sand_url);
+        curl_setopt($ch1, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch1, CURLOPT_HEADER, true);
+        curl_setopt($ch1, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch1, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+        $res1 = curl_exec($ch1);
+        preg_match_all('/^Set-Cookie:\s*([^;]*)/mi', $res1, $matches);
+        $cookies = implode('; ', $matches[1]);
+        curl_close($ch1);
+
+        echo "Captured Cookies: <code>" . htmlspecialchars($cookies ?: 'None') . "</code><br>";
+
+        // 2. Try with cookies and Capitalized Authorization
+        $ch2 = curl_init($sand_url);
+        curl_setopt($ch2, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch2, CURLOPT_HEADER, true);
+        curl_setopt($ch2, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch2, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
+        curl_setopt($ch2, CURLOPT_HTTPHEADER, [
+            'Authorization: Basic ' . $creds,
+            'Accept: application/json',
+            'Connection: keep-alive'
+        ]);
+        curl_setopt($ch2, CURLOPT_COOKIE, $cookies);
+        curl_setopt($ch2, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+        
+        $res2 = curl_exec($ch2);
+        $st2 = curl_getinfo($ch2, CURLINFO_HTTP_CODE);
+        echo "<p>Status with Cookies: $st2</p>";
+        echo "<pre>" . htmlspecialchars($res2) . "</pre>";
+        curl_close($ch2);
+
+        $scenarios = [
+            'Sandbox No-Auth Baseline' => ['url' => 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials', 'no_auth' => true],
+            'Production No-Auth Baseline' => ['url' => 'https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials', 'no_auth' => true],
+        ];
+
         foreach ($scenarios as $desc => $opt) {
             echo "<h4>Scenario: $desc</h4>";
             $res = testAuthFinal($opt['url'], $consumer_key, $consumer_secret, $opt);
