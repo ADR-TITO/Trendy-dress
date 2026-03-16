@@ -310,6 +310,78 @@ $transaction_type = $envVars['MPESA_TRANSACTION_TYPE'] ?? $_ENV['MPESA_TRANSACTI
             echo "<pre>" . json_encode($data, JSON_PRETTY_PRINT) . "</pre>";
         }
         ?>
+    <div class="box">
+        <h2>4. Server Log Viewer (Last 20 lines)</h2>
+        <?php
+        $logs_to_check = [
+            'Root Log' => __DIR__ . '/error_log',
+            'Backend Log' => __DIR__ . '/backend-php/error_log'
+        ];
+        foreach ($logs_to_check as $name => $path) {
+            echo "<h4>$name ($path)</h4>";
+            if (file_exists($path)) {
+                $lines = file($path);
+                $last_lines = array_slice($lines, -20);
+                echo "<pre>" . htmlspecialchars(implode("", $last_lines)) . "</pre>";
+            } else {
+                echo "<p><em>Log file not found.</em></p>";
+            }
+        }
+        ?>
+    </div>
+
+    <div class="box">
+        <h2>5. Database Inspector</h2>
+        <?php
+        try {
+            $pdo = Database::getConnection();
+            
+            echo "<h4>Recent M-Pesa Transactions</h4>";
+            $stmt = $pdo->query("SELECT * FROM mpesa_transactions ORDER BY createdAt DESC LIMIT 5");
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            if ($rows) {
+                echo "<table border='1' cellpadding='5' style='width:100%; border-collapse: collapse;'>";
+                echo "<tr><th>Receipt</th><th>CheckoutID</th><th>OrderID</th><th>Amount</th><th>Status</th><th>Date</th></tr>";
+                foreach ($rows as $r) {
+                    echo "<tr>";
+                    echo "<td>" . ($r['receiptNumber'] ?? '-') . "</td>";
+                    echo "<td>" . ($r['checkoutRequestID'] ?? '-') . "</td>";
+                    echo "<td>" . ($r['orderId'] ?? '-') . "</td>";
+                    echo "<td>" . ($r['amount'] ?? '-') . "</td>";
+                    echo "<td>" . ($r['resultDesc'] ?? 'PENDING') . "</td>";
+                    echo "<td>" . ($r['createdAt'] ?? '-') . "</td>";
+                    echo "</tr>";
+                }
+                echo "</table>";
+            } else {
+                echo "<p>No transactions found.</p>";
+            }
+
+            echo "<h4>Recent Orders (M-Pesa Only)</h4>";
+            $stmt = $pdo->query("SELECT orderId, customerName, totalAmount, paymentStatus, mpesaCode, createdAt FROM orders WHERE paymentMethod = 'mpesa' ORDER BY createdAt DESC LIMIT 5");
+            $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            if ($orders) {
+                echo "<table border='1' cellpadding='5' style='width:100%; border-collapse: collapse;'>";
+                echo "<tr><th>OrderID</th><th>Customer</th><th>Amount</th><th>Status</th><th>M-Pesa Code</th><th>Date</th></tr>";
+                foreach ($orders as $o) {
+                    echo "<tr>";
+                    echo "<td>" . $o['orderId'] . "</td>";
+                    echo "<td>" . $o['customerName'] . "</td>";
+                    echo "<td>" . $o['totalAmount'] . "</td>";
+                    echo "<td>" . $o['paymentStatus'] . "</td>";
+                    echo "<td>" . ($o['mpesaCode'] ?? '-') . "</td>";
+                    echo "<td>" . $o['createdAt'] . "</td>";
+                    echo "</tr>";
+                }
+                echo "</table>";
+            } else {
+                echo "<p>No M-Pesa orders found.</p>";
+            }
+
+        } catch (Exception $e) {
+            echo "<p class='error'>DB Error: " . $e->getMessage() . "</p>";
+        }
+        ?>
     </div>
 </body>
 </html>
