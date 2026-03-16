@@ -138,7 +138,7 @@ try {
                         'mpesaCode' => $mpesaCode,
                         'verified' => true
                     ]);
-                } catch (\\Exception $e) {
+                } catch (\Exception $e) {
                     error_log("M-Pesa verification error: " . $e->getMessage());
                     echo json_encode([
                         'success' => false,
@@ -295,7 +295,7 @@ try {
                 }
                 
                 // Always respond success to M-Pesa
-                echo json_encode(['ResultCode' => 0, 'ResultDesc' => 'Success']);     ]);
+                echo json_encode(['ResultCode' => 0, 'ResultDesc' => 'Success']);
             } elseif ($action === 'stk-push') {
                 // Initiate STK Push
                 $data = json_decode(file_get_contents('php://input'), true);

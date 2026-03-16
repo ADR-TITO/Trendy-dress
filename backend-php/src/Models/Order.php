@@ -214,8 +214,8 @@ class Order {
         $items = json_decode($order['items'] ?? '[]', true) ?? [];
         
         return [
-            '_id' => $order['id'] ?? '',
             'id' => $order['id'] ?? '',
+            '_id' => $order['id'] ?? '',
             'orderId' => $order['orderId'] ?? '',
             'date' => $order['createdAt'] ?? date('Y-m-d H:i:s'),
             'customer' => [
