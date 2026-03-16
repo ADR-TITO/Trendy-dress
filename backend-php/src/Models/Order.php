@@ -3,7 +3,7 @@ namespace App\Models;
 
 require_once __DIR__ . '/../../config/database.php';
 
-use Database;
+use \Database;
 use PDO;
 
 class Order {

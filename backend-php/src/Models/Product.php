@@ -235,7 +235,7 @@ class Product {
             if (!Database::isConnected()) {
                 throw new \Exception('Database not connected');
             }
-            $pdo = Database::getConnection();
+            $pdo = \Database::getConnection();
 
             // Ensure quantity is an integer
             $quantity = (int)$quantity;
@@ -253,6 +253,30 @@ class Product {
             return $stmt->rowCount() > 0;
         } catch (\Exception $e) {
             error_log("Error updating product quantity: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    /**
+     * Decrement product quantity
+     */
+    public function decrementQuantity($id, $amount = 1) {
+        try {
+            if (!Database::isConnected()) {
+                throw new \Exception('Database not connected');
+            }
+            $pdo = \Database::getConnection();
+
+            $sql = "UPDATE products SET quantity = GREATEST(0, quantity - :amount), updatedAt = NOW() WHERE id = :id";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([
+                ':amount' => (int)$amount,
+                ':id' => $id
+            ]);
+
+            return $stmt->rowCount() > 0;
+        } catch (\Exception $e) {
+            error_log("Error decrementing product quantity: " . $e->getMessage());
             throw $e;
         }
     }
