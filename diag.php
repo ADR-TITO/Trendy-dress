@@ -11,7 +11,15 @@ $possibleEnvPaths = [
     dirname(__DIR__) . '/.env'
 ];
 
-echo "<div class='box' style='background: #fdf; border: 1px solid #d9d;'>";
+echo    "<div class=\"box\" style=\"border: 2px solid #e74c3c;\">
+        <h2 style=\"color: #e74c3c;\">🛠️ Repair Environment</h2>
+        <p>If your <code>.env</code> file is missing on the server, use this button to recreate it with the correct production credentials.</p>
+        <form method=\"POST\">
+            <button type=\"submit\" name=\"restore_env\" style=\"background: #e74c3c; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold;\">Restore .env File</button>
+        </form>
+    </div>
+
+    <div class='box' style='background: #fdf; border: 1px solid #d9d;'>";
 echo "<h3>Server File Discovery</h3>";
 echo "<strong>Current Dir content (" . __DIR__ . "):</strong><br>";
 $files = scandir(__DIR__);
@@ -40,6 +48,18 @@ foreach ($possibleEnvPaths as $path) {
 }
 
 $envVars = [];
+if (isset($_POST['restore_env'])) {
+    $envContent = "# Database Configuration\nDB_HOST=localhost\nDB_NAME=trendydr_Shpo\nDB_USER=trendydr_Adrian\nDB_PASS=i\"d)Z8NGP}8\"?aa\n\n# M-Pesa Configuration\nMPESA_CONSUMER_KEY=DVbZeuGGcOQKtRL1Kr4WCV6mOAHoEDwrUGzWgIN2myGN5CFI\nMPESA_CONSUMER_SECRET=AlCA04HIrvRhK9VogcJqXITzFmvQ0JUlMYOwGPG814m2bbUXF4EZEJzprW7B1BIf\nMPESA_SHORTCODE=3576761\nMPESA_PASSKEY=a48a4833b7b881cd22535945a0c61ce835af45be1169a6852c23a4f6136538e0\nMPESA_ENVIRONMENT=production\nMPESA_TRANSACTION_TYPE=CustomerBuyGoodsOnline\nMPESA_TILL_NUMBER=177104\n";
+    $target = __DIR__ . '/backend-php/.env';
+    if (!is_dir(__DIR__ . '/backend-php')) mkdir(__DIR__ . '/backend-php', 0755, true);
+    if (file_put_contents($target, $envContent)) {
+        echo "<div style='background: #dfd; border: 1px solid #9d9; padding: 10px; margin-bottom: 20px;'>✅ <strong>Success:</strong> .env file restored! Please refresh the page.</div>";
+        $envFile = $target; // Use it immediately
+    } else {
+        echo "<div style='background: #fdd; border: 1px solid #d99; padding: 10px; margin-bottom: 20px;'>❌ <strong>Error:</strong> Failed to write .env to $target. Check permissions.</div>";
+    }
+}
+
 if ($envFile) {
     echo "<!-- Found .env at $envFile -->\n";
     $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
