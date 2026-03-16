@@ -177,6 +177,7 @@ $transaction_type = $envVars['MPESA_TRANSACTION_TYPE'] ?? $_ENV['MPESA_TRANSACTI
             if ($res['status'] === 200) {
                 echo "<p class='success'>✅ $name Auth Success!</p>";
                 $data = json_decode($res['body'], true);
+                echo "<strong>Raw Body:</strong><pre>" . htmlspecialchars($res['body']) . "</pre>";
                 echo "<p><strong>Token:</strong> <code>" . ($data['access_token'] ?? 'N/A') . "</code></p>";
                 if ($url === $base_url . '/oauth/v1/generate?grant_type=client_credentials') {
                     $access_token = $data['access_token'] ?? null;
@@ -194,12 +195,14 @@ $transaction_type = $envVars['MPESA_TRANSACTION_TYPE'] ?? $_ENV['MPESA_TRANSACTI
                 if ($resPost['status'] === 200) {
                     echo "<p class='success'>✅ $name POST Success!</p>";
                     $data = json_decode($resPost['body'], true);
+                    echo "<strong>Raw Body:</strong><pre>" . htmlspecialchars($resPost['body']) . "</pre>";
                     echo "<p><strong>Token:</strong> <code>" . ($data['access_token'] ?? 'N/A') . "</code></p>";
                     if ($url === $base_url . '/oauth/v1/generate?grant_type=client_credentials') {
                         $access_token = $data['access_token'] ?? null;
                     }
                 } else {
                     echo "<p class='error'>❌ $name POST Failed (" . $resPost['status'] . ")</p>";
+                    echo "<strong>Raw Body:</strong><pre>" . htmlspecialchars($resPost['body'] ?: '[Empty]') . "</pre>";
                 }
             }
         }
