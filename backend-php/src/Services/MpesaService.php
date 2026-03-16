@@ -120,7 +120,7 @@ class MpesaService
             // Robust callback URL detection
             $protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') ? 'https' : 'http';
             $host = $_SERVER['HTTP_HOST'] ?? 'trendydresses.co.ke';
-            $defaultCallback = "$protocol://$host/backend-php/api";
+            $defaultCallback = "$protocol://$host/backend-php/api/mpesa/webhook";
 
             $callbackURL = $_ENV['MPESA_CALLBACK_URL'] ?? getenv('MPESA_CALLBACK_URL') ?? $defaultCallback;
             // Force HTTPS as Safaricom requires it for webhooks
