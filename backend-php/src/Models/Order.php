@@ -12,7 +12,7 @@ class Order {
      */
     public function findByOrderId($orderId) {
         try {
-            $pdo = Database::getConnection();
+            $pdo = \Database::getConnection();
             
             $stmt = $pdo->prepare("SELECT * FROM orders WHERE orderId = :orderId");
             $stmt->execute([':orderId' => $orderId]);

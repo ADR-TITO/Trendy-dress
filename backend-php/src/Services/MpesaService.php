@@ -122,11 +122,17 @@ class MpesaService
             $host = $_SERVER['HTTP_HOST'] ?? 'trendydresses.co.ke';
             $defaultCallback = "$protocol://$host/backend-php/api/mpesa/webhook";
 
-            $callbackURL = $_ENV['MPESA_CALLBACK_URL'] ?? getenv('MPESA_CALLBACK_URL') ?? $defaultCallback;
+            $callbackURL = $_ENV['MPESA_CALLBACK_URL'] ?? getenv('MPESA_CALLBACK_URL');
+            if (!$callbackURL) {
+                $callbackURL = $defaultCallback;
+            }
+
             // Force HTTPS as Safaricom requires it for webhooks
             if (strpos($callbackURL, 'http://') === 0) {
                 $callbackURL = str_replace('http://', 'https://', $callbackURL);
             }
+
+            error_log("📊 M-Pesa STK Push Callback URL: " . $callbackURL);
 
             // Safaricom Production Requirements:
             // 1. TransactionType: CustomerBuyGoodsOnline for Till Numbers (Buy Goods)
@@ -152,7 +158,7 @@ class MpesaService
                 'PartyA' => $phone,
                 'PartyB' => $partyB,
                 'PhoneNumber' => $phone,
-                'CallBackURL' => rtrim($callbackURL, '/') . '/mpesa/webhook',
+                'CallBackURL' => $callbackURL,
                 'AccountReference' => $accRef,
                 'TransactionDesc' => substr($transactionDesc, 0, 12) // Also truncate description
             ];

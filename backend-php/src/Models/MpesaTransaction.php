@@ -12,7 +12,7 @@ class MpesaTransaction {
      */
     public function findByReceiptNumber($receiptNumber) {
         try {
-            $pdo = Database::getConnection();
+            $pdo = \Database::getConnection();
             
             $stmt = $pdo->prepare("SELECT * FROM mpesa_transactions WHERE receiptNumber = :receiptNumber");
             $stmt->execute([':receiptNumber' => strtoupper($receiptNumber)]);
@@ -34,7 +34,7 @@ class MpesaTransaction {
      */
     public function findByCheckoutRequestID($checkoutRequestID) {
         try {
-            $pdo = Database::getConnection();
+            $pdo = \Database::getConnection();
             
             $stmt = $pdo->prepare("SELECT * FROM mpesa_transactions WHERE checkoutRequestID = :checkoutRequestID");
             $stmt->execute([':checkoutRequestID' => $checkoutRequestID]);
@@ -56,7 +56,7 @@ class MpesaTransaction {
      */
     public function findAll($phoneNumber = null, $limit = 10) {
         try {
-            $pdo = Database::getConnection();
+            $pdo = \Database::getConnection();
             
             $sql = "SELECT * FROM mpesa_transactions";
             $params = [];
@@ -91,7 +91,7 @@ class MpesaTransaction {
      */
     public function create($data) {
         try {
-            $pdo = Database::getConnection();
+            $pdo = \Database::getConnection();
             
             // Handle pending transactions (no receipt number yet)
             $receiptNumber = $data['receiptNumber'] ?? '';
@@ -128,7 +128,7 @@ class MpesaTransaction {
      */
     public function update($id, $data) {
         try {
-            $pdo = Database::getConnection();
+            $pdo = \Database::getConnection();
             
             $fields = [];
             $params = [':id' => $id];
