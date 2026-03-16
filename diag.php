@@ -15,7 +15,10 @@ echo    "<div class=\"box\" style=\"border: 2px solid #e74c3c;\">
         <h2 style=\"color: #e74c3c;\">🛠️ Repair Environment</h2>
         <p>If your <code>.env</code> file is missing on the server, use this button to recreate it with the correct production credentials.</p>
         <form method=\"POST\">
-            <button type=\"submit\" name=\"restore_env\" style=\"background: #e74c3c; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold;\">Restore .env File</button>
+            <button type=\"submit\" name=\"restore_env\" style=\"background: #e74c3c; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; margin-bottom: 10px;\">Restore .env File</button>
+        </form>
+        <form action=\"fix_fulfillment_schema.php\" target=\"_blank\">
+            <button type=\"submit\" style=\"background: #27ae60; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold;\">🛠️ Repair Database Schema</button>
         </form>
     </div>
 
