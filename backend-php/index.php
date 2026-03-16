@@ -11,20 +11,24 @@ if (file_exists(__DIR__ . '/vendor/autoload.php')) {
 // Note: Backend works without Composer - uses built-in PHP features
 
 // Load environment variables
-if (file_exists(__DIR__ . '/.env')) {
+$envPath = __DIR__ . '/.env';
+if (file_exists($envPath)) {
     // Try to use dotenv if available
     if (class_exists('Dotenv\Dotenv')) {
         $dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
         $dotenv->load();
     } else {
-        // Fallback: Simple .env parser (no Composer needed)
-        $lines = file(__DIR__ . '/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        // Fallback: Simple .env parser
+        $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
         foreach ($lines as $line) {
             $line = trim($line);
             if (strpos($line, '#') === 0 || strpos($line, '=') === false) continue;
             list($key, $value) = explode('=', $line, 2);
-            $_ENV[trim($key)] = trim(trim($value), '"\'');
-            putenv(trim($key) . '=' . trim(trim($value), '"\''));
+            $key = trim($key);
+            $value = trim(trim($value), '"\'');
+            $_ENV[$key] = $value;
+            $_SERVER[$key] = $value;
+            putenv("$key=$value");
         }
     }
 } else {

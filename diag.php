@@ -317,8 +317,8 @@ $transaction_type = $envVars['MPESA_TRANSACTION_TYPE'] ?? $_ENV['MPESA_TRANSACTI
         <h2>4. Server Log Viewer (Last 20 lines)</h2>
         <?php
         $logs_to_check = [
-            'Root Log' => __DIR__ . '/error_log',
-            'Backend Log' => __DIR__ . '/backend-php/error_log'
+            'Main Server Log' => __DIR__ . '/error_log',
+            'Backend API Log' => __DIR__ . '/backend-php/logs/php-errors.log'
         ];
         foreach ($logs_to_check as $name => $path) {
             echo "<h4>$name ($path)</h4>";
@@ -361,7 +361,7 @@ $transaction_type = $envVars['MPESA_TRANSACTION_TYPE'] ?? $_ENV['MPESA_TRANSACTI
             }
 
             echo "<h4>Recent Orders (M-Pesa Only)</h4>";
-            $stmt = $pdo->query("SELECT orderId, customerName, totalAmount, paymentStatus, mpesaCode, createdAt FROM orders WHERE paymentMethod = 'mpesa' ORDER BY createdAt DESC LIMIT 5");
+            $stmt = $pdo->query("SELECT orderId, customerName, totalAmount, paymentStatus, mpesaCode, createdAt FROM orders WHERE (paymentMethod LIKE '%mpesa%' OR paymentMethod LIKE '%M%Pesa%') ORDER BY createdAt DESC LIMIT 10");
             $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
             if ($orders) {
                 echo "<table border='1' cellpadding='5' style='width:100%; border-collapse: collapse;'>";
