@@ -119,33 +119,47 @@ $transaction_type = $envVars['MPESA_TRANSACTION_TYPE'] ?? $_ENV['MPESA_TRANSACTI
 
     <div class="box">
         <h2>2. Auth Connectivity Test</h2>
-        <?php
-        function testAuth($url, $key, $secret) {
+         function testAuth($url, $key, $secret, $method = 'GET') {
             $curl = curl_init();
-            curl_setopt($curl, CURLOPT_URL, $url);
             $credentials = base64_encode(trim($key) . ':' . trim($secret));
-            curl_setopt($curl, CURLOPT_HTTPHEADER, array(
+            
+            $headers = [
                 'Authorization: Basic ' . $credentials,
-                'Accept: application/json'
-            ));
+                'Accept: application/json',
+                'User-Agent: Mozilla/5.0'
+            ];
+            
+            curl_setopt($curl, CURLOPT_URL, $url);
+            curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
             curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($curl, CURLOPT_USERAGENT, 'Mozilla/5.0');
-            curl_setopt($curl, CURLOPT_VERBOSE, true);
-            curl_setopt($curl, CURLOPT_HEADER, true); // Include headers in output
+            curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, false);
+            curl_setopt($curl, CURLOPT_VERBOSE, false);
+            curl_setopt($curl, CURLOPT_HEADER, true);
+            curl_setopt($curl, CURLOPT_TIMEOUT, 30);
+            curl_setopt($curl, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
+            
+            if ($method === 'POST') {
+                curl_setopt($curl, CURLOPT_POST, true);
+            } else {
+                curl_setopt($curl, CURLOPT_HTTPGET, true);
+            }
             
             $response = curl_exec($curl);
+            $error = curl_error($curl);
             $status = curl_getinfo($curl, CURLINFO_HTTP_CODE);
             $header_size = curl_getinfo($curl, CURLINFO_HEADER_SIZE);
-            $headers = substr($response, 0, $header_size);
+            $res_headers = substr($response, 0, $header_size);
             $body = substr($response, $header_size);
             curl_close($curl);
             
             return [
                 'status' => $status,
-                'headers' => $headers,
+                'headers' => $res_headers,
                 'body' => $body,
+                'error' => $error,
                 'url' => $url,
+                'method' => $method,
                 'auth_header' => 'Basic ' . $credentials
             ];
         }
@@ -154,27 +168,35 @@ $transaction_type = $envVars['MPESA_TRANSACTION_TYPE'] ?? $_ENV['MPESA_TRANSACTI
         $sand_url = 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials';
 
         foreach (['Production' => $prod_url, 'Sandbox' => $sand_url] as $name => $url) {
-            echo "<h4>Testing $name...</h4>";
-            $res = testAuth($url, $consumer_key, $consumer_secret);
+            echo "<h4>Testing $name (GET)...</h4>";
+            $res = testAuth($url, $consumer_key, $consumer_secret, 'GET');
             if ($res['status'] === 200) {
                 echo "<p class='success'>✅ $name Auth Success!</p>";
                 $data = json_decode($res['body'], true);
                 echo "<p><strong>Token:</strong> <code>" . ($data['access_token'] ?? 'N/A') . "</code></p>";
+                $access_token = $data['access_token'] ?? $access_token;
             } else {
                 echo "<p class='error'>❌ $name Auth Failed (" . $res['status'] . ")</p>";
-                echo "<strong>URL:</strong> <code>" . htmlspecialchars($res['url']) . "</code><br>";
-                echo "<strong>Auth Header Prefix:</strong> <code>" . substr($res['auth_header'], 0, 15) . "...</code><br>";
-                echo "<strong>Raw Response Body:</strong><pre>" . htmlspecialchars($res['body'] ?: '[Empty]') . "</pre>";
-                echo "<strong>Response Headers:</strong><pre>" . htmlspecialchars($res['headers']) . "</pre>";
+                if ($res['error']) echo "<strong>Curl Error:</strong> <code style='color:red;'>" . htmlspecialchars($res['error']) . "</code><br>";
+                echo "<strong>Method:</strong> <code>" . $res['method'] . "</code><br>";
+                echo "<strong>Raw Body:</strong><pre>" . htmlspecialchars($res['body'] ?: '[Empty]') . "</pre>";
+                echo "<strong>Headers:</strong><pre>" . htmlspecialchars($res['headers']) . "</pre>";
+
+                // Try POST as fallback
+                echo "<h4>Testing $name (POST Fallback)...</h4>";
+                $resPost = testAuth($url, $consumer_key, $consumer_secret, 'POST');
+                if ($resPost['status'] === 200) {
+                    echo "<p class='success'>✅ $name POST Success!</p>";
+                    $data = json_decode($resPost['body'], true);
+                    echo "<p><strong>Token:</strong> <code>" . ($data['access_token'] ?? 'N/A') . "</code></p>";
+                    $access_token = $data['access_token'] ?? $access_token;
+                } else {
+                    echo "<p class='error'>❌ $name POST Failed (" . $resPost['status'] . ")</p>";
+                }
             }
         }
-        
-        // Use result from current env for later steps
-        $final_res = ($mpesa_env === 'production') ? 
-            testAuth($prod_url, $consumer_key, $consumer_secret) : 
-            testAuth($sand_url, $consumer_key, $consumer_secret);
-        $access_token = ($final_res['status'] === 200) ? json_decode($final_res['body'], true)['access_token'] : null;
         ?>
+    </div>    ?>
     </div>
 
     <div class="box">
