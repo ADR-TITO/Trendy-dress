@@ -19,11 +19,11 @@ class MpesaService
     public function __construct()
     {
         // M-Pesa Daraja API Credentials from environment variables
-        $this->consumerKey = $_ENV['MPESA_CONSUMER_KEY'] ?? null;
-        $this->consumerSecret = $_ENV['MPESA_CONSUMER_SECRET'] ?? null;
-        $this->shortCode = $_ENV['MPESA_SHORTCODE'] ?? null;
-        $this->passkey = $_ENV['MPESA_PASSKEY'] ?? null;
-        $this->environment = $_ENV['MPESA_ENVIRONMENT'] ?? 'production';
+        $this->consumerKey = $_ENV['MPESA_CONSUMER_KEY'] ?? getenv('MPESA_CONSUMER_KEY') ?: null;
+        $this->consumerSecret = $_ENV['MPESA_CONSUMER_SECRET'] ?? getenv('MPESA_CONSUMER_SECRET') ?: null;
+        $this->shortCode = $_ENV['MPESA_SHORTCODE'] ?? getenv('MPESA_SHORTCODE') ?: null;
+        $this->passkey = $_ENV['MPESA_PASSKEY'] ?? getenv('MPESA_PASSKEY') ?: null;
+        $this->environment = $_ENV['MPESA_ENVIRONMENT'] ?? getenv('MPESA_ENVIRONMENT') ?: 'production';
         
         $this->baseURL = $this->environment === 'production'
             ? 'https://api.safaricom.co.ke'
@@ -58,6 +58,8 @@ class MpesaService
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+        curl_setopt($ch, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
+        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) TrendyDresses/1.0');
 
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -120,15 +122,19 @@ class MpesaService
             $host = $_SERVER['HTTP_HOST'] ?? 'trendydresses.co.ke';
             $defaultCallback = "$protocol://$host/backend-php/api";
 
-            $callbackURL = $_ENV['MPESA_CALLBACK_URL'] ?? $defaultCallback;
+            $callbackURL = $_ENV['MPESA_CALLBACK_URL'] ?? getenv('MPESA_CALLBACK_URL') ?? $defaultCallback;
+            // Force HTTPS as Safaricom requires it for webhooks
+            if (strpos($callbackURL, 'http://') === 0) {
+                $callbackURL = str_replace('http://', 'https://', $callbackURL);
+            }
 
             // Safaricom Production Requirements:
             // 1. TransactionType: CustomerBuyGoodsOnline for Till Numbers (Buy Goods)
             // 2. AccountReference: Max 12 characters (Recommended to use the Till Number or Order Number)
             // 3. Amount: Must be an integer for some Daraja versions
             
-            $transactionType = $_ENV['MPESA_TRANSACTION_TYPE'] ?? 'CustomerBuyGoodsOnline';
-            $displayTill = $_ENV['MPESA_TILL_NUMBER'] ?? '177104';
+            $transactionType = $_ENV['MPESA_TRANSACTION_TYPE'] ?? getenv('MPESA_TRANSACTION_TYPE') ?: 'CustomerBuyGoodsOnline';
+            $displayTill = $_ENV['MPESA_TILL_NUMBER'] ?? getenv('MPESA_TILL_NUMBER') ?: '177104';
             
             // For CustomerBuyGoodsOnline (Buy Goods), PartyB must be the Till Number, 
             // while BusinessShortCode must be the Store Number (Shortcode).
@@ -159,6 +165,9 @@ class MpesaService
             curl_setopt($ch, CURLOPT_POST, true);
             curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
+            curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) TrendyDresses/1.0');
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
 
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
