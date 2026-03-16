@@ -183,17 +183,29 @@ $transaction_type = $envVars['MPESA_TRANSACTION_TYPE'] ?? $_ENV['MPESA_TRANSACTI
         }
 
         $prod_url = 'https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials';
-        $scenarios = [
-            'Production GET' => ['url' => $prod_url],
-            'Sandbox GET' => ['url' => 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials'],
-            'HttpBin Auth Test' => ['url' => 'https://httpbin.org/basic-auth/user/passwd', 'user' => 'user', 'pass' => 'passwd'],
-        ];
+        echo "<h4>Node.js Fetch Test</h4>";
+        if (shell_exec('node -v')) {
+            $cmd = "node fetch_token.js 2>&1";
+            $output = shell_exec($cmd);
+            echo "<pre>" . (htmlspecialchars($output) ?: 'NODE_EXEC RETURNED NULL') . "</pre>";
+        } else {
+            echo "<p>Node.js not found on system path.</p>";
+        }
 
-        echo "<h4>System Curl Test</h4>";
-        $creds = trim($consumer_key) . ':' . trim($consumer_secret);
-        $cmd = "curl -v -G \"https://api.safaricom.co.ke/oauth/v1/generate\" --data-urlencode \"grant_type=client_credentials\" -u \"$creds\" 2>&1";
-        $output = shell_exec($cmd);
-        echo "<pre>" . (htmlspecialchars($output) ?: 'SHELL_EXEC RETURNED NULL') . "</pre>";
+        $prod_url = 'https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials';
+        $scenarios = [
+            'Standard GET' => ['url' => $prod_url],
+            'GET - Accept */*' => ['url' => $prod_url, 'headers' => ['Accept: */*']],
+            'GET - Postman Headers' => [
+                'url' => $prod_url, 
+                'headers' => [
+                    'Accept: */*',
+                    'Cache-Control: no-cache',
+                    'Connection: keep-alive'
+                ]
+            ],
+            'Sandbox GET - Accept */*' => ['url' => 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials', 'headers' => ['Accept: */*']],
+        ];
 
         foreach ($scenarios as $desc => $opt) {
             echo "<h4>Scenario: $desc</h4>";
