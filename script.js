@@ -1788,13 +1788,13 @@ function displayProducts(filterCategory = 'all') {
         <div class="product-card ${!hasAnyStock ? 'sold-out' : ''}" 
              id="${cardId}"
              style="position: relative; display: flex; flex-direction: column; overflow: hidden; cursor: pointer; background: #fff;"
-             onclick="window.location.hash = 'product-${mainProduct.id}'">
+             onclick="${hasAnyStock ? `addToCart('${mainProduct.id}')` : ''}">
             
             <div class="product-image-container" style="position: relative; width: 100%; overflow: hidden; background: #f5f5f5;">
                 <img class="product-img" 
                      src="${hasValidImage ? imageValue : ''}" 
                      alt="${mainProduct.name}"
-                     style="width: 100%; height: auto; display: block; transition: transform 0.5s ease;">
+                     style="width: 100%; height: auto; display: block; transition: none;">
             </div>
             
             ${placeholderDisplay}
