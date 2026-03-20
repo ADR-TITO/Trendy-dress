@@ -1261,6 +1261,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadCart(); // Load cart (UI data - localStorage OK)
     await loadProducts(); // Load products from Database API using fetch() - NOT localStorage
 
+    // START PERIODIC POLLING FOR STOCK SYNC
+    // This ensures stock levels are synced across all devices every 60 seconds
+    setInterval(async () => {
+        // Only poll if the tab is active/visible to save resources
+        if (document.visibilityState === 'visible') {
+            console.log('🔄 Periodic sync: Refreshing products from server...');
+            try {
+                // Use a silent load
+                await loadProducts();
+            } catch (pollError) {
+                console.warn('⚠️ Periodic sync failed:', pollError.message);
+            }
+        }
+    }, 60000); // Poll every 60 seconds
+
     // Automatically check all storage facilities for products
     console.log('\n💡 ========================================');
     console.log('💡 To check ALL storage facilities, run:');
@@ -4061,12 +4076,15 @@ async function processPayment(event) {
                 }
             });
 
-            // Save updated products
+            // Save updated products and REFRESH from server to ensure authoritative sync
             try {
                 await saveProducts();
+                // REFRESH from server to sync with other devices immediately
+                if (useDatabase) {
+                    await loadProducts();
+                }
             } catch (saveError) {
-                console.error('❌ Error saving products:', saveError);
-                // Continue even if save fails
+                console.error('❌ Error saving/refreshing products:', saveError);
             }
 
             // Refresh product display to show updated quantities
@@ -4100,7 +4118,10 @@ async function processPayment(event) {
                     } catch (backendError) {
                         console.error('❌ Backend WhatsApp send failed, trying frontend method:', backendError);
                         // Fallback to frontend method (opens WhatsApp with pre-filled message)
-                        sendReceiptViaWhatsAppSilent();
+                        // Triggered with a small delay to ensure modal transitions are smooth
+                        setTimeout(() => {
+                            sendReceiptViaWhatsAppSilent();
+                        }, 500);
                     }
                 } else {
                     // If Database not available, use frontend method
@@ -4442,11 +4463,14 @@ async function createOrderFromSTKPush(orderId, customerName, customerPhone, cust
             }
         });
 
-        // Save updated products
+        // Save updated products and REFRESH from server
         try {
             await saveProducts();
+            if (useDatabase) {
+                await loadProducts();
+            }
         } catch (saveError) {
-            console.error('❌ Error saving products:', saveError);
+            console.error('❌ Error saving/refreshing products:', saveError);
         }
 
         // Refresh product display
@@ -4481,7 +4505,9 @@ async function createOrderFromSTKPush(orderId, customerName, customerPhone, cust
                     console.log('✅ Receipt and PDF sent to WhatsApp via backend');
                 } catch (backendError) {
                     console.error('❌ Backend WhatsApp send failed:', backendError);
-                    sendReceiptViaWhatsAppSilent();
+                    setTimeout(() => {
+                        sendReceiptViaWhatsAppSilent();
+                    }, 500);
                 }
             } else {
                 sendReceiptViaWhatsAppSilent();
@@ -4874,12 +4900,16 @@ ${currentOrder.delivery && currentOrder.delivery.option !== 'pickup' ? `*Deliver
     // Note: User still needs to click "Send" - this is a limitation of WhatsApp Web API
     const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`;
 
-    // Try to open in same window first (better for mobile), fallback to new tab
-    try {
-        window.location.href = whatsappUrl;
-    } catch (e) {
-        window.open(whatsappUrl, '_blank');
-    }
+    console.log('📱 Opening WhatsApp:', whatsappUrl);
+
+    // Robust redirect for both mobile and desktop
+    const waLink = document.createElement('a');
+    waLink.href = whatsappUrl;
+    waLink.target = '_blank';
+    waLink.rel = 'noopener noreferrer';
+    document.body.appendChild(waLink);
+    waLink.click();
+    setTimeout(() => document.body.removeChild(waLink), 100);
 
     // Also auto-download the PDF in the background
     downloadReceipt();

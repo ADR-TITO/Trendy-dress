@@ -156,6 +156,29 @@ try {
             break;
 
         case 'POST':
+            if ($action === 'send-whatsapp' || $id === 'send-whatsapp') {
+                // Endpoint for frontend to trigger a WhatsApp notification record/log
+                $data = json_decode(file_get_contents('php://input'), true);
+                $orderId = ($action !== 'send-whatsapp' ? $action : ($routeParts[2] ?? ($data['orderId'] ?? null)));
+                
+                if (!$orderId) {
+                    http_response_code(400);
+                    echo json_encode(['error' => 'Order ID is required']);
+                    exit;
+                }
+                
+                // For now, we log the request and return success.
+                // This could be integrated with a real WhatsApp API (like Twilio, Vonage, or a dedicated provider)
+                error_log("📱 WhatsApp notification requested for Order: $orderId");
+                
+                // You could add logic here to send an email notification to the merchant 
+                // which often acts as a reliable backup to WhatsApp.
+                
+                echo json_encode(['success' => true, 'message' => 'WhatsApp notification recorded']);
+                exit;
+            }
+            // Fallthrough to existing POST order creation if not send-whatsapp
+            
             // Create new order
             $data = json_decode(file_get_contents('php://input'), true);
             
