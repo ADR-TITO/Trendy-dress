@@ -7198,7 +7198,7 @@ function openImageCropper(imageSrc) {
                 aspectRatio: currentCropRatio,
                 viewMode: 1, // Restrict crop box within canvas
                 dragMode: 'move',
-                autoCropArea: 0.8,
+                autoCropArea: 1, // Set to 1 to auto-select the ENTIRE image by default
                 restore: false,
                 guides: true,
                 center: true,
