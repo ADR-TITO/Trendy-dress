@@ -1697,6 +1697,13 @@ function displayProducts(filterCategory = 'all') {
             }
         }
 
+        // Check if image exists and is valid
+        const imageValue = mainProduct.image || '';
+        const isFromDatabase = useDatabase && mainProduct.id && !isNaN(mainProduct.id);
+        
+        const hasValidImage = imageValue && imageValue.trim().length > 0 &&
+            (imageValue.startsWith('data:image/') || imageValue.startsWith('http://') || imageValue.startsWith('https://'));
+            
         // Generate unique ID for this product card
         const cardId = `product-card-${mainProduct.id}`;
 
