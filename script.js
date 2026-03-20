@@ -1665,51 +1665,14 @@ function displayProducts(filterCategory = 'all') {
             `;
         }).join('');
 
-        // Get background image style - ensure proper scaling for all products
-        // Calculate overlay height based on image to ensure consistent card sizes
-        let bgImageStyle;
-        let overlayHeight = '15%'; // Default overlay height
-
-        // Check if image exists and is valid
+        // Image handling logic
         const imageValue = mainProduct.image || '';
         const isFromDatabase = useDatabase && mainProduct.id && !isNaN(mainProduct.id);
-        
-        // A product needs lazy loading if:
-        // 1. It came from the Database AND we don't have the image data yet
-        // 2. OR it has a valid-looking URL but isn't loaded
-        const hasValidImage = imageValue && imageValue.trim().length > 0 &&
-            (imageValue.startsWith('data:image/') || imageValue.startsWith('http://') || imageValue.startsWith('https://'));
-            
-        const needsLazyLoad = isFromDatabase && !hasValidImage;
-
-        if (hasValidImage) {
-            // Escape single quotes in image URL to prevent CSS issues
-            const escapedImage = imageValue.replace(/'/g, "\\'");
-            bgImageStyle = `background-image: url('${escapedImage}'); background-size: cover; background-position: center; background-repeat: no-repeat; transition: transform 0.5s ease, background-size 0.5s ease;`;
-            overlayHeight = '15%';
-        } else {
-            // Use gradient with proper scaling for initial products
-            bgImageStyle = `background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); background-size: cover; background-position: center; transition: transform 0.5s ease, background-size 0.5s ease;`;
-            overlayHeight = '15%'; // Default for products without images
-            // Log missing image for debugging
-            if (imageValue && imageValue.trim().length > 0) {
-                console.warn(`⚠️ Product "${mainProduct.name}" has invalid image format:`, imageValue.substring(0, 50));
-            }
-        }
-
-        // Check if image exists and is valid
-        const imageValue = mainProduct.image || '';
-        const isFromDatabase = useDatabase && mainProduct.id && !isNaN(mainProduct.id);
-        
         const hasValidImage = imageValue && imageValue.trim().length > 0 &&
             (imageValue.startsWith('data:image/') || imageValue.startsWith('http://') || imageValue.startsWith('https://'));
             
         // Generate unique ID for this product card
         const cardId = `product-card-${mainProduct.id}`;
-
-        // Add placeholder icon display if no image (reuse imageValue from above)
-        const hasImage = hasValidImage;
-        const placeholderDisplay = '';
 
         // Create product HTML
         const productHTML = `
@@ -1719,7 +1682,7 @@ function displayProducts(filterCategory = 'all') {
              onclick="${hasAnyStock ? `addToCart('${mainProduct.id}')` : ''}">
             
             <div class="product-image-container ${!hasValidImage && mainProduct.hasImage ? 'img-lazy-pending' : ''}" 
-                 style="position: relative; width: 100%; border-radius: 20px 20px 0 0; overflow: visible; background: #f5f5f5; height: auto; min-height: 200px;">
+                 style="position: relative; width: 100%; border-radius: 20px 20px 0 0; overflow: visible; background: #f5f5f5; height: auto; min-height: 150px;">
                 <img class="product-img" 
                      src="${hasValidImage ? imageValue : ''}" 
                      data-product-id="${mainProduct._id || mainProduct.id}"
@@ -7215,8 +7178,10 @@ function applyImageCrop() {
 
     // 1. Resize: Increase limit to 1024px width for better vertical resolution
     // If it's a "Free" crop, it will maintain its natural aspect ratio
+    // Using 800px width is the "sweet spot" for mobile display
+    // It's high enough for 2x pixel density but low enough to avoid database truncation
     const canvas = imageCropper.getCroppedCanvas({
-        width: 1024,
+        width: 800,
         imageSmoothingEnabled: true,
         imageSmoothingQuality: 'high'
     });
