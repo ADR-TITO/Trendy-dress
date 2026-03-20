@@ -1564,10 +1564,6 @@ function getCategoryDisplayName(category) {
     return categoryMap[category] || category.charAt(0).toUpperCase() + category.slice(1).replace(/-/g, ' ');
 }
 
-// Lazy load product images in background (optimization for faster initial page load)
-// Optimized lazy image loading with batching and caching
-// loadProductImagesLazy removed for optimization - replaced by smarter IntersectionObserver
-
 // Calculate final price with discount
 function getFinalPrice(product) {
     const discount = product.discount || 0;
@@ -1577,288 +1573,146 @@ function getFinalPrice(product) {
     return product.price;
 }
 
-// Display Products - Shows ALL products without any limits
-function displayProducts(filterCategory = 'all') {
+async function displayProducts(filterCategory = 'all') {
     const productsGrid = document.getElementById('productsGrid');
-    const sectionTitle = document.querySelector('.section-title');
+    if (!productsGrid) return;
 
-    // Check if productsGrid exists
-    if (!productsGrid) {
-        console.error('[displayProducts] productsGrid element not found');
-        return;
-    }
-
-    // Filter products by category (no limits - shows ALL)
-    const filteredProducts = filterCategory === 'all'
+    // Filter products
+    let filteredProducts = filterCategory === 'all'
         ? products
         : products.filter(p => p.category === filterCategory);
 
-    // Update section title with product count (only visible to admin)
+    // Sort newest first
+    filteredProducts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    const sectionTitle = document.querySelector('.section-title');
     if (sectionTitle) {
-        const categoryName = filterCategory === 'all'
-            ? 'All Products'
-            : filterCategory.charAt(0).toUpperCase() + filterCategory.slice(1);
-        const count = filteredProducts.length;
-        // Only show product count if admin is logged in
-        if (isAdmin) {
-            sectionTitle.innerHTML = `${categoryName} <span style="font-size: 1.2rem; color: var(--primary-color);">(${count} items)</span>`;
-        } else {
-            sectionTitle.innerHTML = categoryName;
-        }
+        const categoryName = filterCategory === 'all' ? 'All Products' : filterCategory.charAt(0).toUpperCase() + filterCategory.slice(1);
+        sectionTitle.innerHTML = isAdmin ? `${categoryName} <span style="font-size: 1.2rem; color: var(--primary-color);">(${filteredProducts.length} items)</span>` : categoryName;
     }
 
     if (filteredProducts.length === 0) {
-        productsGrid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; padding: 40px; color: #666;">No products found in this category.</p>';
+        productsGrid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; padding: 40px; color: #666;">No products found.</p>';
         return;
     }
 
-    // Clear the grid first
     productsGrid.innerHTML = '';
 
-    // Group products by name (case-insensitive)
-    const groupedProducts = {};
-    filteredProducts.forEach(product => {
-        const nameKey = product.name.toLowerCase().trim();
-        if (!groupedProducts[nameKey]) {
-            groupedProducts[nameKey] = [];
-        }
-        groupedProducts[nameKey].push(product);
+    // Group by name
+    const grouped = {};
+    filteredProducts.forEach(p => {
+        const key = p.name.toLowerCase().trim();
+        if (!grouped[key]) grouped[key] = [];
+        grouped[key].push(p);
     });
 
-    // Display grouped products one by one
-    const groupedCount = Object.keys(groupedProducts).length;
-    const productGroups = Object.values(groupedProducts);
+    Object.values(grouped).forEach(group => {
+        const main = group[0];
+        const hasStock = group.some(p => p.quantity > 0);
+        const discount = main.discount || 0;
+        const finalPrice = getFinalPrice(main);
+        
+        const imageValue = main.image || '';
+        const isDb = useDatabase && main.id && !isNaN(main.id);
+        const hasImg = imageValue && imageValue.length > 20 && (imageValue.startsWith('data:') || imageValue.startsWith('http'));
+        const lazy = isDb && !hasImg;
 
-    // Render products with staggered animation
-    productGroups.forEach((productGroup, index) => {
-        // Use first product for main info (image, price, category)
-        const mainProduct = productGroup[0];
-        const discount = mainProduct.discount || 0;
-        const finalPrice = getFinalPrice(mainProduct);
-        const hasDiscount = discount > 0;
-
-        // Sort sizes for better display (S, M, L, XL, 2XL, 3XL, 4XL, 5XL, 6XL order)
-        const sizeOrder = { 'S': 0, 'M': 1, 'L': 2, 'XL': 3, '2XL': 4, '3XL': 5, '4XL': 6, '5XL': 7, '6XL': 8 };
-        productGroup.sort((a, b) => {
-            const sizeA = normalizeSize(a.size || 'M');
-            const sizeB = normalizeSize(b.size || 'M');
-            const orderA = sizeOrder[sizeA] || 99;
-            const orderB = sizeOrder[sizeB] || 99;
-            return orderA - orderB;
-        });
-
-        // Calculate total stock across all sizes
-        const totalStock = productGroup.reduce((sum, p) => sum + (p.quantity || 0), 0);
-        const hasAnyStock = totalStock > 0;
-
-        // Generate size options HTML - compact version
-        const sizeOptions = productGroup.map(p => {
-            const sizeQty = p.quantity || 0;
-            const sizeAvailable = sizeQty > 0;
+        const sizeOptions = group.map(p => {
+            const avail = p.quantity > 0;
             return `
-                <div class="size-option ${sizeAvailable ? 'available' : 'sold-out'}" 
-                     style="display: flex; align-items: center; justify-content: center; gap: 4px; padding: 6px 10px; border-radius: 8px; cursor: pointer; transition: all 0.2s;"
-                     onclick="${sizeAvailable ? `event.stopPropagation(); selectSizeAndAddToCart('${p.id}')` : ''}">
+                <div class="size-btn ${avail ? '' : 'sold-out'}" 
+                     style="display: flex; align-items: center; justify-content: center; gap: 4px; padding: 6px 10px; border-radius: 8px; border: 1px solid #eee; cursor: pointer; transition: all 0.2s;"
+                     onclick="${avail ? `event.stopPropagation(); selectSizeAndAddToCart('${p.id}')` : ''}">
                     <span style="font-weight: 700; font-size: 0.8rem;">${getSizeDisplay(p.size)}</span>
-                    ${sizeAvailable ? '<i class="fas fa-cart-plus" style="font-size: 0.85rem; color: var(--primary-color);"></i>' : ''}
+                    ${avail ? '<i class="fas fa-cart-plus" style="font-size: 0.8rem; color: var(--primary-color);"></i>' : ''}
                 </div>
             `;
         }).join('');
 
-        // Image handling logic
-        const imageValue = mainProduct.image || '';
-        const isFromDatabase = useDatabase && mainProduct.id && !isNaN(mainProduct.id);
-        const hasValidImage = imageValue && imageValue.trim().length > 0 &&
-            (imageValue.startsWith('data:image/') || imageValue.startsWith('http://') || imageValue.startsWith('https://'));
-            
-        // Generate unique ID for this product card
-        const cardId = `product-card-${mainProduct.id}`;
-
-        // Create product HTML
-        const productHTML = `
-        <div class="product-card ${!hasAnyStock ? 'sold-out' : ''}" 
-             id="${cardId}"
-             style="position: relative; display: block; cursor: pointer; background: #fff; box-shadow: 0 5px 15px rgba(0,0,0,0.08); border-radius: 20px; border: 1px solid #efefef; overflow: visible; height: auto;"
-             onclick="${hasAnyStock ? `addToCart('${mainProduct.id}')` : ''}">
-            
-            <div class="product-image-container ${!hasValidImage && mainProduct.hasImage ? 'img-lazy-pending' : ''}" 
-                 style="position: relative; width: 100%; border-radius: 20px 20px 0 0; overflow: visible; background: #f5f5f5; height: auto; min-height: 150px;">
-                <img class="product-img" 
-                     src="${hasValidImage ? imageValue : ''}" 
-                     data-product-id="${mainProduct._id || mainProduct.id}"
-                     data-src="${!hasValidImage && mainProduct.hasImage ? 'fetch-from-api' : ''}"
-                     alt="${mainProduct.name}"
-                     style="width: 100%; height: auto; display: block; border-radius: 20px 20px 0 0; opacity: ${hasValidImage ? '1' : '0'}; transition: opacity 0.5s ease; position: relative; z-index: 1;">
-            </div>
-            
-            ${placeholderDisplay}
-            
-            ${!hasAnyStock ? `
-            <!-- Diagonal SOLD overlay -->
-            <div style="
-                position: absolute;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 4rem;
-                font-weight: bold;
-                color: rgba(255, 0, 0, 0.9);
-                background: linear-gradient(to bottom right, rgba(255, 0, 0, 0.4) 0%, rgba(255, 0, 0, 0.2) 50%, rgba(255, 0, 0, 0.4) 100%);
-                transform: rotate(-45deg);
-                transform-origin: center;
-                z-index: 5;
-                pointer-events: none;
-                text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.7);
-                letter-spacing: 12px;
-                -webkit-text-stroke: 3px rgba(255, 255, 255, 0.9);
-                text-stroke: 3px rgba(255, 255, 255, 0.9);
-            ">SOLD</div>
-            ` : ''}
-            
-            <!-- Badges -->
-            <div style="position: absolute; top: 15px; right: 15px; z-index: 10; display: flex; flex-direction: column; gap: 10px; align-items: flex-end;">
-                ${!hasAnyStock ? `<div class="sold-out-badge">SOLD OUT</div>` : ''}
-                ${hasDiscount ? `<div class="discount-badge">-${discount}%</div>` : ''}
-            </div>
-            
-            <!-- Product Info Section - Stacks naturally below the image -->
-            <div class="product-info" style="
-                position: relative;
-                z-index: 2;
-                background: #fff;
-                padding: 14px 16px;
-                border-top: 1px solid #f0f0f0;
-                margin-top: 0;
-                border-radius: 0 0 20px 20px;
-            ">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap;">
-                    <div style="flex: 1; min-width: 180px;">
-                        <div class="product-category" style="color: var(--primary-color); font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">${getCategoryDisplayName(mainProduct.category)}</div>
-                        <div class="product-name" style="font-size: 1rem; font-weight: bold; color: var(--dark-color); margin-bottom: 8px; line-height: 1.2;">${mainProduct.name}</div>
-                        <div style="margin: 8px 0;">
-                            <div style="font-size: 0.7rem; color: #666; margin-bottom: 6px; font-weight: 500;">
-                                <i class="fas fa-ruler"></i> Select Size:
+        const html = `
+            <div class="product-card ${!hasStock ? 'sold-out' : ''}" 
+                 id="product-card-${main.id}"
+                 style="position: relative; cursor: pointer; background: #fff; border-radius: 20px; border: 1px solid #efefef; overflow: visible; display: block;"
+                 onclick="${hasStock ? `addToCart('${main.id}')` : ''}">
+                
+                <div class="product-image-container ${lazy ? 'img-lazy-pending' : ''}" 
+                     style="width: 100%; border-radius: 20px 20px 0 0; min-height: 150px; background: #f9f9f9; overflow: visible; position: relative;">
+                    <img class="product-img" 
+                         src="${hasImg ? imageValue : ''}" 
+                         data-src="${lazy ? 'fetch-from-api' : ''}" 
+                         data-product-id="${main.id}"
+                         style="width: 100%; height: auto; display: block; border-radius: 20px 20px 0 0; opacity: ${hasImg ? '1' : '0'}; transition: opacity 0.4s; position: relative; z-index: 1;">
                 </div>
-                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(50px, 1fr)); gap: 6px;">
-                                ${sizeOptions}
-                    </div>
+
+                ${!hasStock ? '<div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 3rem; font-weight: bold; color: rgba(255,0,0,0.5); transform: rotate(-30deg); z-index: 5; pointer-events: none;">SOLD</div>' : ''}
+
+                <div style="padding: 15px; background: #fff; border-radius: 0 0 20px 20px;">
+                    <div style="font-size: 0.7rem; color: var(--primary-color); font-weight: 600; text-transform: uppercase;">${getCategoryDisplayName(main.category)}</div>
+                    <h3 style="margin: 5px 0; font-size: 1rem; color: #333;">${main.name}</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; flex-wrap: wrap; gap: 10px;">
+                        <div style="display: flex; gap: 5px; flex-wrap: wrap; flex: 1;">${sizeOptions}</div>
+                        <div style="text-align: right; min-width: 80px;">
+                            ${discount > 0 ? `<div style="text-decoration: line-through; color: #999; font-size: 0.7rem;">KSh ${main.price.toLocaleString()}</div>` : ''}
+                            <div style="font-weight: bold; color: var(--primary-color); font-size: 1.1rem;">KSh ${Math.round(finalPrice).toLocaleString()}</div>
                         </div>
                     </div>
-                    
-                    <div style="text-align: right; flex-shrink: 0;">
-                        <div class="product-price" style="margin-bottom: 5px;">
-                    ${hasDiscount ? `
-                                <div style="text-decoration: line-through; color: #999; font-size: 0.75rem; margin-bottom: 2px;">
-                                    KSh ${mainProduct.price.toLocaleString('en-KE')}
-                                </div>
-                                <div style="color: var(--primary-color); font-weight: bold; font-size: 1.1rem;">
-                            KSh ${Math.round(finalPrice).toLocaleString('en-KE')}
-                                </div>
-                    ` : `
-                                <div style="font-size: 1.1rem; font-weight: bold; color: var(--primary-color);">KSh ${mainProduct.price.toLocaleString('en-KE')}</div>
-                    `}
-                </div>
-                        ${hasAnyStock ? `
-                            <div style="color: #666; font-size: 0.7rem; margin-top: 5px;">
-                                <i class="fas fa-box"></i> <strong>${totalStock}</strong> in stock
-                            </div>
-                        ` : ''}
-                    </div>
                 </div>
             </div>
-        </div>
         `;
 
-        // Render immediately — no stagger delay
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = productHTML.trim();
-        const productCard = tempDiv.firstChild;
-
-        // Fade-in on first paint (no delay)
-        productCard.style.opacity = '0';
-        productCard.style.transition = 'opacity 0.25s ease';
-        productsGrid.appendChild(productCard);
-        requestAnimationFrame(() => { productCard.style.opacity = '1'; });
-
-        // Lazy-load the actual image only when the card enters the viewport
-        if (hasValidImage || needsLazyLoad) {
-            const productImg = productCard.querySelector('.product-img');
-            if (productImg) {
-                // Store actual image URL OR marker for API fetch as a data attribute
-                productImg.dataset.src = hasValidImage ? imageValue : 'fetch-from-api';
-                productImg.dataset.productId = mainProduct.id;
-                
-                // Set initial placeholder state
-                if (!hasValidImage) {
-                    productImg.style.opacity = '0';
-                    productCard.style.background = 'linear-gradient(135deg, #e0e0e0 25%, #f5f5f5 50%, #e0e0e0 75%)';
-                    productCard.style.backgroundSize = '400% 400%';
-                    productCard.style.animation = 'shimmer 1.5s infinite';
-                    productCard.classList.add('img-lazy-pending');
-                }
-            }
-        }
+        const div = document.createElement('div');
+        div.innerHTML = html.trim();
+        const card = div.firstChild;
+        productsGrid.appendChild(card);
     });
 
-    // Intersection Observer: load image when card scrolls into view
+    // Throttled Lazy Loading Logic
+    if (!window._lazyLoadQueue) {
+        window._lazyLoadQueue = [];
+        window._isProcessingLazyQueue = false;
+        window._processLazyQueue = async () => {
+            if (window._isProcessingLazyQueue || window._lazyLoadQueue.length === 0) return;
+            window._isProcessingLazyQueue = true;
+            while (window._lazyLoadQueue.length > 0) {
+                const entry = window._lazyLoadQueue.shift();
+                const card = entry.target;
+                const img = card.querySelector('.product-img');
+                if (img && img.dataset.src === 'fetch-from-api') {
+                    try {
+                        card.classList.add('loading-image');
+                        const data = await apiService.getProduct(img.dataset.productId);
+                        if (data && data.image) {
+                            img.src = data.image;
+                            img.onload = () => {
+                                img.style.opacity = '1';
+                                card.classList.remove('img-lazy-pending', 'loading-image');
+                                card.style.background = '#fff';
+                            };
+                            const p = products.find(prod => (prod.id || prod._id) == img.dataset.productId);
+                            if (p) p.image = data.image;
+                        }
+                    } catch (e) {
+                        console.error('Lazy load error:', e);
+                        card.classList.remove('loading-image');
+                    }
+                    delete img.dataset.src;
+                    await new Promise(r => setTimeout(r, 120));
+                }
+                window._lazyImgObserver.unobserve(card);
+            }
+            window._isProcessingLazyQueue = false;
+        };
+    }
+
     if (!window._lazyImgObserver) {
         window._lazyImgObserver = new IntersectionObserver((entries) => {
-            entries.forEach(async (entry) => {
-                if (entry.isIntersecting) {
-                    const card = entry.target;
-                    const productImg = card.querySelector('.product-img');
-                    if (!productImg) {
-                        window._lazyImgObserver.unobserve(card);
-                        return;
-                    }
-
-                    let imgSrc = productImg.dataset.src;
-                    const productId = productImg.dataset.productId;
-                    
-                    if (imgSrc) {
-                        try {
-                            // If we need to fetch from API, do it now
-                            if (imgSrc === 'fetch-from-api' && productId) {
-                                // Add loading spinner or visual feedback
-                                card.classList.add('loading-image');
-                                
-                                const productData = await apiService.getProduct(productId);
-                                if (productData && productData.image) {
-                                    imgSrc = productData.image;
-                                    // Update main products array for future filters
-                                    const pIndex = products.findIndex(p => (p.id || p._id) == productId);
-                                    if (pIndex !== -1) products[pIndex].image = imgSrc;
-                                } else {
-                                    imgSrc = '';
-                                }
-                            }
-                            
-                            if (imgSrc) {
-                                productImg.src = imgSrc;
-                                productImg.onload = () => {
-                                    productImg.style.opacity = '1';
-                                    card.classList.remove('img-lazy-pending', 'loading-image');
-                                    card.style.background = '#fff';
-                                };
-                            } else {
-                                card.classList.remove('img-lazy-pending', 'loading-image');
-                                card.style.background = 'linear-gradient(135deg, #667eea11 0%, #764ba211 100%)';
-                            }
-                        } catch (error) {
-                            console.error('❌ Error lazy-loading image:', error);
-                            card.classList.remove('loading-image');
-                        }
-                        
-                        delete productImg.dataset.src;
-                    }
-                    window._lazyImgObserver.unobserve(card);
+            entries.forEach(e => {
+                if (e.isIntersecting) {
+                    window._lazyLoadQueue.push(e);
+                    window._processLazyQueue();
                 }
             });
-        }, { rootMargin: '200px' }); // start loading 200px before card enters view
+        }, { rootMargin: '600px', threshold: 0.01 });
     }
     // Observe all lazy-pending cards
     productsGrid.querySelectorAll('.img-lazy-pending').forEach(card => {

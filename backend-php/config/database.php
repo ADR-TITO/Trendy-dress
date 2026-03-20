@@ -131,6 +131,13 @@ class Database {
                 INDEX idx_createdAt (createdAt)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
             
+            // AUTO-FIX: Ensure existing tables are upgraded to LONGTEXT
+            try {
+                $pdo->exec("ALTER TABLE products MODIFY COLUMN image LONGTEXT");
+            } catch (Exception $e) {
+                // Ignore if already LONGTEXT or other issues
+            }
+            
             // Orders table
             $pdo->exec("CREATE TABLE IF NOT EXISTS orders (
                 id VARCHAR(255) PRIMARY KEY,
@@ -154,6 +161,13 @@ class Database {
                 INDEX idx_paymentStatus (paymentStatus),
                 INDEX idx_createdAt (createdAt)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+            // AUTO-FIX: Ensure existing tables are upgraded to LONGTEXT
+            try {
+                $pdo->exec("ALTER TABLE orders MODIFY COLUMN items LONGTEXT");
+            } catch (Exception $e) {
+                // Ignore
+            }
             
             // M-Pesa transactions table
             $pdo->exec("CREATE TABLE IF NOT EXISTS mpesa_transactions (
