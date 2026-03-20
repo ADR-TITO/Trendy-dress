@@ -1787,9 +1787,15 @@ function displayProducts(filterCategory = 'all') {
         const productHTML = `
         <div class="product-card ${!hasAnyStock ? 'sold-out' : ''}" 
              id="${cardId}"
-             style="${bgImageStyle} position: relative; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; cursor: pointer;"
-             onmouseenter="this.style.transform='scale(1.05)'; this.style.backgroundSize='110%'; this.querySelector('.product-info-overlay').style.transform='translateY(0)';"
-             onmouseleave="this.style.transform='scale(1)'; this.style.backgroundSize='cover'; this.querySelector('.product-info-overlay').style.transform='translateY(10px)';">
+             style="position: relative; display: flex; flex-direction: column; overflow: hidden; cursor: pointer; background: #fff;"
+             onclick="window.location.hash = 'product-${mainProduct.id}'">
+            
+            <div class="product-image-container" style="position: relative; width: 100%; overflow: hidden; background: #f5f5f5;">
+                <img class="product-img" 
+                     src="${hasValidImage ? imageValue : ''}" 
+                     alt="${mainProduct.name}"
+                     style="width: 100%; height: auto; display: block; transition: transform 0.5s ease;">
+            </div>
             
             ${placeholderDisplay}
             
@@ -1825,18 +1831,16 @@ function displayProducts(filterCategory = 'all') {
                 ${hasDiscount ? `<div class="discount-badge">-${discount}%</div>` : ''}
             </div>
             
-            <!-- Product Info Overlay - consistent size for all products (image is 85%) -->
+            <!-- Product Info Overlay - stacks below the image -->
             <div class="product-info-overlay product-info" style="
                 position: relative;
                 z-index: 2;
-                background: rgba(255, 255, 255, 0.98);
-                backdrop-filter: blur(10px);
+                background: white;
                 padding: 14px 16px;
-                border-radius: 15px 15px 0 0;
-                margin-top: auto;
-                transform: translateY(10px);
+                border-top: 1px solid #eee;
+                margin-top: 0;
                 transition: transform 0.3s ease;
-                box-shadow: 0 -3px 15px rgba(0,0,0,0.2);
+                box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
                 min-height: ${overlayHeight};
             ">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap;">
@@ -1890,14 +1894,21 @@ function displayProducts(filterCategory = 'all') {
 
         // Lazy-load the actual image only when the card enters the viewport
         if (hasValidImage || needsLazyLoad) {
-            // Store actual image URL OR marker for API fetch as a data attribute
-            productCard.dataset.bgImage = hasValidImage ? imageValue : 'fetch-from-api';
-            productCard.dataset.productId = mainProduct.id;
-            productCard.style.backgroundImage = '';
-            productCard.style.background = 'linear-gradient(135deg, #e0e0e0 25%, #f5f5f5 50%, #e0e0e0 75%)';
-            productCard.style.backgroundSize = '400% 400%';
-            productCard.style.animation = 'shimmer 1.5s infinite';
-            productCard.classList.add('img-lazy-pending');
+            const productImg = productCard.querySelector('.product-img');
+            if (productImg) {
+                // Store actual image URL OR marker for API fetch as a data attribute
+                productImg.dataset.src = hasValidImage ? imageValue : 'fetch-from-api';
+                productImg.dataset.productId = mainProduct.id;
+                
+                // Set initial placeholder state
+                if (!hasValidImage) {
+                    productImg.style.opacity = '0';
+                    productCard.style.background = 'linear-gradient(135deg, #e0e0e0 25%, #f5f5f5 50%, #e0e0e0 75%)';
+                    productCard.style.backgroundSize = '400% 400%';
+                    productCard.style.animation = 'shimmer 1.5s infinite';
+                    productCard.classList.add('img-lazy-pending');
+                }
+            }
         }
     });
 
@@ -1907,8 +1918,14 @@ function displayProducts(filterCategory = 'all') {
             entries.forEach(async (entry) => {
                 if (entry.isIntersecting) {
                     const card = entry.target;
-                    let imgSrc = card.dataset.bgImage;
-                    const productId = card.dataset.productId;
+                    const productImg = card.querySelector('.product-img');
+                    if (!productImg) {
+                        window._lazyImgObserver.unobserve(card);
+                        return;
+                    }
+
+                    let imgSrc = productImg.dataset.src;
+                    const productId = productImg.dataset.productId;
                     
                     if (imgSrc) {
                         try {
@@ -1919,7 +1936,7 @@ function displayProducts(filterCategory = 'all') {
                                 if (productData && productData.image) {
                                     imgSrc = productData.image;
                                     // Cache it in the main products array for future filter/re-render
-                                    const pIndex = products.findIndex(p => p.id == productId);
+                                    const pIndex = products.findIndex(p => (p.id || p._id) == productId);
                                     if (pIndex !== -1) products[pIndex].image = imgSrc;
                                 } else {
                                     imgSrc = ''; // No image available
@@ -1927,17 +1944,14 @@ function displayProducts(filterCategory = 'all') {
                             }
                             
                             if (imgSrc) {
-                                // Preload via Image object, then apply — prevents FOUC
-                                const img = new Image();
-                                img.onload = () => {
+                                // Set src directly on the <img> tag
+                                productImg.src = imgSrc;
+                                productImg.onload = () => {
                                     card.style.animation = '';
-                                    card.style.backgroundSize = 'cover';
-                                    card.style.backgroundPosition = 'center';
-                                    card.style.backgroundRepeat = 'no-repeat';
-                                    card.style.backgroundImage = `url('${imgSrc.replace(/'/g, "\\'")}')`;
+                                    card.style.background = '#fff';
+                                    productImg.style.opacity = '1';
                                     card.classList.remove('img-lazy-pending');
                                 };
-                                img.src = imgSrc;
                             } else {
                                 // No image found - use fallback gradient
                                 card.style.animation = '';
@@ -1949,8 +1963,8 @@ function displayProducts(filterCategory = 'all') {
                             card.style.animation = '';
                         }
                         
-                        delete card.dataset.bgImage;
-                        delete card.dataset.productId;
+                        delete productImg.dataset.src;
+                        delete productImg.dataset.productId;
                     }
                     window._lazyImgObserver.unobserve(card);
                 }
@@ -3703,7 +3717,7 @@ async function processPayment(event) {
             showPaymentVerificationModal();
 
             // Check if Database is available
-            const useDatabase = localStorage.getItem('useDatabase') === 'true';
+            useDatabase = localStorage.getItem('useDatabase') === 'true';
 
             // Track payment progress
             let totalPaid = 0;
@@ -4111,7 +4125,7 @@ async function processPayment(event) {
             }
             
             // Still try the backend sync for logging, but don't wait for it
-            const useDatabase = localStorage.getItem('useDatabase') === 'true';
+            useDatabase = localStorage.getItem('useDatabase') === 'true';
             if (useDatabase) {
                 apiService.sendReceiptToWhatsApp(order, currentOrderPDF).catch(err => {
                     console.warn('Backend sync log failed:', err);
