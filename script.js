@@ -4101,35 +4101,21 @@ async function processPayment(event) {
             // Close payment modal silently
             closePaymentModal();
 
-            // Automatically send receipt to WhatsApp via backend (no notification on website)
-            try {
-                // Generate PDF first (await to ensure it's ready)
-                if (!currentOrderPDF) {
-                    await generateReceiptPDF(order);
-                }
-
-                // Send receipt to WhatsApp via backend API (automatic) - WITH PDF
-                const useDatabase = localStorage.getItem('useDatabase') === 'true';
-                if (useDatabase) {
-                    try {
-                        // Call backend to send receipt to WhatsApp (including PDF)
-                        await apiService.sendReceiptToWhatsApp(order, currentOrderPDF);
-                        console.log('✅ Receipt and PDF sent to WhatsApp via backend');
-                    } catch (backendError) {
-                        console.error('❌ Backend WhatsApp send failed, trying frontend method:', backendError);
-                        // Fallback to frontend method (opens WhatsApp with pre-filled message)
-                        // Triggered with a small delay to ensure modal transitions are smooth
-                        setTimeout(() => {
-                            sendReceiptViaWhatsAppSilent();
-                        }, 500);
-                    }
-                } else {
-                    // If Database not available, use frontend method
-                    sendReceiptViaWhatsAppSilent();
-                }
-            } catch (whatsappError) {
-                console.error('❌ Error sending receipt to WhatsApp:', whatsappError);
-                // Don't show error to user - fail silently
+            // Open success modal instead of just showing a notification
+            const successMessage = `Payment for Order ${orderId} verified successfully! Your items are now reserved.`;
+            openSuccessModal(successMessage);
+            
+            // Generate PDF in background (already stored in currentOrderPDF if generated)
+            if (!currentOrderPDF) {
+                generateReceiptPDF(order).catch(console.error);
+            }
+            
+            // Still try the backend sync for logging, but don't wait for it
+            const useDatabase = localStorage.getItem('useDatabase') === 'true';
+            if (useDatabase) {
+                apiService.sendReceiptToWhatsApp(order, currentOrderPDF).catch(err => {
+                    console.warn('Backend sync log failed:', err);
+                });
             }
             
             try {
@@ -4493,36 +4479,23 @@ async function createOrderFromSTKPush(orderId, customerName, customerPhone, cust
         // Close payment modal
         closePaymentModal();
 
-        // Send receipt to WhatsApp
-        try {
-            if (!currentOrderPDF) {
-                await generateReceiptPDF(order);
-            }
+        // Open success modal
+        const successMessage = 'Success! Your order has been placed and payment confirmed.';
+        openSuccessModal(successMessage);
 
-            if (useDatabase) {
-                try {
-                    await apiService.sendReceiptToWhatsApp(order, currentOrderPDF);
-                    console.log('✅ Receipt and PDF sent to WhatsApp via backend');
-                } catch (backendError) {
-                    console.error('❌ Backend WhatsApp send failed:', backendError);
-                    setTimeout(() => {
-                        sendReceiptViaWhatsAppSilent();
-                    }, 500);
-                }
-            } else {
-                sendReceiptViaWhatsAppSilent();
-            }
-        } catch (whatsappError) {
-            console.error('❌ Error sending receipt to WhatsApp:', whatsappError);
+        // Generate PDF in background
+        if (!currentOrderPDF) {
+            generateReceiptPDF(order).catch(console.error);
         }
 
-        // Clear cart
-        cart = [];
-        updateCartUI();
-        saveCart();
-        
-        // Final Success feedback
-        showNotification('Success! Your order has been placed and payment confirmed.', 'success');
+        // Backend sync for logging
+        if (useDatabase) {
+            apiService.sendReceiptToWhatsApp(order, currentOrderPDF).catch(err => {
+                console.warn('Backend sync log failed:', err);
+            });
+        }
+
+        // Cart cleared above
         
         // Small delay before closing everything for visual feedback
         setTimeout(() => {
@@ -4870,7 +4843,16 @@ Please find the receipt attached. Thank you!`;
 // This is a fallback method that opens WhatsApp with pre-filled message
 // The backend method is preferred for automatic sending
 function sendReceiptViaWhatsAppSilent() {
-    if (!currentOrder) return;
+    // Keep existing version but we'll use a user-triggered one mostly
+    sendReceiptViaWhatsApp();
+}
+
+// User-triggered WhatsApp receipt
+function sendReceiptViaWhatsApp() {
+    if (!currentOrder) {
+        showNotification('No order data found. Please try again or contact support.', 'error');
+        return;
+    }
 
     // Create message with order details
     const message = `*NEW ORDER RECEIVED* 📦
@@ -4894,28 +4876,42 @@ ${currentOrder.delivery && currentOrder.delivery.option !== 'pickup' ? `*Deliver
 
     // Encode message for WhatsApp
     const encodedMessage = encodeURIComponent(message);
-    const whatsappNumber = websiteContent.contactPhone;
+    const whatsappNumber = websiteContent.contactPhone || '254702660144';
 
-    // Open WhatsApp with message (this opens WhatsApp with pre-filled message)
-    // Note: User still needs to click "Send" - this is a limitation of WhatsApp Web API
+    // Open WhatsApp
     const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`;
+    window.open(whatsappUrl, '_blank');
 
-    console.log('📱 Opening WhatsApp:', whatsappUrl);
-
-    // Robust redirect for both mobile and desktop
-    const waLink = document.createElement('a');
-    waLink.href = whatsappUrl;
-    waLink.target = '_blank';
-    waLink.rel = 'noopener noreferrer';
-    document.body.appendChild(waLink);
-    waLink.click();
-    setTimeout(() => document.body.removeChild(waLink), 100);
-
-    // Also auto-download the PDF in the background
+    // Also auto-download the PDF
     downloadReceipt();
+}
 
-    // No notification shown - receipt is sent automatically
-    console.log('✅ Receipt opened in WhatsApp (user needs to click Send)');
+function openSuccessModal(message) {
+    const modal = document.getElementById('successModal');
+    const overlay = document.getElementById('successModalOverlay');
+    const messageDiv = document.getElementById('successModalMessage');
+    
+    if (message && messageDiv) {
+        messageDiv.textContent = message;
+    }
+    
+    if (modal && overlay) {
+        modal.classList.add('show');
+        overlay.classList.add('show');
+    }
+}
+
+function closeSuccessModal() {
+    const modal = document.getElementById('successModal');
+    const overlay = document.getElementById('successModalOverlay');
+    
+    if (modal && overlay) {
+        modal.classList.remove('show');
+        overlay.classList.remove('show');
+    }
+    
+    // Refresh products just in case
+    loadProducts();
 }
 
 // Toggle Mobile Menu
@@ -6143,34 +6139,26 @@ async function confirmDelete() {
 async function saveProducts() {
     try {
         const productsToSave = [...products];
+        console.log('💾 [saveProducts] Saving to local storage only... Products count:', productsToSave.length);
 
-        console.log('💾 [saveProducts] Starting sync to all storage locations... Products count:', productsToSave.length);
-
-        // Use unified sync function to save to all storage locations
-        const syncResult = await syncProductsToAllStorage(productsToSave, { preserveImages: true });
-
-        if (syncResult.success) {
-            // Update products array with synced products (in case Database IDs changed)
-            if (syncResult.products && syncResult.products.length > 0) {
-                // Update products array with synced products (preserve order and add Database IDs)
-                syncResult.products.forEach((syncedProduct, index) => {
-                    if (index < products.length) {
-                        // Update existing product with synced data (especially Database ID)
-                        const currentProduct = products[index];
-                        products[index] = {
-                            ...currentProduct,
-                            id: syncedProduct.id || currentProduct.id,
-                            _id: syncedProduct.id || currentProduct._id || currentProduct.id
-                        };
-                    }
-                });
+        // Save to IndexedDB (as cache)
+        let indexedResult = false;
+        try {
+            await storageManager.init();
+            if (storageManager.useIndexedDB && storageManager.db) {
+                indexedResult = await storageManager.saveProducts(productsToSave);
             }
+        } catch (idbErr) {
+            console.warn('⚠️ IndexedDB sync failed:', idbErr.message);
+        }
 
-            console.log('✅ [saveProducts] Products synced to all storage locations successfully');
+        // Save to localStorage (as backup)
+        try {
+            localStorage.setItem('products', JSON.stringify(productsToSave));
             return true;
-        } else {
-            console.error('❌ [saveProducts] Failed to sync to any storage location');
-            return false;
+        } catch (lsErr) {
+            console.error('❌ localStorage save failed:', lsErr);
+            return indexedResult; // Return true if IndexedDB succeeded
         }
     } catch (error) {
         console.error('❌ [saveProducts] Unexpected error:', error);
@@ -6303,59 +6291,32 @@ async function loadProducts() {
                     });
                 }
 
-                // Step 2: If we have local products, sync them to Database (Database is authoritative)
-                if (localProductCount > 0 && localProducts.length > 0) {
-                    console.log(`🔄 Found ${localProductCount} products in local cache - syncing to Database (authoritative)...`);
-                    try {
-                        await syncProductsToAllStorage(localProducts, { preserveImages: true });
-                        console.log(`✅ Synced ${localProductCount} local products to Database (permanent storage)`);
+                // Step 2: Use Database products as authoritative
+                loadedProducts = dbProducts.map(p => ({
+                    ...p,
+                    id: p._id || p.id,
+                    image: p.image || '' // Will be empty, loaded lazily
+                }));
+                loadSource = 'Database (permanent, centralized)';
+                console.log(`📦 Using ${loadedProducts.length} products from Database (authoritative source)`);
 
-                        // Reload from Database after sync to get the latest data (without images for speed)
-                        const updatedMongoProducts = await apiService.getProducts('all', false);
-                        loadedProducts = updatedMongoProducts.map(p => ({
-                            ...p,
-                            id: p._id || p.id,
-                            image: p.image || '' // Will be empty, loaded lazily
-                        }));
-                        loadSource = 'Database (permanent, centralized)';
-                        console.log(`📦 Using ${loadedProducts.length} products from Database (authoritative)`);
-
-                        // Update IndexedDB cache with latest Database data
-                        try {
-                            await storageManager.syncFromDatabase(updatedMongoProducts);
-                        } catch (cacheError) {
-                            console.warn('⚠️ Could not update IndexedDB cache:', cacheError.message);
-                        }
-
-                        // Load images in background
-                        loadProductImagesLazy(loadedProducts).catch(err => {
-                            console.warn('⚠️ Some product images failed to load:', err.message);
-                        });
-                    } catch (syncError) {
-                        console.error('❌ Error syncing to Database:', syncError);
-                        // If sync fails, still use Database products (they're the source of truth)
-                        loadedProducts = dbProducts.map(p => ({
-                            ...p,
-                            id: p._id || p.id,
-                            image: p.image || ''
-                        }));
-                        loadSource = 'Database (permanent, centralized)';
+                // Step 3: Update local cache (IndexedDB/localStorage) to match Database
+                try {
+                    await storageManager.init();
+                    if (storageManager.useIndexedDB && storageManager.db) {
+                        await storageManager.syncFromDatabase(dbProducts);
+                        console.log('✅ Updated local IndexedDB cache from Database');
                     }
-                } else {
-                    // No local products - use Database directly (primary source)
-                    loadedProducts = dbProducts.map(p => ({
-                        ...p,
-                        id: p._id || p.id,
-                        image: p.image || '' // Will be empty, loaded lazily
-                    }));
-                    loadSource = 'Database (permanent, centralized)';
-                    console.log(`📦 Using ${loadedProducts.length} products from Database (permanent, centralized storage)`);
-
-                    // Load images in background for products that have them
-                    loadProductImagesLazy(loadedProducts).catch(err => {
-                        console.warn('⚠️ Some product images failed to load:', err.message);
-                    });
+                    // Also update localStorage as a backup
+                    localStorage.setItem('products', JSON.stringify(loadedProducts));
+                } catch (cacheError) {
+                    console.warn('⚠️ Could not update local cache:', cacheError.message);
                 }
+
+                // Step 4: Load images in background
+                loadProductImagesLazy(loadedProducts).catch(err => {
+                    console.warn('⚠️ Some product images failed to load:', err.message);
+                });
 
             } catch (error) {
                 // Database failed - check if it's a transient error or permanent failure

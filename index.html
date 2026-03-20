@@ -596,8 +596,30 @@
                     <div style="margin-bottom: 10px;">
                         <input type="file" id="heroImageFile" accept="image/*" onchange="handleHeroImageUpload(event)"
                             style="margin-bottom: 10px;">
-                        <small style="color: #666; font-size: 0.85rem; display: block;">Upload an image file or enter
-                            URL below</small>
+    <!-- Order Success Modal -->
+    <div class="modal" id="successModal">
+        <div class="modal-content" style="text-align: center; padding: 30px;">
+            <div style="font-size: 4rem; color: var(--success-color); margin-bottom: 20px;">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <h2 style="margin-bottom: 10px;">Order Successful!</h2>
+            <p id="successModalMessage" style="margin-bottom: 25px; color: #666; line-height: 1.5;">
+                Your order has been placed successfully. A receipt has been generated.
+            </p>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <button class="btn-primary" onclick="sendReceiptViaWhatsApp()" style="width: 100%; padding: 15px;">
+                    <i class="fab fa-whatsapp"></i> Send Receipt to WhatsApp
+                </button>
+                <button class="btn-secondary" onclick="closeSuccessModal()" style="width: 100%; padding: 12px;">
+                    Continue Shopping
+                </button>
+            </div>
+            <p style="margin-top: 15px; font-size: 0.85rem; color: #999;">
+                Note: Clicking "Send Receipt" will open WhatsApp where you can send the order details to us.
+            </p>
+        </div>
+    </div>
+    <div class="modal-overlay" id="successModalOverlay" onclick="closeSuccessModal()"></div>
                     </div>
                     <div style="margin-top: 10px;">
                         <label style="font-size: 0.9rem; color: #666;">Or enter image URL:</label>
