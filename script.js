@@ -1708,17 +1708,17 @@ function displayProducts(filterCategory = 'all') {
         const productHTML = `
         <div class="product-card ${!hasAnyStock ? 'sold-out' : ''}" 
              id="${cardId}"
-             style="position: relative; display: flex; flex-direction: column; cursor: pointer; background: #fff; box-shadow: 0 5px 15px rgba(0,0,0,0.08); border-radius: 20px; border: 1px solid #efefef;"
+             style="position: relative; display: block; cursor: pointer; background: #fff; box-shadow: 0 5px 15px rgba(0,0,0,0.08); border-radius: 20px; border: 1px solid #efefef; overflow: visible; height: auto;"
              onclick="${hasAnyStock ? `addToCart('${mainProduct.id}')` : ''}">
             
             <div class="product-image-container ${!hasValidImage && mainProduct.hasImage ? 'img-lazy-pending' : ''}" 
-                 style="position: relative; width: 100%; border-radius: 20px 20px 0 0; overflow: visible; background: #f5f5f5;">
+                 style="position: relative; width: 100%; border-radius: 20px 20px 0 0; overflow: visible; background: #f5f5f5; height: auto; min-height: 200px;">
                 <img class="product-img" 
                      src="${hasValidImage ? imageValue : ''}" 
                      data-product-id="${mainProduct._id || mainProduct.id}"
                      data-src="${!hasValidImage && mainProduct.hasImage ? 'fetch-from-api' : ''}"
                      alt="${mainProduct.name}"
-                     style="width: 100%; height: auto; display: block; border-radius: 20px 20px 0 0; opacity: ${hasValidImage ? '1' : '0'}; transition: opacity 0.5s ease;">
+                     style="width: 100%; height: auto; display: block; border-radius: 20px 20px 0 0; opacity: ${hasValidImage ? '1' : '0'}; transition: opacity 0.5s ease; position: relative; z-index: 1;">
             </div>
             
             ${placeholderDisplay}
@@ -1755,16 +1755,14 @@ function displayProducts(filterCategory = 'all') {
                 ${hasDiscount ? `<div class="discount-badge">-${discount}%</div>` : ''}
             </div>
             
-            <!-- Product Info Overlay - stacks below the image -->
-            <div class="product-info-overlay product-info" style="
+            <!-- Product Info Section - Stacks naturally below the image -->
+            <div class="product-info" style="
                 position: relative;
                 z-index: 2;
-                background: white;
+                background: #fff;
                 padding: 14px 16px;
-                border-top: 1px solid #eee;
+                border-top: 1px solid #f0f0f0;
                 margin-top: 0;
-                transition: transform 0.3s ease;
-                box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
                 border-radius: 0 0 20px 20px;
             ">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap;">
