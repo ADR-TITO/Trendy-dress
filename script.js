@@ -1724,22 +1724,10 @@ function displayProducts(filterCategory = 'all') {
             const sizeAvailable = sizeQty > 0;
             return `
                 <div class="size-option ${sizeAvailable ? 'available' : 'sold-out'}" 
-                     onclick="${sizeAvailable ? `selectSizeAndAddToCart('${p.id}')` : ''}"
-                     style="
-                         padding: 5px 8px;
-                         border: 2px solid ${sizeAvailable ? '#4caf50' : '#ddd'};
-                         border-radius: 4px;
-                         cursor: ${sizeAvailable ? 'pointer' : 'not-allowed'};
-                         background: ${sizeAvailable ? '#f0f8f0' : '#f5f5f5'};
-                         color: ${sizeAvailable ? '#333' : '#999'};
-                         text-align: center;
-                         transition: all 0.2s;
-                         font-size: 0.75rem;
-                         font-weight: bold;
-                     "
-                     onmouseover="${sizeAvailable ? 'this.style.background=\'#e8f5e9\'; this.style.borderColor=\'#4caf50\'; this.style.transform=\'scale(1.1)\';' : ''}"
-                     onmouseout="${sizeAvailable ? 'this.style.background=\'#f0f8f0\'; this.style.borderColor=\'#4caf50\'; this.style.transform=\'scale(1)\';' : ''}">
-                    ${getSizeDisplay(p.size)}
+                     style="display: flex; align-items: center; justify-content: center; gap: 4px; padding: 6px 10px; border-radius: 8px; cursor: pointer; transition: all 0.2s;"
+                     onclick="${sizeAvailable ? `event.stopPropagation(); selectSizeAndAddToCart('${p.id}')` : ''}">
+                    <span style="font-weight: 700; font-size: 0.8rem;">${getSizeDisplay(p.size)}</span>
+                    ${sizeAvailable ? '<i class="fas fa-cart-plus" style="font-size: 0.85rem; color: var(--primary-color);"></i>' : ''}
                 </div>
             `;
         }).join('');
@@ -1787,14 +1775,14 @@ function displayProducts(filterCategory = 'all') {
         const productHTML = `
         <div class="product-card ${!hasAnyStock ? 'sold-out' : ''}" 
              id="${cardId}"
-             style="position: relative; display: flex; flex-direction: column; overflow: hidden; cursor: pointer; background: #fff;"
+             style="position: relative; display: flex; flex-direction: column; cursor: pointer; background: #fff; box-shadow: 0 5px 15px rgba(0,0,0,0.08); border-radius: 20px; border: 1px solid #efefef;"
              onclick="${hasAnyStock ? `addToCart('${mainProduct.id}')` : ''}">
             
-            <div class="product-image-container" style="position: relative; width: 100%; overflow: hidden; background: #f5f5f5;">
+            <div class="product-image-container" style="position: relative; width: 100%; border-radius: 20px 20px 0 0; overflow: visible; background: #f5f5f5;">
                 <img class="product-img" 
                      src="${hasValidImage ? imageValue : ''}" 
                      alt="${mainProduct.name}"
-                     style="width: 100%; height: auto; display: block; transition: none;">
+                     style="width: 100%; height: auto; display: block; border-radius: 20px 20px 0 0;">
             </div>
             
             ${placeholderDisplay}
@@ -1841,7 +1829,7 @@ function displayProducts(filterCategory = 'all') {
                 margin-top: 0;
                 transition: transform 0.3s ease;
                 box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
-                min-height: ${overlayHeight};
+                border-radius: 0 0 20px 20px;
             ">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap;">
                     <div style="flex: 1; min-width: 180px;">
