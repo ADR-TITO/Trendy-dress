@@ -7087,7 +7087,7 @@ function compressImage(file, maxWidth = 800, maxHeight = 800, quality = 0.7) {
 // Global cropper instance
 let imageCropper = null;
 let currentImageFile = null;
-let currentCropRatio = 3 / 4; // Default to 3:4 (Portrait)
+let currentCropRatio = NaN; // Default to Free (Original Size)
 
 // Handle product image file upload
 function handleProductImageUpload(event) {
@@ -7280,10 +7280,10 @@ function closeImageCropper() {
     currentImageFile = null;
 
     // Reset ratio to default
-    currentCropRatio = 3 / 4;
-    const ratio34 = document.getElementById('ratio34');
-    if (ratio34) {
-        ratio34.checked = true;
+    currentCropRatio = NaN;
+    const ratioFree = document.getElementById('ratioFree');
+    if (ratioFree) {
+        ratioFree.checked = true;
     }
 }
 
