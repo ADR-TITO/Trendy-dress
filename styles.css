@@ -595,11 +595,18 @@ h1, h2, h3, h4, h5, h6, .logo {
     opacity: 1;
 }
 
-/* Skeleton Loading Shimmer */
+/* Skeleton Loading Shimmer - Premium Edition */
 .img-lazy-pending {
     position: relative;
-    background: #e2e8f0 !important;
+    background: #f0f2f5 !important;
     overflow: hidden;
+    min-height: 250px; /* Ensure skeleton has height before image loads */
+}
+
+@media (max-width: 768px) {
+    .img-lazy-pending {
+        min-height: 180px;
+    }
 }
 
 .img-lazy-pending::after {
@@ -613,17 +620,39 @@ h1, h2, h3, h4, h5, h6, .logo {
     background: linear-gradient(
         90deg,
         rgba(255, 255, 255, 0) 0,
-        rgba(255, 255, 255, 0.2) 20%,
-        rgba(255, 255, 255, 0.5) 60%,
-        rgba(255, 255, 255, 0)
+        rgba(255, 255, 255, 0.4) 30%,
+        rgba(255, 255, 255, 0.7) 50%,
+        rgba(255, 255, 255, 0.4) 70%,
+        rgba(255, 255, 255, 0) 100%
     );
-    animation: shimmer 2s infinite;
+    animation: premium-shimmer 1.5s infinite cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-@keyframes shimmer {
+@keyframes premium-shimmer {
+    0% {
+        transform: translateX(-100%);
+    }
     100% {
         transform: translateX(100%);
     }
+}
+
+.loading-image {
+    position: relative;
+}
+
+.loading-image::before {
+    content: '';
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(var(--primary-rgb, 255, 51, 102), 0.1);
+    border-top: 2px solid var(--primary-color, #ff3366);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    z-index: 10;
 }
 
 /* Ensure product info is above shimmer */

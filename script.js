@@ -1566,74 +1566,7 @@ function getCategoryDisplayName(category) {
 
 // Lazy load product images in background (optimization for faster initial page load)
 // Optimized lazy image loading with batching and caching
-async function loadProductImagesLazy(products) {
-    try {
-        const useDatabase = localStorage.getItem('useDatabase') === 'true';
-        if (!useDatabase) {
-            // If not using Database, images should already be in localStorage
-            return;
-        }
-
-        // Filter products that need images loaded
-        const productsNeedingImages = products.filter(p => {
-            const hasImageFlag = p.hasImage === true;
-            const noImageData = !p.image || p.image.trim() === '';
-            return hasImageFlag && noImageData;
-        });
-
-        if (productsNeedingImages.length === 0) {
-            return; // All images already loaded
-        }
-
-        console.log(`🖼️ Loading images for ${productsNeedingImages.length} products in background...`);
-
-        // Load images in larger batches for faster loading
-        const batchSize = 10; // Increased batch size for faster loading
-        let lastUpdateTime = Date.now();
-
-        for (let i = 0; i < productsNeedingImages.length; i += batchSize) {
-            const batch = productsNeedingImages.slice(i, i + batchSize);
-
-            // Load images for this batch in parallel
-            await Promise.all(batch.map(async (product) => {
-                try {
-                    const productId = product._id || product.id;
-                    if (!productId) return;
-
-                    // Fetch full product with image
-                    const fullProduct = await apiService.getProduct(productId);
-                    if (fullProduct && fullProduct.image) {
-                        // Update product in products array
-                        const productIndex = products.findIndex(p =>
-                            (p._id || p.id) === productId
-                        );
-                        if (productIndex !== -1) {
-                            products[productIndex].image = fullProduct.image;
-                        }
-                    }
-                } catch (imgError) {
-                    // Silently fail - image will remain empty
-                    console.warn(`⚠️ Failed to load image for product ${product.name}:`, imgError.message);
-                }
-            }));
-
-            // Throttle display updates - only update every 500ms to avoid excessive re-renders
-            const now = Date.now();
-            if (now - lastUpdateTime > 500) {
-                displayProducts(currentCategory);
-                lastUpdateTime = now;
-            }
-        }
-
-        // Final display update
-        displayProducts(currentCategory);
-
-        console.log(`✅ Finished loading product images in background`);
-    } catch (error) {
-        console.warn('⚠️ Error in lazy image loading:', error.message);
-        // Don't throw - this is a background optimization
-    }
-}
+// loadProductImagesLazy removed for optimization - replaced by smarter IntersectionObserver
 
 // Calculate final price with discount
 function getFinalPrice(product) {
@@ -1778,11 +1711,14 @@ function displayProducts(filterCategory = 'all') {
              style="position: relative; display: flex; flex-direction: column; cursor: pointer; background: #fff; box-shadow: 0 5px 15px rgba(0,0,0,0.08); border-radius: 20px; border: 1px solid #efefef;"
              onclick="${hasAnyStock ? `addToCart('${mainProduct.id}')` : ''}">
             
-            <div class="product-image-container" style="position: relative; width: 100%; border-radius: 20px 20px 0 0; overflow: visible; background: #f5f5f5;">
+            <div class="product-image-container ${!hasValidImage && mainProduct.hasImage ? 'img-lazy-pending' : ''}" 
+                 style="position: relative; width: 100%; border-radius: 20px 20px 0 0; overflow: visible; background: #f5f5f5;">
                 <img class="product-img" 
                      src="${hasValidImage ? imageValue : ''}" 
+                     data-product-id="${mainProduct._id || mainProduct.id}"
+                     data-src="${!hasValidImage && mainProduct.hasImage ? 'fetch-from-api' : ''}"
                      alt="${mainProduct.name}"
-                     style="width: 100%; height: auto; display: block; border-radius: 20px 20px 0 0;">
+                     style="width: 100%; height: auto; display: block; border-radius: 20px 20px 0 0; opacity: ${hasValidImage ? '1' : '0'}; transition: opacity 0.5s ease;">
             </div>
             
             ${placeholderDisplay}
@@ -1919,40 +1855,37 @@ function displayProducts(filterCategory = 'all') {
                         try {
                             // If we need to fetch from API, do it now
                             if (imgSrc === 'fetch-from-api' && productId) {
-                                console.log(`🖼️ Lazy fetching image for product#${productId}...`);
+                                // Add loading spinner or visual feedback
+                                card.classList.add('loading-image');
+                                
                                 const productData = await apiService.getProduct(productId);
                                 if (productData && productData.image) {
                                     imgSrc = productData.image;
-                                    // Cache it in the main products array for future filter/re-render
+                                    // Update main products array for future filters
                                     const pIndex = products.findIndex(p => (p.id || p._id) == productId);
                                     if (pIndex !== -1) products[pIndex].image = imgSrc;
                                 } else {
-                                    imgSrc = ''; // No image available
+                                    imgSrc = '';
                                 }
                             }
                             
                             if (imgSrc) {
-                                // Set src directly on the <img> tag
                                 productImg.src = imgSrc;
                                 productImg.onload = () => {
-                                    card.style.animation = '';
-                                    card.style.background = '#fff';
                                     productImg.style.opacity = '1';
-                                    card.classList.remove('img-lazy-pending');
+                                    card.classList.remove('img-lazy-pending', 'loading-image');
+                                    card.style.background = '#fff';
                                 };
                             } else {
-                                // No image found - use fallback gradient
-                                card.style.animation = '';
-                                card.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-                                card.classList.remove('img-lazy-pending');
+                                card.classList.remove('img-lazy-pending', 'loading-image');
+                                card.style.background = 'linear-gradient(135deg, #667eea11 0%, #764ba211 100%)';
                             }
                         } catch (error) {
                             console.error('❌ Error lazy-loading image:', error);
-                            card.style.animation = '';
+                            card.classList.remove('loading-image');
                         }
                         
                         delete productImg.dataset.src;
-                        delete productImg.dataset.productId;
                     }
                     window._lazyImgObserver.unobserve(card);
                 }
@@ -6391,57 +6324,29 @@ async function loadProducts() {
             localStorage.setItem('preferredStorage', 'database');
 
             try {
-                // Step 1: Load products from Database (PERMANENT, CENTRALIZED storage) - WITHOUT images for speed
+                // Step 1: Load products metadata from Database
                 const dbProducts = await apiService.getProducts('all', false);
-                console.log(`📦 Loaded ${dbProducts.length} product records from Database (metadata only)`);
-
-                // Step 1.5: Cache Database data to IndexedDB for offline access
-                try {
-                    await storageManager.init();
-                    if (storageManager.useIndexedDB && storageManager.db) {
-                        await storageManager.syncFromDatabase(dbProducts);
-                        console.log(`✅ Cached Database data to IndexedDB for offline access`);
-                    }
-                } catch (cacheError) {
-                    console.warn('⚠️ Could not cache to IndexedDB:', cacheError.message);
-                    // Continue - caching is optional
-                }
-
-                // Step 1.6: Load images for products that have them (lazy load)
-                // This is done asynchronously after initial display
-                if (dbProducts.length > 0) {
-                    console.log('🖼️ Loading product images in background...');
-                    loadProductImagesLazy(dbProducts).catch(err => {
-                        console.warn('⚠️ Some product images failed to load:', err.message);
-                    });
-                }
+                console.log(`📦 Loaded ${dbProducts.length} product records from Database`);
 
                 // Step 2: Use Database products as authoritative
                 loadedProducts = dbProducts.map(p => ({
                     ...p,
                     id: p._id || p.id,
-                    image: p.image || '' // Will be empty, loaded lazily
+                    image: p.image || ''
                 }));
-                loadSource = 'Database (permanent, centralized)';
-                console.log(`📦 Using ${loadedProducts.length} products from Database (authoritative source)`);
+                loadSource = 'Database';
 
-                // Step 3: Update local cache (IndexedDB/localStorage) to match Database
-                try {
-                    await storageManager.init();
+                // Step 3: Trigger immediate render of metadata
+                products.length = 0;
+                products.push(...loadedProducts);
+                displayProducts(currentCategory);
+
+                // Step 4: Background sync to IndexedDB
+                storageManager.init().then(() => {
                     if (storageManager.useIndexedDB && storageManager.db) {
-                        await storageManager.syncFromDatabase(dbProducts);
-                        console.log('✅ Updated local IndexedDB cache from Database');
+                        storageManager.syncFromDatabase(dbProducts);
                     }
-                    // Also update localStorage as a backup
-                    localStorage.setItem('products', JSON.stringify(loadedProducts));
-                } catch (cacheError) {
-                    console.warn('⚠️ Could not update local cache:', cacheError.message);
-                }
-
-                // Step 4: Load images in background
-                loadProductImagesLazy(loadedProducts).catch(err => {
-                    console.warn('⚠️ Some product images failed to load:', err.message);
-                });
+                }).catch(() => {});
 
             } catch (error) {
                 // Database failed - check if it's a transient error or permanent failure
