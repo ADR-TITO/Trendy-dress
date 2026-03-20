@@ -7087,7 +7087,7 @@ function compressImage(file, maxWidth = 800, maxHeight = 800, quality = 0.7) {
 // Global cropper instance
 let imageCropper = null;
 let currentImageFile = null;
-let currentCropRatio = 4 / 3; // Default to 4:3
+let currentCropRatio = 3 / 4; // Default to 3:4 (Portrait)
 
 // Handle product image file upload
 function handleProductImageUpload(event) {
