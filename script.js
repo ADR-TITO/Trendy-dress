@@ -7208,9 +7208,11 @@ function applyImageCrop() {
         uploadLabel.style.pointerEvents = 'none';
     }
 
-    // 1. Resize: Limit width to 800px to prevent huge files
+    // 1. Resize: Increase limit to 1024px width for better vertical resolution
+    // If it's a "Free" crop, it will maintain its natural aspect ratio
     const canvas = imageCropper.getCroppedCanvas({
-        width: 800,
+        width: 1024,
+        imageSmoothingEnabled: true,
         imageSmoothingQuality: 'high'
     });
 
@@ -7223,19 +7225,52 @@ function applyImageCrop() {
         return;
     }
 
-    // 2. Compress: Convert to WebP at 70% quality
-    // This creates a much smaller string for your database
-    const compressedDataUrl = canvas.toDataURL('image/webp', 0.7);
+    // 2. Compress: Convert to WebP at 75% quality (slightly higher for sharpness)
+    const compressedDataUrl = canvas.toDataURL('image/webp', 0.75);
 
     // 3. Update the preview and hidden input
     const productImageInput = document.getElementById('productImage');
     if (productImageInput) {
         productImageInput.value = compressedDataUrl;
         previewProductImage(compressedDataUrl);
-        showNotification('Image processed and compressed successfully!');
+        showNotification('Image processed successfully!');
     }
 
     // 4. Close the cropper modal
+    closeImageCropper();
+
+    if (uploadLabel) {
+        uploadLabel.innerHTML = '<i class="fas fa-upload"></i> Browse & Upload Image';
+        uploadLabel.style.pointerEvents = 'auto';
+    }
+}
+
+// Bypass cropper and use original image
+function useOriginalImage() {
+    const cropperImage = document.getElementById('cropperImage');
+    if (!cropperImage || !cropperImage.src || cropperImage.src.startsWith('data:image/gif')) {
+        alert('No image found to upload.');
+        return;
+    }
+
+    const uploadLabel = document.querySelector('label[for="productImageFile"]');
+    if (uploadLabel) {
+        uploadLabel.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+        uploadLabel.style.pointerEvents = 'none';
+    }
+
+    // Use the original image source directly (the one we put in the cropper)
+    const originalSrc = cropperImage.src;
+    
+    // Update the preview and hidden input
+    const productImageInput = document.getElementById('productImage');
+    if (productImageInput) {
+        productImageInput.value = originalSrc;
+        previewProductImage(originalSrc);
+        showNotification('Original full-size image used (No cropping)');
+    }
+
+    // Close the cropper modal
     closeImageCropper();
 
     if (uploadLabel) {

@@ -835,37 +835,40 @@
                     <p style="color: #666; font-size: 0.9rem; margin-bottom: 10px;">Adjust the crop area to
                         frame your
                         product image. Choose an aspect ratio:</p>
-                    <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 10px;">
-                        <label
-                            style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem;">
-                            <input type="radio" name="cropRatio" id="ratio43" value="4:3"
-                                onchange="updateCropRatio(4/3)" style="cursor: pointer;">
-                            <span>4:3 (Landscape - Wider)</span>
-                        </label>
-                        <label
-                            style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem;">
-                            <input type="radio" name="cropRatio" id="ratio34" value="3:4"
-                                onchange="updateCropRatio(3/4)" style="cursor: pointer;">
-                            <span>3:4 (Portrait - Taller)</span>
-                        </label>
-                        <label
-                            style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem;">
-                            <input type="radio" name="cropRatio" id="ratioFree" value="NaN" checked
-                                onchange="updateCropRatio(NaN)" style="cursor: pointer;">
+                    <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 5px; flex-wrap: wrap;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem;">
+                            <input type="radio" name="cropRatio" id="ratioFree" value="NaN" checked onchange="updateCropRatio(NaN)" style="cursor: pointer;">
                             <span>Free (Any Size)</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem;">
+                            <input type="radio" name="cropRatio" id="ratio23" value="2:3" onchange="updateCropRatio(2/3)" style="cursor: pointer;">
+                            <span>2:3 (Portrait - Dress)</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem;">
+                            <input type="radio" name="cropRatio" id="ratio34" value="3:4" onchange="updateCropRatio(3/4)" style="cursor: pointer;">
+                            <span>3:4 (Portrait)</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem;">
+                            <input type="radio" name="cropRatio" id="ratio43" value="4:3" onchange="updateCropRatio(4/3)" style="cursor: pointer;">
+                            <span>4:3 (Landscape)</span>
                         </label>
                     </div>
                 </div>
-                <div style="max-width: 100%; margin: 0 auto; position: relative;">
+                <div style="max-width: 100%; margin: 0 auto; position: relative; background: #f0f0f0; border-radius: 8px; overflow: hidden;">
                     <img id="cropperImage"
                         src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Crop"
-                        style="max-width: 100%; display: block; max-height: 70vh;">
+                        style="max-width: 100%; display: block; max-height: 80vh;">
                 </div>
-                <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
-                    <button type="button" class="btn-secondary" onclick="closeImageCropper()">Cancel</button>
-                    <button type="button" class="btn-primary" onclick="applyImageCrop()">
-                        <i class="fas fa-check"></i> Apply Crop
-                    </button>
+                <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: space-between; flex-wrap: wrap;">
+                    <button type="button" class="btn-secondary" onclick="closeImageCropper()" style="padding: 10px 20px;">Cancel</button>
+                    <div style="display: flex; gap: 10px;">
+                        <button type="button" class="btn-secondary" onclick="useOriginalImage()" style="background: #607d8b; color: white; border: none; padding: 10px 20px;">
+                            <i class="fas fa-file-image"></i> Use Full Image (No Crop)
+                        </button>
+                        <button type="button" class="btn-primary" onclick="applyImageCrop()" style="padding: 10px 20px;">
+                            <i class="fas fa-check"></i> Apply Crop
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
