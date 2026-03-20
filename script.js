@@ -7280,10 +7280,10 @@ function closeImageCropper() {
     currentImageFile = null;
 
     // Reset ratio to default
-    currentCropRatio = 4 / 3;
-    const ratio43 = document.getElementById('ratio43');
-    if (ratio43) {
-        ratio43.checked = true;
+    currentCropRatio = 3 / 4;
+    const ratio34 = document.getElementById('ratio34');
+    if (ratio34) {
+        ratio34.checked = true;
     }
 }
 
