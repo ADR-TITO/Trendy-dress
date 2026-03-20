@@ -23,6 +23,7 @@ spl_autoload_register(function ($class) {
 
 use App\Models\Order;
 use App\Models\MpesaTransaction;
+use App\Models\Product;
 
 $method = $_SERVER['REQUEST_METHOD'];
 $route = $_GET['route'] ?? '';
@@ -210,6 +211,29 @@ try {
             }
             
             $order = $orderModel->create($data);
+
+            // Decrement inventory for each item in the order (manual M-Pesa code path)
+            try {
+                $items = $data['items'] ?? [];
+                if (!is_array($items) && !empty($items)) {
+                    $items = json_decode($items, true);
+                }
+                if (is_array($items)) {
+                    $productModel = new Product();
+                    foreach ($items as $item) {
+                        $productId = $item['id'] ?? $item['_id'] ?? null;
+                        $quantity  = (int)($item['quantity'] ?? 1);
+                        if ($productId) {
+                            $productModel->decrementQuantity($productId, $quantity);
+                            error_log("📉 Order created: Decremented inventory for product $productId by $quantity");
+                        }
+                    }
+                }
+            } catch (\Exception $invEx) {
+                // Non-fatal: log but don't fail the order
+                error_log("⚠️ Warning: Failed to decrement inventory on order create: " . $invEx->getMessage());
+            }
+
             http_response_code(201);
             echo json_encode($order);
             break;
