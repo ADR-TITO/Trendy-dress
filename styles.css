@@ -1800,6 +1800,10 @@ h1, h2, h3, h4, h5, h6, .logo {
         font-size: 0.9rem;
     }
 
+    .hide-mobile {
+        display: none !important;
+    }
+
     .payment-info {
         flex-direction: column;
     }

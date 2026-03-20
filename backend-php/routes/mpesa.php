@@ -238,7 +238,7 @@ try {
                                             if (is_array($items)) {
                                                 $productModel = new Product();
                                                 foreach ($items as $item) {
-                                                    $productId = $item['id'] ?? $item['_id'] ?? null;
+                                                    $productId = $item['productId'] ?? $item['id'] ?? $item['_id'] ?? null;
                                                     $quantity = (int)($item['quantity'] ?? 1);
                                                     
                                                     if ($productId) {
@@ -321,7 +321,7 @@ try {
                                         if (is_array($items)) {
                                             $productModel = new Product();
                                             foreach ($items as $item) {
-                                                $productId = $item['id'] ?? $item['_id'] ?? null;
+                                                $productId = $item['productId'] ?? $item['id'] ?? $item['_id'] ?? null;
                                                 $quantity = (int)($item['quantity'] ?? 1);
                                                 
                                                 if ($productId) {

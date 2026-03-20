@@ -133,6 +133,23 @@ try {
                     'valid' => true,
                     'transaction' => $transaction
                 ]);
+            } else if (!empty($action) && strpos($action, 'ORD-') === 0) {
+                // Get single order by ID (for customer tracking)
+                try {
+                    $order = $orderModel->findByOrderId($action);
+                    if ($order) {
+                        header('Content-Type: application/json; charset=utf-8');
+                        echo json_encode($order, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                    } else {
+                        http_response_code(404);
+                        echo json_encode(['error' => 'Order not found']);
+                    }
+                } catch (Exception $e) {
+                    ob_clean();
+                    http_response_code(500);
+                    echo json_encode(['error' => 'Failed to fetch order', 'message' => $e->getMessage()]);
+                    exit;
+                }
             } else {
                 // Get all orders
                 try {
@@ -244,7 +261,7 @@ try {
                 if (is_array($items)) {
                     $productModel = new Product();
                     foreach ($items as $item) {
-                        $productId = $item['id'] ?? $item['_id'] ?? null;
+                        $productId = $item['productId'] ?? $item['id'] ?? $item['_id'] ?? null;
                         $quantity  = (int)($item['quantity'] ?? 1);
                         if ($productId) {
                             $productModel->decrementQuantity($productId, $quantity);

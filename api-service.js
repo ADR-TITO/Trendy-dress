@@ -590,6 +590,26 @@ class ApiService {
         }
     }
 
+    // Get a single order from Database (for customer tracking)
+    async getOrder(orderId) {
+        try {
+            const response = await fetch(`${this.baseURL}/orders/${orderId}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({}));
+                throw new Error(error.error || error.message || 'Failed to get order');
+            }
+            return await response.json();
+        } catch (error) {
+            console.error(`Error getting order ${orderId} via API:`, error);
+            throw error;
+        }
+    }
+
     // Initiate STK Push (M-Pesa Prompt) payment using repo script
     async initiateSTKPush(phoneNumber, amount, accountReference, transactionDesc) {
         try {

@@ -4914,7 +4914,130 @@ function closeSuccessModal() {
     loadProducts();
 }
 
-// Toggle Mobile Menu
+async function openMyOrdersModal() {
+    const modal = document.getElementById('myOrdersModal');
+    const overlay = document.getElementById('myOrdersModalOverlay');
+    const ordersList = document.getElementById('myOrdersList');
+    
+    if (modal && overlay) {
+        modal.classList.add('show');
+        overlay.classList.add('show');
+    }
+
+    if (!ordersList) return;
+
+    // Load orders from localStorage
+    let orders = [];
+    try {
+        const savedOrders = localStorage.getItem('orders');
+        if (savedOrders) {
+            orders = JSON.parse(savedOrders);
+        }
+    } catch (e) {
+        console.error('Error parsing local orders:', e);
+    }
+
+    if (orders.length === 0) {
+        ordersList.innerHTML = `
+            <div style="text-align: center; padding: 40px 20px; color: #666;">
+                <i class="fas fa-box-open" style="font-size: 3rem; margin-bottom: 15px; opacity: 0.3;"></i>
+                <p>No past orders found on this device.</p>
+            </div>
+        `;
+        return;
+    }
+
+    // Show loading state
+    ordersList.innerHTML = `
+        <div style="text-align: center; padding: 40px 20px; color: #666;">
+            <i class="fas fa-spinner fa-spin" style="font-size: 3rem; margin-bottom: 15px; opacity: 0.6;"></i>
+            <p>Fetching latest status for your ${orders.length} order(s)...</p>
+        </div>
+    `;
+
+    // Fetch latest status for each order from the backend concurrently
+    let updatedOrders = [];
+    const fetchPromises = orders.map(async (order) => {
+        try {
+            // Check if backend available
+            const useDatabase = localStorage.getItem('useDatabase') === 'true';
+            let latestOrderData = null;
+            
+            if (useDatabase && apiService) {
+                latestOrderData = await apiService.getOrder(order.orderId);
+            }
+            
+            // If backend returned latest data, merge it
+            if (latestOrderData) {
+                // Keep local items if backend doesn't have them in exact shape, but update status
+                order.delivery = latestOrderData.delivery || order.delivery;
+                order.paymentStatus = latestOrderData.paymentStatus || order.paymentStatus;
+                if (latestOrderData.mpesaCode) order.mpesaCode = latestOrderData.mpesaCode;
+            }
+        } catch (error) {
+            console.warn(`Could not fetch latest status for order ${order.orderId}:`, error);
+        }
+        return order;
+    });
+
+    updatedOrders = await Promise.all(fetchPromises);
+    
+    // Save updated orders back to local storage
+    localStorage.setItem('orders', JSON.stringify(updatedOrders));
+
+    // Render orders
+    // Sort so newest are first
+    updatedOrders.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+
+    ordersList.innerHTML = updatedOrders.map(order => {
+        const isDelivered = order.delivery && order.delivery.status === 'delivered';
+        const statusColor = isDelivered ? 'var(--success-color)' : '#ff9800';
+        const statusIcon = isDelivered ? 'fa-check-circle' : 'fa-truck';
+        const statusText = isDelivered ? 'Delivered' : 'Pending';
+
+        return `
+            <div style="background: var(--light-color); padding: 15px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid ${statusColor};">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; flex-wrap: wrap; gap: 10px;">
+                    <div>
+                        <strong style="display: block; font-size: 1.1rem;">${order.orderId}</strong>
+                        <small style="color: #666;">${order.date}</small>
+                    </div>
+                    <div style="text-align: right;">
+                        <span style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 20px; background: ${statusColor}20; color: ${statusColor}; font-weight: bold; font-size: 0.85rem;">
+                            <i class="fas ${statusIcon}"></i> ${statusText}
+                        </span>
+                    </div>
+                </div>
+                <div style="margin-top: 10px;">
+                    <strong style="display: block; margin-bottom: 5px; font-size: 0.9rem;">Items:</strong>
+                    <ul style="list-style: none; padding: 0; margin: 0; font-size: 0.9rem; color: #555;">
+                        ${(order.items || []).map(item => `
+                            <li style="display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px dashed #eee;">
+                                <span>${item.quantity}x ${item.name}</span>
+                                <span>KSh ${item.subtotal.toLocaleString('en-KE')}</span>
+                            </li>
+                        `).join('')}
+                    </ul>
+                    <div style="display: flex; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 2px solid #ddd; font-weight: bold;">
+                        <span>Total:</span>
+                        <span>KSh ${order.total.toLocaleString('en-KE')}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function closeMyOrdersModal() {
+    const modal = document.getElementById('myOrdersModal');
+    const overlay = document.getElementById('myOrdersModalOverlay');
+    
+    if (modal && overlay) {
+        modal.classList.remove('show');
+        overlay.classList.remove('show');
+    }
+}
+
 function toggleMobileMenu() {
     const navMenu = document.querySelector('.nav-menu');
     navMenu.classList.toggle('active');
