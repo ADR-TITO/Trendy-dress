@@ -23,6 +23,16 @@ let websiteContent = {
     contactAddress: 'Nairobi, Moi avenue, Imenti HSE Glory Exhibition Basement, Shop B4'
 };
 
+/* Core Utilities */
+function getDeviceId() {
+    let deviceId = localStorage.getItem('deviceId');
+    if (!deviceId) {
+        deviceId = 'dev_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+        localStorage.setItem('deviceId', deviceId);
+    }
+    return deviceId;
+}
+
 // Global status flags
 let useDatabase = false;
 
@@ -1649,7 +1659,7 @@ async function displayProducts(filterCategory = 'all') {
             <div class="product-card ${!hasStock ? 'sold-out' : ''}" 
                  id="product-card-${main.id}"
                  style="position: relative; cursor: pointer; background: #fff; border-radius: 20px; border: 1px solid #efefef; overflow: visible; display: block;"
-                 onclick="${hasStock ? `addToCart('${main.id}')` : ''}">
+                 onclick="openProductDetails('${main.id}')">
                 
                 <div class="product-image-container ${lazy ? 'img-lazy-pending' : ''}" 
                      style="width: 100%; border-radius: 20px 20px 0 0; min-height: 150px; background: #f9f9f9; overflow: visible; position: relative;">
@@ -2569,6 +2579,7 @@ function saveOrderToLocalStorage(order) {
             // Update existing order
             orders[existingOrderIndex] = {
                 ...order,
+                deviceId: order.deviceId || getDeviceId(),
                 createdAt: orders[existingOrderIndex].createdAt || new Date().toISOString(),
                 updatedAt: new Date().toISOString()
             };
@@ -2577,6 +2588,7 @@ function saveOrderToLocalStorage(order) {
             // Add new order
             orders.push({
                 ...order,
+                deviceId: getDeviceId(),
                 createdAt: new Date().toISOString()
             });
             console.log('✅ Order saved to localStorage');
@@ -2629,6 +2641,13 @@ function saveOrderToLocalStorage(order) {
 
 // Sync orders from Database to localStorage
 async function syncOrdersFromDatabase() {
+    // CRITICAL: Only sync all orders for Admins. 
+    // Regular users should only see their own local history.
+    if (!isAdmin) {
+        console.log('ℹ️ Skipping global order sync for non-admin user.');
+        return;
+    }
+
     const useDatabase = localStorage.getItem('useDatabase') === 'true';
     if (!useDatabase) {
         return; // Skip if Database is not available
@@ -4781,7 +4800,13 @@ async function renderMyOrdersSidebar() {
     try {
         const savedOrders = localStorage.getItem('orders');
         if (savedOrders) {
-            orders = JSON.parse(savedOrders);
+            const allSavedOrders = JSON.parse(savedOrders);
+            const myDeviceId = getDeviceId();
+            
+            // Filter: Only show orders from this device, or legacy orders with no deviceId
+            orders = allSavedOrders.filter(order => 
+                order.deviceId === myDeviceId || !order.deviceId
+            );
         }
     } catch (e) {
         console.error('Error parsing local orders:', e);
@@ -7963,3 +7988,106 @@ async function refreshProducts() {
 } // Closing brace for refreshProducts function
 // Expose to global scope
 window.refreshProducts = refreshProducts;
+
+/* Product Details Modal Logic */
+let selectedDetailProduct = null;
+
+function openProductDetails(productId) {
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
+
+    selectedDetailProduct = product;
+    
+    // Find all variations (sizes) of this product
+    const variations = products.filter(p => p.name.toLowerCase().trim() === product.name.toLowerCase().trim());
+    
+    // Populate simple fields
+    const detailsImg = document.getElementById('detailsImage');
+    if (detailsImg) detailsImg.src = product.image || '';
+    
+    const detailsTitle = document.getElementById('detailsTitle');
+    if (detailsTitle) detailsTitle.textContent = product.name;
+    
+    const detailsCat = document.getElementById('detailsCategory');
+    if (detailsCat) detailsCat.textContent = getCategoryDisplayName ? getCategoryDisplayName(product.category) : product.category;
+    
+    const finalPrice = typeof getFinalPrice === 'function' ? getFinalPrice(product) : (product.price - (product.price * (product.discount || 0) / 100));
+    const detailsPrice = document.getElementById('detailsPrice');
+    if (detailsPrice) {
+        detailsPrice.innerHTML = (product.discount > 0) 
+            ? `<span style="text-decoration: line-through; color: #94a3b8; font-size: 1.2rem; margin-right: 10px;">KSh ${product.price.toLocaleString()}</span> KSh ${Math.round(finalPrice).toLocaleString()}`
+            : `KSh ${Math.round(finalPrice).toLocaleString()}`;
+    }
+
+    // Populate description
+    const descElement = document.getElementById('detailsDescription');
+    if (descElement) {
+        if (product.description) {
+            descElement.textContent = product.description;
+        } else {
+            descElement.textContent = "Experience the perfect blend of style and comfort with this premium choice. Crafted from high-quality materials, it's designed to make you stand out on any occasion.";
+        }
+    }
+
+    // Populate sizes
+    const sizesContainer = document.getElementById('detailsSizes');
+    if (sizesContainer) {
+        sizesContainer.innerHTML = variations.map(v => {
+            const isSoldOut = v.quantity <= 0;
+            const isActive = v.id === productId;
+            return `
+                <div class="details-size-btn ${isActive ? 'active' : ''} ${isSoldOut ? 'sold-out' : ''}" 
+                     onclick="${isSoldOut ? '' : `event.stopPropagation(); selectDetailSize('${v.id}')`}">
+                    ${typeof getSizeDisplay === 'function' ? getSizeDisplay(v.size) : v.size}
+                </div>
+            `;
+        }).join('');
+    }
+
+    // Update Add to Cart Button
+    const addBtn = document.getElementById('detailsAddToCartBtn');
+    if (addBtn) {
+        if (product.quantity <= 0) {
+            addBtn.innerHTML = '<i class="fas fa-times-circle"></i> Out of Stock';
+            addBtn.disabled = true;
+            addBtn.style.opacity = '0.5';
+        } else {
+            addBtn.innerHTML = '<i class="fas fa-shopping-cart"></i> Add to Cart';
+            addBtn.disabled = false;
+            addBtn.style.opacity = '1';
+            addBtn.onclick = () => {
+                addToCart(selectedDetailProduct.id);
+                closeProductDetails();
+            };
+        }
+    }
+
+    // Show modal
+    const modal = document.getElementById('productDetailsModal');
+    const overlay = document.getElementById('productDetailsOverlay');
+    if (modal && overlay) {
+        modal.classList.add('show');
+        overlay.classList.add('show');
+        document.body.style.overflow = 'hidden'; // Prevent scrolling
+    }
+}
+
+function selectDetailSize(productId) {
+    // Just re-open with the new product ID to refresh data
+    openProductDetails(productId);
+}
+
+function closeProductDetails() {
+    const modal = document.getElementById('productDetailsModal');
+    const overlay = document.getElementById('productDetailsOverlay');
+    if (modal && overlay) {
+        modal.classList.remove('show');
+        overlay.classList.remove('show');
+        document.body.style.overflow = 'auto';
+    }
+}
+
+// Expose to global scope
+window.openProductDetails = openProductDetails;
+window.closeProductDetails = closeProductDetails;
+window.selectDetailSize = selectDetailSize;

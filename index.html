@@ -1015,7 +1015,43 @@
     </div>
     <div class="modal-overlay" id="successModalOverlay" onclick="closeSuccessModal()"></div>
 
+    <!-- Product Details Modal -->
+    <div class="modal" id="productDetailsModal">
+        <div class="modal-content product-details-content">
+            <button class="close-modal-overlap" onclick="closeProductDetails()">
+                <i class="fas fa-times"></i>
+            </button>
+            <div class="product-details-grid">
+                <div class="product-details-image-side">
+                    <img id="detailsImage" src="" alt="Product Image">
+                </div>
+                <div class="product-details-info-side">
+                    <div class="details-category" id="detailsCategory">CATEGORY</div>
+                    <h1 class="details-title" id="detailsTitle">Product Name</h1>
+                    <div class="details-price" id="detailsPrice">KSh 0</div>
+                    
+                    <div class="details-section">
+                        <h3>Select Size</h3>
+                        <div class="details-sizes" id="detailsSizes">
+                            <!-- Sizes will be populated here -->
+                        </div>
+                    </div>
 
+                    <div class="details-section">
+                        <h3>Product Description</h3>
+                        <p id="detailsDescription">Experience the perfect blend of style and comfort with this premium choice. Crafted from high-quality materials, it's designed to make you stand out on any occasion.</p>
+                    </div>
+
+                    <div class="details-footer">
+                        <button class="btn-primary" id="detailsAddToCartBtn" style="width: 100%; padding: 18px; font-size: 1.1rem; border-radius: 12px;">
+                            <i class="fas fa-shopping-cart"></i> Add to Cart
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-overlay" id="productDetailsOverlay" onclick="closeProductDetails()"></div>
 
     <!-- Performance monitoring (non-critical, deferred) -->
     <script src="performance-monitor.js" defer></script> <!-- Defer main scripts to not block rendering -->
