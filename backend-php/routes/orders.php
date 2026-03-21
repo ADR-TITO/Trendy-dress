@@ -361,13 +361,45 @@ try {
                     exit;
                 }
                 
-                $deleted = $orderModel->delete($orderIdOrAction);
-                if (!$deleted) {
-                    http_response_code(404);
-                    echo json_encode(['error' => 'Order not found']);
-                    exit;
+                try {
+                    // 1. Get order details to restore stock
+                    $order = $orderModel->findByOrderId($orderIdOrAction);
+                    
+                    if ($order) {
+                        // 2. Restore stock
+                        try {
+                            $items = $order['items'] ?? [];
+                            if (is_array($items)) {
+                                $productModel = new Product();
+                                foreach ($items as $item) {
+                                    $productId = $item['productId'] ?? $item['id'] ?? $item['_id'] ?? null;
+                                    $quantity = (int)($item['quantity'] ?? 1);
+                                    if ($productId) {
+                                        $productModel->incrementQuantity($productId, $quantity);
+                                    }
+                                }
+                            }
+                        } catch (Exception $stockEx) {
+                            error_log("⚠️ Warning: Failed to restore stock during order deletion: " . $stockEx->getMessage());
+                            // Continue anyway
+                        }
+                        
+                        // 3. Delete order
+                        $deleted = $orderModel->delete($orderIdOrAction);
+                        if ($deleted) {
+                            echo json_encode(['success' => true, 'message' => 'Order deleted and stock restored']);
+                        } else {
+                            http_response_code(500);
+                            echo json_encode(['error' => 'Failed to delete order from database']);
+                        }
+                    } else {
+                        http_response_code(404);
+                        echo json_encode(['error' => 'Order not found']);
+                    }
+                } catch (Exception $deEx) {
+                    http_response_code(500);
+                    echo json_encode(['error' => 'Error during order deletion', 'message' => $deEx->getMessage()]);
                 }
-                echo json_encode(['success' => true, 'message' => 'Order deleted successfully']);
             } else {
                 http_response_code(400);
                 echo json_encode(['error' => 'Order ID is required']);

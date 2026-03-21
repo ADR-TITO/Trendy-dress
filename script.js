@@ -7643,6 +7643,7 @@ if (typeof window !== 'undefined') {
     window.viewOrderDetails = viewOrderDetails;
     window.downloadOrderReceipt = downloadOrderReceipt;
     window.toggleDeliveryStatus = toggleDeliveryStatus;
+    window.cancelOrder = cancelOrder;
     // Initialize pending delete storage
     window.pendingDelete = null;
 }
@@ -7912,12 +7913,15 @@ async function loadAdminOrdersInternal(searchQuery = '', completedOnly = false) 
                                 </div>
                             </div>
                             `}
-                            <div style="margin-top: 10px; display: flex; gap: 10px;">
-                                <button onclick="viewOrderDetails('${order.orderId}')" class="btn-primary" style="flex: 1; padding: 10px;">
+                            <div style="margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap;">
+                                <button onclick="viewOrderDetails('${order.orderId}')" class="btn-primary" style="flex: 1; padding: 10px; min-width: 120px;">
                                     <i class="fas fa-eye"></i> View Details
                                 </button>
-                                <button onclick="downloadOrderReceipt('${order.orderId}')" class="btn-secondary" style="flex: 1; padding: 10px;">
-                                    <i class="fas fa-download"></i> Download PDF
+                                <button onclick="downloadOrderReceipt('${order.orderId}')" class="btn-secondary" style="flex: 1; padding: 10px; min-width: 120px;">
+                                    <i class="fas fa-download"></i> Receipt
+                                </button>
+                                <button onclick="cancelOrder('${order.orderId}')" class="btn-danger" style="flex: 1; padding: 10px; min-width: 120px; background-color: #f44336; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                                    <i class="fas fa-trash-alt"></i> Cancel Order
                                 </button>
                             </div>
                         </div>
@@ -8081,6 +8085,56 @@ async function downloadOrderReceipt(orderId) {
     } catch (error) {
         console.error('Error generating receipt:', error);
         alert('Error generating receipt. Please try again.');
+    }
+}
+
+// Cancel/Delete an order
+async function cancelOrder(orderId) {
+    if (!confirm(`Are you sure you want to cancel and DELETE order ${orderId}? This will restore stock for the items in this order and remove it from the database.`)) {
+        return;
+    }
+
+    try {
+        showNotification('Cancelling order and restoring stock...', 'info');
+        
+        const useDatabase = localStorage.getItem('useDatabase') === 'true';
+        if (useDatabase) {
+            await apiService.deleteOrder(orderId);
+            console.log(`✅ Order ${orderId} deleted from Database`);
+        }
+
+        // Also remove from localStorage if it exists there
+        const ordersJson = localStorage.getItem('orders');
+        if (ordersJson) {
+            let localOrders = JSON.parse(ordersJson);
+            const filteredOrders = localOrders.filter(o => o.orderId !== orderId);
+            if (filteredOrders.length !== localOrders.length) {
+                localStorage.setItem('orders', JSON.stringify(filteredOrders));
+                console.log(`✅ Order ${orderId} removed from localStorage`);
+            }
+        }
+
+        // Refresh admin orders display
+        const completedSearchQuery = document.getElementById('adminCompletedSearch')?.value || '';
+        const activeSearchQuery = document.getElementById('adminOrderSearch')?.value || '';
+        
+        await loadAdminOrders(activeSearchQuery);
+        await loadCompletedOrders(completedSearchQuery);
+        
+        // Refresh products display to show restored stock
+        await loadProducts();
+        if (typeof displayProducts === 'function') {
+            displayProducts(currentCategory);
+        }
+
+        showNotification('Order cancelled and stock restored successfully!', 'success');
+    } catch (error) {
+        console.error('❌ Error cancelling order:', error);
+        showNotification('Error cancelling order: ' + error.message, 'error');
+        
+        if (error.message.includes('Unauthorized') || error.message.includes('login required')) {
+            if (typeof logout === 'function') logout();
+        }
     }
 }
 

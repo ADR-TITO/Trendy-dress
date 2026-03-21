@@ -278,6 +278,30 @@ class Product {
         } catch (\Exception $e) {
             error_log("Error decrementing product quantity: " . $e->getMessage());
             throw $e;
+    }
+}
+
+    /**
+     * Increment product quantity
+     */
+    public function incrementQuantity($id, $amount = 1) {
+        try {
+            if (!Database::isConnected()) {
+                throw new \Exception('Database not connected');
+            }
+            $pdo = \Database::getConnection();
+
+            $sql = "UPDATE products SET quantity = quantity + :amount, updatedAt = NOW() WHERE id = :id";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([
+                ':amount' => (int)$amount,
+                ':id' => $id
+            ]);
+
+            return $stmt->rowCount() > 0;
+        } catch (\Exception $e) {
+            error_log("Error incrementing product quantity: " . $e->getMessage());
+            throw $e;
         }
     }
 }

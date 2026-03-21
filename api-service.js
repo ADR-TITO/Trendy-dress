@@ -681,6 +681,26 @@ class ApiService {
         }
     }
 
+    // Delete order
+    async deleteOrder(orderId) {
+        try {
+            const response = await fetch(`${this.baseURL}/orders/${orderId}`, {
+                method: 'DELETE',
+                headers: {
+                    ...ApiService.getAuthHeader(), // Add authorization header
+                },
+            });
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || error.message || 'Failed to delete order');
+            }
+            return await response.json();
+        } catch (error) {
+            console.error('Error deleting order via API:', error);
+            throw error;
+        }
+    }
+
     // Update delivery status
     async updateDeliveryStatus(orderId, deliveryStatus, deliveredBy = null) {
         try {
