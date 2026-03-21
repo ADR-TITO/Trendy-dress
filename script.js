@@ -1230,11 +1230,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                 try {
                     // One-time cleanup for synced global orders in localStorage for non-admins
                     if (!isAdmin) {
-                        const ordersSyncFixed = localStorage.getItem('ordersSyncFixed_v3');
+                        const ordersSyncFixed = localStorage.getItem('ordersSyncFixed_v5'); // Increment version
                         if (!ordersSyncFixed) {
-                            localStorage.removeItem('orders'); // Clear once to remove synced global orders
-                            localStorage.setItem('ordersSyncFixed_v3', 'true');
-                            console.log('🧹 Cleaned up legacy synced orders');
+                            try {
+                                const ordersJson = localStorage.getItem('orders');
+                                if (ordersJson && ordersJson.length > 50000) { // If > 50KB, likely bloated
+                                    console.log('🧹 Detected potential order bloat, clearing for privacy and performance');
+                                    localStorage.removeItem('orders');
+                                }
+                                localStorage.setItem('ordersSyncFixed_v5', 'true');
+                            } catch (e) {
+                                console.warn('Storage cleanup failed:', e);
+                            }
                         }
                     }
                     await syncOrdersFromDatabase();
@@ -2606,7 +2613,22 @@ function saveOrderToLocalStorage(order) {
         }
 
         // Save back to localStorage
-        localStorage.setItem('orders', JSON.stringify(orders));
+        try {
+            localStorage.setItem('orders', JSON.stringify(orders));
+        } catch (storageError) {
+            console.error('❌ Failed to save order to localStorage (Quota exceeded?):', storageError);
+            // If storage is full, we still want the order to be "captured" in the current session
+            // or we might need to clear very old orders to make room.
+            if (orders.length > 50) {
+                console.warn('🗑️ Clearing oldest 20 orders to make room');
+                orders = orders.slice(-30);
+                try {
+                    localStorage.setItem('orders', JSON.stringify(orders));
+                } catch (e) {
+                    localStorage.removeItem('orders'); // Last resort
+                }
+            }
+        }
 
         // Also save M-Pesa code(s) separately for quick lookup
         // Handle both single code and multiple codes
@@ -3363,66 +3385,74 @@ async function completeTillPayment() {
         }
     }
 
-    // Verify M-Pesa code (now checking against the saved order)
-    const verificationResult = await verifyMpesaCodeBeforePayment(validMpesaCode, total, mpesaCodeInput, orderId);
-    if (!verificationResult.valid) {
-        // Verification failed
-        return;
-    }
-
-    // Subtract quantity from products
-    cart.forEach(cartItem => {
-        const product = products.find(p => p.id === cartItem.id);
-        if (product) {
-            const currentQuantity = product.quantity || 0;
-            const purchasedQuantity = cartItem.quantity;
-            product.quantity = Math.max(0, currentQuantity - purchasedQuantity);
-        }
-    });
-
-    // Save updated products
-    await saveProducts();
-
-    // Refresh product display
-    displayProducts(currentCategory);
-
-    // Generate PDF receipt
-    generateReceiptPDF(order);
-
-    // Store order
-    currentOrder = order;
-
-    // Close modals
-    closeTillPaymentModal();
-    closePaymentModal();
-
-    // Send receipt to WhatsApp
     try {
-        if (!currentOrderPDF) {
-            await generateReceiptPDF(order);
+        // Verify M-Pesa code (now checking against the saved order)
+        const verificationResult = await verifyMpesaCodeBeforePayment(validMpesaCode, total, mpesaCodeInput, orderId);
+        if (!verificationResult.valid) {
+            // Verification failed
+            return;
         }
 
-        if (useDatabase) {
-            try {
-                await apiService.sendReceiptToWhatsApp(order);
-                console.log('✅ Receipt sent to WhatsApp via backend');
-            } catch (backendError) {
-                console.error('❌ Backend WhatsApp send failed, trying frontend method:', backendError);
+        // Subtract quantity from products
+        cart.forEach(cartItem => {
+            const product = products.find(p => p.id === cartItem.id);
+            if (product) {
+                const currentQuantity = product.quantity || 0;
+                const purchasedQuantity = cartItem.quantity;
+                product.quantity = Math.max(0, currentQuantity - purchasedQuantity);
+            }
+        });
+
+        // Save updated products
+        await saveProducts();
+
+        // Refresh product display
+        displayProducts(currentCategory);
+
+        // Generate PDF receipt
+        generateReceiptPDF(order);
+
+        // Store order
+        currentOrder = order;
+
+        // Close modals
+        closeTillPaymentModal();
+        closePaymentModal();
+
+        // Send receipt to WhatsApp
+        try {
+            if (!currentOrderPDF) {
+                await generateReceiptPDF(order);
+            }
+
+            if (useDatabase) {
+                try {
+                    await apiService.sendReceiptToWhatsApp(order);
+                    console.log('✅ Receipt sent to WhatsApp via backend');
+                } catch (backendError) {
+                    console.error('❌ Backend WhatsApp send failed, trying frontend method:', backendError);
+                    sendReceiptViaWhatsAppSilent();
+                }
+            } else {
                 sendReceiptViaWhatsAppSilent();
             }
-        } else {
-            sendReceiptViaWhatsAppSilent();
+        } catch (whatsappError) {
+            console.error('❌ Error sending receipt to WhatsApp:', whatsappError);
         }
-    } catch (whatsappError) {
-        console.error('❌ Error sending receipt to WhatsApp:', whatsappError);
+
+        // Clear cart
+        cart = [];
+        updateCartUI();
+        saveCart();
+
+        showNotification('Payment verified and order placed successfully!', 'success');
+        openSuccessModal('Payment verified and order placed successfully!');
+    } catch (paymentError) {
+        console.error('❌ Error in completeTillPayment:', paymentError);
+        alert('An unexpected error occurred while finishing your order. Please refresh and check My Orders.');
+    } finally {
+        hidePaymentVerificationModal();
     }
-
-    // Clear cart
-    cart = [];
-    updateCartUI();
-    saveCart();
-
-    showNotification('Payment verified and order placed successfully!', 'success');
 }
 // Expose to window
 window.completeTillPayment = completeTillPayment;
@@ -3452,6 +3482,33 @@ async function processPayment(event) {
             if (!customerName) document.getElementById('customerName')?.focus();
             else if (!customerPhone) document.getElementById('customerPhone')?.focus();
             return;
+        }
+
+        // CRITICAL: Real-time Stock Check before payment initiation
+        showNotification('Checking stock availability...', 'info');
+        try {
+            const latestProducts = await apiService.getProducts();
+            for (const cartItem of cart) {
+                const dbProduct = latestProducts.find(p => p.id === cartItem.id);
+                if (!dbProduct || dbProduct.quantity < cartItem.quantity) {
+                    const available = dbProduct ? dbProduct.quantity : 0;
+                    alert(`Sorry, ${cartItem.name} just sold out or has insufficient stock!\n\n` +
+                          `Available: ${available}\n` +
+                          `Your Cart: ${cartItem.quantity}\n\n` +
+                          `Please adjust your cart before proceeding.`);
+                    
+                    // Refresh local products array and UI
+                    if (dbProduct) {
+                        const localIndex = products.findIndex(p => p.id === cartItem.id);
+                        if (localIndex >= 0) products[localIndex].quantity = dbProduct.quantity;
+                    }
+                    displayProducts(currentCategory);
+                    updateCartUI();
+                    return;
+                }
+            }
+        } catch (stockError) {
+            console.warn('⚠️ Parallel stock check failed, proceeding with payment:', stockError);
         }
         const deliveryOption = document.querySelector('input[name="deliveryOption"]:checked');
         const deliveryAddress = document.getElementById('deliveryAddress')?.value || '';
@@ -3717,8 +3774,15 @@ async function processPayment(event) {
             };
 
             // CRITICAL: Save order to localStorage FIRST (prevents duplicates immediately)
-            saveOrderToLocalStorage(order);
-            console.log('✅ Order saved to localStorage (prevents duplicate M-Pesa codes)');
+            try {
+                saveOrderToLocalStorage(order);
+                console.log('✅ Order saved to localStorage');
+            } catch (saveError) {
+                console.error('❌ Failed to save order locally:', saveError);
+            }
+            
+            // Hide loading modal IMMEDIATELY after verification completes, before DB save
+            hidePaymentVerificationModal();
 
             // Save order to Database if available
             if (useDatabase) {
@@ -3727,6 +3791,14 @@ async function processPayment(event) {
                     console.log('✅ Order saved to Database');
                 } catch (orderError) {
                     console.error('❌ Error saving order:', orderError);
+
+                    // Handle Insufficient Stock error from backend
+                    if (orderError.message && (orderError.message.includes('Insufficient stock') || orderError.message.includes('product not found'))) {
+                        alert(`⚠️ Order Error: ${orderError.message}\n\nPlease refresh the page to see updated stock.`);
+                        showNotification(orderError.message, 'error');
+                        // No need to cleanup, order is already in localStorage as "local"
+                        return; 
+                    }
 
                     // Helper function to cleanup localStorage
                     const cleanupLocalStorage = () => {
@@ -4136,23 +4208,31 @@ async function processSTKPushPayment(customerName, customerPhone, customerEmail,
                     const receiptNumber = statusResult.mpesa_receipt || statusResult.mpesaReceiptNumber;
                     const transactionAmount = statusResult.amount;
 
-                    // Create order with the receipt number
-                    await createOrderFromSTKPush(
-                        orderId,
-                        customerName,
-                        customerPhone,
-                        customerEmail,
-                        total,
-                        deliveryOption,
-                        deliveryAddress,
-                        subtotal,
-                        deliveryCost,
-                        deliveryOptionText,
-                        receiptNumber
-                    );
-                    
-                    // Force hide modal just in case createOrderFromSTKPush didn't or had an internal error
+                    // Important: Hide modal BEFORE potentially long-running or error-prone save operations
                     hidePaymentVerificationModal();
+
+                    // Create order with the receipt number
+                    try {
+                        await createOrderFromSTKPush(
+                            orderId,
+                            customerName,
+                            customerPhone,
+                            customerEmail,
+                            total,
+                            deliveryOption,
+                            deliveryAddress,
+                            subtotal,
+                            deliveryCost,
+                            deliveryOptionText,
+                            receiptNumber
+                        );
+                    } catch (orderError) {
+                        console.error('❌ Error creating order from STK Push success:', orderError);
+                        // The payment IS successful, but saving failed.
+                        // We must still show success and let the user know.
+                        openSuccessModal('Payment successful! Your order was received, but we had trouble saving it locally. Please keep your M-Pesa receipt for reference.');
+                    }
+                    
                     return; // Exit polling
                 } else if (statusResult.status === 'PENDING' || statusResult.resultCode === '1032' || statusResult.status === 'WAITING') {
                     // Payment still pending - keep polling

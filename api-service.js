@@ -620,10 +620,17 @@ class ApiService {
             if (accountReference) formData.append('accountReference', accountReference);
             if (transactionDesc) formData.append('transactionDesc', transactionDesc);
 
+            // Add a timeout to prevent infinite hangs
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s for STK initiation
+
             const response = await fetch('process_payment.php', {
                 method: 'POST',
+                signal: controller.signal,
                 body: formData
             });
+
+            clearTimeout(timeoutId);
 
             if (!response.ok) {
                 let errorMsg = 'Failed to initiate M-Pesa payment prompt';
@@ -764,13 +771,20 @@ class ApiService {
     // Login
     async login(username, password) {
         try {
+            // Add a timeout to prevent infinite hangs
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
             const response = await fetch(`${this.baseURL}/auth/login`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
+                signal: controller.signal,
                 body: JSON.stringify({ username, password })
             });
+
+            clearTimeout(timeoutId);
 
             const data = await response.json();
 

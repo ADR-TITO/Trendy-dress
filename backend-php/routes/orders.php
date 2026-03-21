@@ -249,6 +249,45 @@ try {
                     }
                 }
             }
+
+            // CRITICAL: Verify stock availability before creating order
+            try {
+                $items = $data['items'] ?? [];
+                if (!is_array($items) && !empty($items)) {
+                    $items = json_decode($items, true);
+                }
+                if (is_array($items)) {
+                    $productModel = new Product();
+                    foreach ($items as $item) {
+                        $productId = $item['productId'] ?? $item['id'] ?? $item['_id'] ?? null;
+                        $requestedQty = (int)($item['quantity'] ?? 1);
+                        
+                        if ($productId) {
+                            $product = $productModel->findById($productId);
+                            if (!$product) {
+                                http_response_code(400);
+                                echo json_encode(['error' => 'Product not found', 'productId' => $productId]);
+                                exit;
+                            }
+                            
+                            if ($product['quantity'] < $requestedQty) {
+                                http_response_code(400);
+                                echo json_encode([
+                                    'error' => 'Insufficient stock',
+                                    'productName' => $product['name'],
+                                    'requested' => $requestedQty,
+                                    'available' => $product['quantity']
+                                ]);
+                                error_log("🚫 Order blocked: Insufficient stock for " . $product['name'] . " (Requested: $requestedQty, Available: " . $product['quantity'] . ")");
+                                exit;
+                            }
+                        }
+                    }
+                }
+            } catch (Exception $stockEx) {
+                error_log("⚠️ Error checking stock: " . $stockEx->getMessage());
+                // Continue if stock check fails (don't break orders if metadata check errors)
+            }
             
             $order = $orderModel->create($data);
 
