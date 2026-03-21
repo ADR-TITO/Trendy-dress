@@ -63,10 +63,13 @@
             </ul>
             <div class="nav-icons">
                 <button class="login-btn" onclick="openLoginModal()" id="loginBtn">
-                    <i class="fas fa-user"></i> Login
+                    <i class="fas fa-user"></i> <span>Login</span>
+                </button>
+                <button class="orders-btn" onclick="openMyOrders()" id="myOrdersNavBtn">
+                    <i class="fas fa-history"></i> <span>Orders</span>
                 </button>
                 <button class="admin-btn" onclick="openAdminPanel()" id="adminBtn" style="display: none;">
-                    <i class="fas fa-cog"></i> Admin
+                    <i class="fas fa-cog"></i> <span>Admin</span>
                 </button>
                 <div class="cart-icon" onclick="toggleCart()">
                     <i class="fas fa-shopping-cart"></i>

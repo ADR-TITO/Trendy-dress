@@ -1970,34 +1970,44 @@ function updateCartUI() {
 
     // Update cart items
     if (cart.length === 0) {
-        cartItems.innerHTML = '<p class="empty-cart">Your cart is empty</p>';
+        cartItems.innerHTML = `
+            <div style="text-align: center; padding: 60px 20px; color: #94a3b8;">
+                <i class="fas fa-shopping-basket" style="font-size: 3rem; margin-bottom: 20px; opacity: 0.2;"></i>
+                <p style="font-size: 1.1rem; font-weight: 500;">Your cart is empty</p>
+                <p style="font-size: 0.9rem; margin-top: 8px;">Add some beautiful dresses to get started!</p>
+            </div>
+        `;
     } else {
         cartItems.innerHTML = cart.map((item, index) => `
             <div class="cart-item">
                 <div class="cart-item-image">
                     ${item.image && item.image.trim() ?
-                `<img src="${item.image}" alt="${item.name}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 5px;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                `<img src="${item.image}" alt="${item.name}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                          <div class="no-image-placeholder" style="display: none;"></div>` :
-                `<div class="no-image-placeholder" style="display: none;"></div>`
+                `<div class="no-image-placeholder" style="display: flex; align-items: center; justify-content: center; height: 100%; font-size: 1.5rem; color: #cbd5e1;"><i class="fas fa-image"></i></div>`
             }
                 </div>
                 <div class="cart-item-info">
                     <div class="cart-item-name">${item.name}</div>
-                    <div class="cart-item-size" style="color: #666; font-size: 0.85rem; margin: 3px 0;">
-                        Size: <strong>${item.size || 'N/A'}</strong>
+                    <div style="color: #64748b; font-size: 0.8rem; margin-bottom: 4px;">
+                        Size: <span style="font-weight: 600; color: #475569;">${item.size || 'N/A'}</span>
                     </div>
                     <div class="cart-item-price">
-                        KSh ${item.price.toLocaleString('en-KE')} x ${item.quantity}
-                        ${item.discount && item.discount > 0 ? `<span style="color: var(--primary-color); font-size: 0.85rem; margin-left: 5px;">(${item.discount}% off)</span>` : ''}
+                        KSh ${item.price.toLocaleString('en-KE')}
+                        ${item.discount && item.discount > 0 ? `<span style="color: #64748b; font-size: 0.75rem; font-weight: 400; text-decoration: line-through; margin-left: 5px;">KSh ${Math.round(item.price / (1 - item.discount / 100)).toLocaleString('en-KE')}</span>` : ''}
                     </div>
-                    <div style="display: flex; gap: 10px; margin-top: 10px; align-items: center;">
-                        <button onclick="updateCartQuantityByIndex(${index}, -1)" style="background: var(--light-color); border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">-</button>
-                        <span>${item.quantity}</span>
-                        <button onclick="updateCartQuantityByIndex(${index}, 1)" style="background: var(--light-color); border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">+</button>
+                    <div class="cart-item-qty-controls">
+                        <button class="qty-btn" onclick="updateCartQuantityByIndex(${index}, -1)" title="Decrease quantity">
+                            <i class="fas fa-minus" style="font-size: 0.7rem;"></i>
+                        </button>
+                        <span style="font-weight: 700; font-size: 0.9rem; width: 20px; text-align: center;">${item.quantity}</span>
+                        <button class="qty-btn" onclick="updateCartQuantityByIndex(${index}, 1)" title="Increase quantity">
+                            <i class="fas fa-plus" style="font-size: 0.7rem;"></i>
+                        </button>
                     </div>
                 </div>
-                <button class="cart-item-remove" onclick="removeFromCartByIndex(${index})">
-                    <i class="fas fa-trash"></i>
+                <button class="cart-item-remove" onclick="removeFromCartByIndex(${index})" title="Remove item">
+                    <i class="fas fa-times"></i>
                 </button>
             </div>
         `).join('');
@@ -2558,11 +2568,7 @@ function saveOrderToLocalStorage(order) {
         if (existingOrderIndex >= 0) {
             // Update existing order
             orders[existingOrderIndex] = {
-                orderId: order.orderId,
-                date: order.date,
-                mpesaCode: order.mpesaCode,
-                total: order.total,
-                customer: order.customer,
+                ...order,
                 createdAt: orders[existingOrderIndex].createdAt || new Date().toISOString(),
                 updatedAt: new Date().toISOString()
             };
@@ -2570,11 +2576,7 @@ function saveOrderToLocalStorage(order) {
         } else {
             // Add new order
             orders.push({
-                orderId: order.orderId,
-                date: order.date,
-                mpesaCode: order.mpesaCode,
-                total: order.total,
-                customer: order.customer,
+                ...order,
                 createdAt: new Date().toISOString()
             });
             console.log('✅ Order saved to localStorage');
@@ -4737,6 +4739,19 @@ function toggleCart() {
     }
 }
 
+// Helper function to open cart and switch to My Orders tab
+function openMyOrders() {
+    if (typeof toggleCart === 'function') {
+        const cartSidebar = document.getElementById('cartSidebar');
+        if (cartSidebar && !cartSidebar.classList.contains('open')) {
+            toggleCart();
+        }
+    }
+    if (typeof switchCartTab === 'function') {
+        switchCartTab('orders');
+    }
+}
+
 function switchCartTab(tab) {
     const cartSection = document.getElementById('cartSection');
     const myOrdersSection = document.getElementById('myOrdersSection');
@@ -4774,9 +4789,10 @@ async function renderMyOrdersSidebar() {
 
     if (orders.length === 0) {
         ordersList.innerHTML = `
-            <div style="text-align: center; padding: 40px 20px; color: #666;">
-                <i class="fas fa-box-open" style="font-size: 3rem; margin-bottom: 15px; opacity: 0.3;"></i>
-                <p>No past orders found on this device.</p>
+            <div style="text-align: center; padding: 60px 20px; color: #94a3b8;">
+                <i class="fas fa-box-open" style="font-size: 3rem; margin-bottom: 20px; opacity: 0.2;"></i>
+                <p style="font-size: 1.1rem; font-weight: 500;">No past orders found</p>
+                <p style="font-size: 0.9rem; margin-top: 8px;">Items you buy will appear here.</p>
             </div>
         `;
         return;
@@ -4788,26 +4804,43 @@ async function renderMyOrdersSidebar() {
     // Render orders
     ordersList.innerHTML = orders.map(order => {
         const isDelivered = order.delivery && order.delivery.status === 'delivered';
-        const statusColor = isDelivered ? 'var(--success-color)' : '#ff9800';
-        const statusIcon = isDelivered ? 'fa-check-circle' : 'fa-truck';
-        const statusText = isDelivered ? 'Delivered' : 'Pending';
+        const statusClass = isDelivered ? 'status-delivered' : 'status-paid';
+        const statusIcon = isDelivered ? 'fa-check-circle' : 'fa-clock';
+        const statusText = isDelivered ? 'Delivered' : (order.status || 'Paid');
+
+        // Prepare items list HTML
+        const items = order.items || [];
+        const itemsHtml = items.length > 0 
+            ? `<div class="order-items-mini">
+                ${items.slice(0, 3).map(item => `
+                    <div class="mini-item">
+                        <span class="mini-item-name">${item.name}</span>
+                        <span class="mini-item-qty">x${item.quantity}</span>
+                    </div>
+                `).join('')}
+                ${items.length > 3 ? `<div style="font-size: 0.7rem; color: #94a3b8; text-align: center; margin-top: 4px;">+ ${items.length - 3} more items</div>` : ''}
+               </div>`
+            : `<div style="font-size: 0.75rem; color: #94a3b8; margin-top: 10px; font-style: italic;">Item list unavailable (Old order)</div>`;
 
         return `
-            <div style="background: var(--light-color); padding: 15px; border-radius: 8px; margin-bottom: 12px; border-left: 4px solid ${statusColor}; box-shadow: var(--shadow-sm); cursor: pointer;" onclick="viewOrderReceipt('${order.orderId}')">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
-                    <div>
-                        <strong style="display: block; font-size: 1rem; color: var(--dark-color);">${order.orderId}</strong>
-                        <small style="color: #888; font-size: 0.8rem;">${order.date}</small>
-                    </div>
-                    <span style="font-size: 0.75rem; padding: 3px 8px; border-radius: 12px; background: ${statusColor}15; color: ${statusColor}; font-weight: 700; display: flex; align-items: center; gap: 4px;">
+            <div class="order-sidebar-card">
+                <div class="order-card-header">
+                    <span class="order-id-badge">${order.orderId}</span>
+                    <span class="order-status-badge ${statusClass}">
                         <i class="fas ${statusIcon}"></i> ${statusText}
                     </span>
                 </div>
-                <div style="font-size: 0.85rem; color: #555;">
-                    <div style="display: flex; justify-content: space-between; margin-top: 5px;">
-                        <span>${(order.items || []).length} item(s)</span>
-                        <strong style="color: var(--primary-color);">KSh ${order.total.toLocaleString('en-KE')}</strong>
+                <div class="order-card-body">
+                    <div class="order-summary-text">
+                        Placed on ${order.date || 'No date'}
                     </div>
+                    ${itemsHtml}
+                </div>
+                <div class="order-card-footer">
+                    <div class="order-price-total">KSh ${order.total.toLocaleString('en-KE')}</div>
+                    <button class="btn-view-receipt" onclick="viewOrderReceipt('${order.orderId}')">
+                        <i class="fas fa-file-invoice-dollar"></i> Receipt
+                    </button>
                 </div>
             </div>
         `;
