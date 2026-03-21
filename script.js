@@ -8098,9 +8098,23 @@ async function cancelOrder(orderId) {
         showNotification('Cancelling order and restoring stock...', 'info');
         
         const useDatabase = localStorage.getItem('useDatabase') === 'true';
+        let orderDeletedFromServer = false;
+
         if (useDatabase) {
-            await apiService.deleteOrder(orderId);
-            console.log(`✅ Order ${orderId} deleted from Database`);
+            try {
+                await apiService.deleteOrder(orderId);
+                console.log(`✅ Order ${orderId} deleted from Database`);
+                orderDeletedFromServer = true;
+            } catch (apiError) {
+                // If the order wasn't found on the server (e.g., local-only test order), 
+                // we still want to proceed with deleting it locally.
+                if (apiError.message && apiError.message.includes('not found')) {
+                    console.log(`⚠️ Order ${orderId} not found on server, assuming it's a local-only order.`);
+                } else {
+                    // Re-throw if it's a real error (like Unauthorized)
+                    throw apiError;
+                }
+            }
         }
 
         // Also remove from localStorage if it exists there

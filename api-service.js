@@ -686,6 +686,7 @@ class ApiService {
         try {
             const response = await fetch(`${this.baseURL}/orders/${orderId}`, {
                 method: 'DELETE',
+                credentials: 'include',
                 headers: {
                     ...ApiService.getAuthHeader(), // Add authorization header
                 },
@@ -706,6 +707,7 @@ class ApiService {
         try {
             const response = await fetch(`${this.baseURL}/orders/${orderId}/delivery-status`, {
                 method: 'PATCH',
+                credentials: 'include',
                 headers: {
                     'Content-Type': 'application/json',
                     ...ApiService.getAuthHeader(), // Add authorization header
