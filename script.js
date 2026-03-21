@@ -4924,19 +4924,23 @@ async function renderMyOrdersSidebar() {
         const statusIcon = isDelivered ? 'fa-check-circle' : 'fa-clock';
         const statusText = isDelivered ? 'Delivered' : (order.status || 'Paid');
 
-        // Prepare items list HTML
+        // Prepare items list HTML with images
         const items = order.items || [];
         const itemsHtml = items.length > 0 
             ? `<div class="order-items-mini">
                 ${items.slice(0, 3).map(item => `
                     <div class="mini-item">
-                        <span class="mini-item-name">${item.name}</span>
+                        <div class="mini-item-left">
+                            <img src="${item.image || 'placeholder-product.png'}" alt="${item.name}" class="mini-item-img" onerror="handleImageError(this)">
+                            <span class="mini-item-name">${item.name}</span>
+                        </div>
                         <span class="mini-item-qty">x${item.quantity}</span>
                     </div>
                 `).join('')}
-                ${items.length > 3 ? `<div style="font-size: 0.7rem; color: #94a3b8; text-align: center; margin-top: 4px;">+ ${items.length - 3} more items</div>` : ''}
+                ${items.length > 3 ? `<div style="font-size: 0.7rem; color: #94a3b8; text-align: center; margin-top: 8px; padding-top: 6px; border-top: 1px dashed #e2e8f0;">+ ${items.length - 3} more items</div>` : ''}
                </div>`
             : `<div style="font-size: 0.75rem; color: #94a3b8; margin-top: 10px; font-style: italic;">Item list unavailable (Old order)</div>`;
+
 
         return `
             <div class="order-sidebar-card">
@@ -7945,34 +7949,93 @@ function updateOrderBadges() {
 function viewOrderDetails(orderId) {
     const order = allAdminOrders.find(o => o.orderId === orderId);
     if (!order) {
-        alert('Order not found');
+        showNotification('Order not found', 'error');
         return;
     }
 
-    // Create detailed view modal
-    const details = `
-Order ID: ${order.orderId}
-Date: ${order.date || order.createdAt || 'N/A'}
-Customer: ${order.customer?.name || 'N/A'}
-Phone: ${order.customer?.phone || 'N/A'}
-Email: ${order.customer?.email || 'N/A'}
+    const modal = document.getElementById('adminOrderDetailsModal');
+    const contentBox = document.getElementById('adminOrderDetailsContent');
+    const receiptBtn = document.getElementById('adminOrderReceiptBtn');
 
-Items:
-${(order.items || []).map(item => `• ${item.name} x${item.quantity} - KSh ${item.subtotal?.toLocaleString('en-KE') || '0'}`).join('\n')}
+    if (!modal || !contentBox) return;
 
-Subtotal: KSh ${(order.subtotal || order.total || 0).toLocaleString('en-KE')}
-${order.delivery?.cost > 0 ? `Delivery: KSh ${order.delivery.cost.toLocaleString('en-KE')}\n` : ''}
-Total: KSh ${order.total?.toLocaleString('en-KE') || '0'}
+    // Generate Items HTML with images
+    const itemsHtml = (order.items || []).map(item => `
+        <div class="admin-order-item">
+            <img src="${item.image || 'placeholder-product.png'}" alt="${item.name}" class="admin-order-item-img" onerror="handleImageError(this)">
+            <div class="admin-order-item-info">
+                <div class="admin-order-item-name">${item.name}</div>
+                <div class="admin-order-item-meta">Size: ${item.size || 'N/A'} | Qty: ${item.quantity}</div>
+            </div>
+            <div class="admin-order-item-price">KSh ${(item.subtotal || (item.price * item.quantity))?.toLocaleString('en-KE') || '0'}</div>
+        </div>
+    `).join('');
 
-Payment Method: ${order.paymentMethod || 'N/A'}
-M-Pesa Code: ${order.mpesaCode || 'N/A'}
-Verified: ${order.verified ? 'Yes' : 'Pending'}
+    const subtotal = order.subtotal || order.total || 0;
+    const delivery = order.delivery?.cost || 0;
+    const total = order.total || 0;
 
-${order.delivery?.option !== 'pickup' ? `Delivery Address:\n${order.delivery?.address || 'N/A'}\n` : ''}
+    contentBox.innerHTML = `
+        <div class="admin-order-modal-section">
+            <h3><i class="fas fa-user-circle"></i> Customer Info</h3>
+            <div class="admin-order-detail-row"><span class="admin-order-detail-label">Name:</span> <span class="admin-order-detail-value">${order.customer?.name || 'N/A'}</span></div>
+            <div class="admin-order-detail-row"><span class="admin-order-detail-label">Phone:</span> <span class="admin-order-detail-value">${order.customer?.phone || 'N/A'}</span></div>
+            <div class="admin-order-detail-row"><span class="admin-order-detail-label">Email:</span> <span class="admin-order-detail-value">${order.customer?.email || 'N/A'}</span></div>
+        </div>
+
+        <div class="admin-order-modal-section">
+            <h3><i class="fas fa-money-check-alt"></i> Payment Details</h3>
+            <div class="admin-order-detail-row"><span class="admin-order-detail-label">Date:</span> <span class="admin-order-detail-value">${order.date || order.createdAt || 'N/A'}</span></div>
+            <div class="admin-order-detail-row"><span class="admin-order-detail-label">Method:</span> <span class="admin-order-detail-value">${order.paymentMethod || 'N/A'}</span></div>
+            <div class="admin-order-detail-row"><span class="admin-order-detail-label">M-Pesa Code:</span> <span class="admin-order-detail-value" style="font-family: monospace; font-size: 1.1rem; color: var(--primary-color);">${order.mpesaCode || 'N/A'}</span></div>
+            <div class="admin-order-detail-row"><span class="admin-order-detail-label">Verified:</span> <span class="admin-order-detail-value" style="color: ${order.verified ? 'var(--success-color)' : '#f59e0b'};">${order.verified ? '<i class="fas fa-check-circle"></i> Yes' : '<i class="fas fa-clock"></i> Pending'}</span></div>
+        </div>
+
+        ${order.delivery?.option !== 'pickup' ? `
+        <div class="admin-order-modal-section">
+            <h3><i class="fas fa-truck"></i> Delivery</h3>
+            <div class="admin-order-detail-row"><span class="admin-order-detail-label">Address:</span> <span class="admin-order-detail-value">${order.delivery?.address || 'N/A'}</span></div>
+        </div>
+        ` : ''}
+
+        <div class="admin-order-modal-section">
+            <h3><i class="fas fa-shopping-bag"></i> Ordered Items (${(order.items || []).length})</h3>
+            ${itemsHtml || '<p style="color: #64748b; font-style: italic;">No items found in this order.</p>'}
+            
+            <div class="admin-order-summary">
+                <div class="admin-order-summary-row">
+                    <span>Subtotal:</span>
+                    <span>KSh ${subtotal.toLocaleString('en-KE')}</span>
+                </div>
+                ${delivery > 0 ? `
+                <div class="admin-order-summary-row">
+                    <span>Delivery:</span>
+                    <span>KSh ${delivery.toLocaleString('en-KE')}</span>
+                </div>` : ''}
+                <div class="admin-order-summary-row total">
+                    <span>Total Paid:</span>
+                    <span>KSh ${total.toLocaleString('en-KE')}</span>
+                </div>
+            </div>
+        </div>
     `;
 
-    alert(details);
+    // Hook up receipt button
+    if (receiptBtn) {
+        receiptBtn.onclick = () => {
+            closeAdminOrderDetailsModal();
+            viewOrderReceipt(order.orderId);
+        };
+    }
+
+    modal.classList.add('show');
 }
+
+function closeAdminOrderDetailsModal() {
+    const modal = document.getElementById('adminOrderDetailsModal');
+    if (modal) modal.classList.remove('show');
+}
+
 
 async function downloadOrderReceipt(orderId) {
     const order = allAdminOrders.find(o => o.orderId === orderId);

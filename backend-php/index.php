@@ -77,8 +77,21 @@ if (!is_dir(__DIR__ . '/logs')) {
     @mkdir(__DIR__ . '/logs', 0755, true);
 }
 
-// Get route from query string or PATH_INFO
+// Get route from query string
 $route = $_GET['route'] ?? '';
+
+// Fallback for built-in PHP server or environments without .htaccess support
+if (empty($route)) {
+    $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+    // Handle /api/ or /backend-php/api/
+    if (strpos($uri, '/api/') !== false) {
+        $parts = explode('/api/', $uri, 2);
+        $route = $parts[1] ?? '';
+    } elseif (strpos($uri, 'index.php/') !== false) {
+        $parts = explode('index.php/', $uri, 2);
+        $route = $parts[1] ?? '';
+    }
+}
 $method = $_SERVER['REQUEST_METHOD'];
 
 // Parse route
