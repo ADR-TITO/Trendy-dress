@@ -1228,6 +1228,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 // Sync orders from Database to localStorage (to prevent duplicate M-Pesa codes)
                 try {
+                    // One-time cleanup for synced global orders in localStorage for non-admins
+                    if (!isAdmin) {
+                        const ordersSyncFixed = localStorage.getItem('ordersSyncFixed_v3');
+                        if (!ordersSyncFixed) {
+                            localStorage.removeItem('orders'); // Clear once to remove synced global orders
+                            localStorage.setItem('ordersSyncFixed_v3', 'true');
+                            console.log('🧹 Cleaned up legacy synced orders');
+                        }
+                    }
                     await syncOrdersFromDatabase();
                 } catch (syncError) {
                     console.error('❌ Error syncing orders:', syncError);
@@ -1662,12 +1671,14 @@ async function displayProducts(filterCategory = 'all') {
                  onclick="openProductDetails('${main.id}')">
                 
                 <div class="product-image-container ${lazy ? 'img-lazy-pending' : ''}" 
-                     style="width: 100%; border-radius: 20px 20px 0 0; min-height: 150px; background: #f9f9f9; overflow: visible; position: relative;">
+                     style="width: 100%; border-radius: 20px 20px 0 0; min-height: 150px; background: #f9f9f9; overflow: visible; position: relative;"
+                     onclick="event.stopPropagation(); openProductDetails('${main.id}')">
                     <img class="product-img" 
                          src="${hasImg ? imageValue : ''}" 
                          data-src="${lazy ? 'fetch-from-api' : ''}" 
                          data-product-id="${main.id}"
-                         style="width: 100%; height: auto; display: block; border-radius: 20px 20px 0 0; opacity: ${hasImg ? '1' : '0'}; transition: opacity 0.4s; position: relative; z-index: 1;">
+                         style="width: 100%; height: auto; display: block; border-radius: 20px 20px 0 0; opacity: ${hasImg ? '1' : '0'}; transition: opacity 0.4s; position: relative; z-index: 1;"
+                         onclick="event.stopPropagation(); openProductDetails('${main.id}')">
                 </div>
 
                 ${!hasStock ? '<div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 3rem; font-weight: bold; color: rgba(255,0,0,0.5); transform: rotate(-30deg); z-index: 5; pointer-events: none;">SOLD</div>' : ''}
