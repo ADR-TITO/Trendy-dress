@@ -4316,34 +4316,38 @@ async function createOrderFromSTKPush(orderId, customerName, customerPhone, cust
         console.log('✅ Order saved to localStorage');
 
         // Immediately refresh "My Orders" sidebar to show the new order
+        // Update order status in the local object before saving
+        order.paymentStatus = 'paid';
+        order.mpesaCode = mpesaCode;
+        order.verified = true;
+
+        // Add to local orders for immediate display
+        const savedOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+        // Check if order already exists in local storage to avoid duplicates
+        const exists = savedOrders.some(o => o.orderId === orderId);
+        if (!exists) {
+            savedOrders.unshift(order);
+            localStorage.setItem('orders', JSON.stringify(savedOrders));
+        }
+        
+        // Refresh the My Orders sidebar immediately
         if (typeof renderMyOrdersSidebar === 'function') {
             renderMyOrdersSidebar();
         }
 
-        // Save order to Database if available
-        const useDatabase = localStorage.getItem('useDatabase') === 'true';
-        if (useDatabase) {
-            try {
-                const dbResponse = await apiService.createOrder(order);
-                console.log('✅ Order saved to Database:', dbResponse);
-            } catch (orderError) {
-                console.error('❌ Error saving order to Database:', orderError);
-                console.error('Order data sent:', JSON.stringify(order).substring(0, 200) + '...');
-                // Continue even if Database save fails
-            }
+        // Clear cart after successful order
+        if (typeof clearCart === 'function') {
+            clearCart();
         }
 
-        // Subtract quantity from products
-        cart.forEach(cartItem => {
-            const product = products.find(p => p.id === cartItem.id);
-            if (product) {
-                const currentQuantity = product.quantity || 0;
-                const purchasedQuantity = cartItem.quantity;
-                product.quantity = Math.max(0, currentQuantity - purchasedQuantity);
+        // Try to refresh product stock from database (since backend already decremented it)
+        try {
+            if (useDatabase && typeof loadProducts === 'function') {
+                await loadProducts();
             }
-        });
-
-        // Save updated products and REFRESH from server
+        } catch (saveError) {
+            console.error('❌ Error refreshing products:', saveError);
+        }
         try {
             await saveProducts();
             if (useDatabase) {

@@ -227,29 +227,6 @@ try {
                                             'verified' => true
                                         ]);
                                         error_log("✅ Order $orderId updated with successful STK Push payment.");
-                                        
-                                        // Update Inventory
-                                        try {
-                                            $items = $existingOrder['items'] ?? [];
-                                            if (!is_array($items) && !empty($items)) {
-                                                $items = json_decode($items, true);
-                                            }
-                                            
-                                            if (is_array($items)) {
-                                                $productModel = new Product();
-                                                foreach ($items as $item) {
-                                                    $productId = $item['productId'] ?? $item['id'] ?? $item['_id'] ?? null;
-                                                    $quantity = (int)($item['quantity'] ?? 1);
-                                                    
-                                                    if ($productId) {
-                                                        $productModel->decrementQuantity($productId, $quantity);
-                                                        error_log("📉 Decremented inventory for product $productId by $quantity");
-                                                    }
-                                                }
-                                            }
-                                        } catch (\Exception $invEx) {
-                                            error_log("⚠️ Warning: Failed to update inventory for order $orderId: " . $invEx->getMessage());
-                                        }
                                     }
                                 } catch (\Exception $e) {
                                     error_log('❌ Webhook: Error updating order: ' . $e->getMessage());
@@ -310,29 +287,6 @@ try {
                                         'verified' => true
                                     ]);
                                     error_log("✅ Order $orderId updated with successful C2B payment.");
-                                    
-                                    // Update Inventory
-                                    try {
-                                        $items = $existingOrder['items'] ?? [];
-                                        if (!is_array($items) && !empty($items)) {
-                                            $items = json_decode($items, true);
-                                        }
-                                        
-                                        if (is_array($items)) {
-                                            $productModel = new Product();
-                                            foreach ($items as $item) {
-                                                $productId = $item['productId'] ?? $item['id'] ?? $item['_id'] ?? null;
-                                                $quantity = (int)($item['quantity'] ?? 1);
-                                                
-                                                if ($productId) {
-                                                    $productModel->decrementQuantity($productId, $quantity);
-                                                    error_log("📉 C2B: Decremented inventory for product $productId by $quantity");
-                                                }
-                                            }
-                                        }
-                                    } catch (\Exception $invEx) {
-                                        error_log("⚠️ Warning: C2B: Failed to update inventory for order $orderId: " . $invEx->getMessage());
-                                    }
                                 }
                             } catch (\Exception $e) {
                                 error_log('❌ C2B Webhook: Error updating order: ' . $e->getMessage());

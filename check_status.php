@@ -22,7 +22,7 @@ if (isset($_GET['checkout_request_id'])) {
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if ($row) {
-        if ($row['status'] == '0' && !empty($row['mpesa_receipt']) && $row['mpesa_receipt'] !== 'PENDING') {
+        if ($row['status'] == '0' && !empty($row['mpesa_receipt']) && strpos($row['mpesa_receipt'], 'PENDING') === false) {
             echo json_encode([
                 'success' => true,
                 'status' => 'COMPLETED',
