@@ -4315,14 +4315,20 @@ async function createOrderFromSTKPush(orderId, customerName, customerPhone, cust
         saveOrderToLocalStorage(order);
         console.log('✅ Order saved to localStorage');
 
+        // Immediately refresh "My Orders" sidebar to show the new order
+        if (typeof renderMyOrdersSidebar === 'function') {
+            renderMyOrdersSidebar();
+        }
+
         // Save order to Database if available
         const useDatabase = localStorage.getItem('useDatabase') === 'true';
         if (useDatabase) {
             try {
-                await apiService.createOrder(order);
-                console.log('✅ Order saved to Database');
+                const dbResponse = await apiService.createOrder(order);
+                console.log('✅ Order saved to Database:', dbResponse);
             } catch (orderError) {
-                console.error('❌ Error saving order:', orderError);
+                console.error('❌ Error saving order to Database:', orderError);
+                console.error('Order data sent:', JSON.stringify(order).substring(0, 200) + '...');
                 // Continue even if Database save fails
             }
         }

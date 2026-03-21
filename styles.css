@@ -945,6 +945,8 @@ h1, h2, h3, h4, h5, h6, .logo {
 .mini-item-img {
     width: 40px;
     height: 40px;
+    max-width: 40px;
+    max-height: 40px;
     border-radius: 6px;
     object-fit: cover;
     background: #f8f9fa;
@@ -1764,6 +1766,8 @@ h1, h2, h3, h4, h5, h6, .logo {
 .order-item-img {
     width: 45px;
     height: 45px;
+    max-width: 45px;
+    max-height: 45px;
     border-radius: 6px;
     object-fit: cover;
     margin-right: 12px;
@@ -2509,6 +2513,8 @@ h1, h2, h3, h4, h5, h6, .logo {
 .admin-order-item-img {
     width: 60px;
     height: 60px;
+    max-width: 60px;
+    max-height: 60px;
     border-radius: 8px;
     object-fit: cover;
     margin-right: 15px;

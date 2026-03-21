@@ -290,30 +290,38 @@ try {
                 error_log("⚠️ Error checking stock: " . $stockEx->getMessage());
             }
             
-            $order = $orderModel->create($data);
-
-            // Decrement inventory
             try {
-                $items = $data['items'] ?? [];
-                if (!is_array($items) && !empty($items)) {
-                    $items = json_decode($items, true);
-                }
-                if (is_array($items)) {
-                    $productModel = new Product();
-                    foreach ($items as $item) {
-                        $productId = $item['productId'] ?? $item['id'] ?? $item['_id'] ?? null;
-                        $quantity  = (int)($item['quantity'] ?? 1);
-                        if ($productId) {
-                            $productModel->decrementQuantity($productId, $quantity);
+                $order = $orderModel->create($data);
+                
+                // Decrement inventory on backend
+                try {
+                    $items = $data['items'] ?? [];
+                    if (!is_array($items) && !empty($items)) {
+                        $items = json_decode($items, true);
+                    }
+                    if (is_array($items)) {
+                        $productModel = new Product();
+                        foreach ($items as $item) {
+                            $productId = $item['productId'] ?? $item['id'] ?? $item['_id'] ?? null;
+                            $quantity  = (int)($item['quantity'] ?? 1);
+                            if ($productId) {
+                                $productModel->decrementQuantity($productId, $quantity);
+                            }
                         }
                     }
+                } catch (\Exception $invEx) {
+                    error_log("⚠️ Warning: Failed to decrement inventory on order create: " . $invEx->getMessage());
                 }
-            } catch (\Exception $invEx) {
-                error_log("⚠️ Warning: Failed to decrement inventory on order create: " . $invEx->getMessage());
+
+                http_response_code(201);
+                echo json_encode($order);
+            } catch (Exception $createEx) {
+                error_log("❌ Critical: Failed to create order in database: " . $createEx->getMessage());
+                error_log("Data: " . json_encode($data));
+                http_response_code(500);
+                echo json_encode(['error' => 'Database error during order creation', 'message' => $createEx->getMessage()]);
             }
 
-            http_response_code(201);
-            echo json_encode($order);
             break;
 
         case 'PATCH':
