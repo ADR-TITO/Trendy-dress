@@ -24,12 +24,13 @@ spl_autoload_register(function ($class) {
 use App\Models\Order;
 use App\Models\MpesaTransaction;
 use App\Models\Product;
+use App\Utils\Auth;
 
 $method = $_SERVER['REQUEST_METHOD'];
 $route = $_GET['route'] ?? '';
 $routeParts = explode('/', trim($route, '/'));
-$action = $routeParts[1] ?? null;
-$id = $routeParts[2] ?? null;
+$orderIdOrAction = $routeParts[1] ?? null;
+$subAction = $routeParts[2] ?? null;
 
 try {
     $orderModel = new Order();
@@ -72,7 +73,7 @@ try {
 
     switch ($method) {
         case 'GET':
-            if ($action === 'verify') {
+            if ($orderIdOrAction === 'verify') {
                 // Verify M-Pesa code
                 $data = json_decode(file_get_contents('php://input'), true);
                 $mpesaCode = $data['mpesaCode'] ?? '';
@@ -133,10 +134,10 @@ try {
                     'valid' => true,
                     'transaction' => $transaction
                 ]);
-            } else if (!empty($action) && strpos($action, 'ORD-') === 0) {
+            } else if (!empty($orderIdOrAction) && strpos($orderIdOrAction, 'ORD-') === 0) {
                 // Get single order by ID (for customer tracking)
                 try {
-                    $order = $orderModel->findByOrderId($action);
+                    $order = $orderModel->findByOrderId($orderIdOrAction);
                     if ($order) {
                         header('Content-Type: application/json; charset=utf-8');
                         echo json_encode($order, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -151,7 +152,13 @@ try {
                     exit;
                 }
             } else {
-                // Get all orders
+                // Get all orders (requires admin auth)
+                if (!Auth::isAdminAuthenticated()) {
+                    http_response_code(401);
+                    echo json_encode(['error' => 'Unauthorized - Admin login required']);
+                    exit;
+                }
+                
                 try {
                     $completedOnly = isset($_GET['completed']) && $_GET['completed'] === 'true';
                     $orders = $orderModel->findAll($completedOnly);
@@ -173,28 +180,23 @@ try {
             break;
 
         case 'POST':
-            if ($action === 'send-whatsapp' || $id === 'send-whatsapp') {
+            if ($orderIdOrAction === 'send-whatsapp' || $subAction === 'send-whatsapp') {
                 // Endpoint for frontend to trigger a WhatsApp notification record/log
                 $data = json_decode(file_get_contents('php://input'), true);
-                $orderId = ($action !== 'send-whatsapp' ? $action : ($routeParts[2] ?? ($data['orderId'] ?? null)));
+                $orderIdForWhatsApp = ($orderIdOrAction !== 'send-whatsapp' ? $orderIdOrAction : ($routeParts[2] ?? ($data['orderId'] ?? null)));
                 
-                if (!$orderId) {
+                if (!$orderIdForWhatsApp) {
                     http_response_code(400);
                     echo json_encode(['error' => 'Order ID is required']);
                     exit;
                 }
                 
                 // For now, we log the request and return success.
-                // This could be integrated with a real WhatsApp API (like Twilio, Vonage, or a dedicated provider)
-                error_log("📱 WhatsApp notification requested for Order: $orderId");
-                
-                // You could add logic here to send an email notification to the merchant 
-                // which often acts as a reliable backup to WhatsApp.
+                error_log("📱 WhatsApp notification requested for Order: $orderIdForWhatsApp");
                 
                 echo json_encode(['success' => true, 'message' => 'WhatsApp notification recorded']);
                 exit;
             }
-            // Fallthrough to existing POST order creation if not send-whatsapp
             
             // Create new order
             $data = json_decode(file_get_contents('php://input'), true);
@@ -286,12 +288,11 @@ try {
                 }
             } catch (Exception $stockEx) {
                 error_log("⚠️ Error checking stock: " . $stockEx->getMessage());
-                // Continue if stock check fails (don't break orders if metadata check errors)
             }
             
             $order = $orderModel->create($data);
 
-            // Decrement inventory for each item in the order (manual M-Pesa code path)
+            // Decrement inventory
             try {
                 $items = $data['items'] ?? [];
                 if (!is_array($items) && !empty($items)) {
@@ -304,12 +305,10 @@ try {
                         $quantity  = (int)($item['quantity'] ?? 1);
                         if ($productId) {
                             $productModel->decrementQuantity($productId, $quantity);
-                            error_log("📉 Order created: Decremented inventory for product $productId by $quantity");
                         }
                     }
                 }
             } catch (\Exception $invEx) {
-                // Non-fatal: log but don't fail the order
                 error_log("⚠️ Warning: Failed to decrement inventory on order create: " . $invEx->getMessage());
             }
 
@@ -318,20 +317,26 @@ try {
             break;
 
         case 'PATCH':
-            if ($action === 'delivery-status' && $id) {
-                // Update delivery status
+            if ($subAction === 'delivery-status' && $orderIdOrAction) {
+                // Update delivery status (requires admin auth)
+                if (!Auth::isAdminAuthenticated()) {
+                    http_response_code(401);
+                    echo json_encode(['error' => 'Unauthorized - Admin login required']);
+                    exit;
+                }
+                
                 $data = json_decode(file_get_contents('php://input'), true);
                 $status = $data['deliveryStatus'] ?? $data['status'] ?? 'delivered';
                 $deliveredBy = $data['deliveredBy'] ?? 'admin';
                 
-                $updated = $orderModel->updateDeliveryStatus($id, $status, $deliveredBy);
+                $updated = $orderModel->updateDeliveryStatus($orderIdOrAction, $status, $deliveredBy);
                 if (!$updated) {
                     http_response_code(404);
                     echo json_encode(['error' => 'Order not found']);
                     exit;
                 }
                 
-                $order = $orderModel->findByOrderId($id);
+                $order = $orderModel->findByOrderId($orderIdOrAction);
                 echo json_encode($order);
             } else {
                 http_response_code(400);
@@ -340,9 +345,15 @@ try {
             break;
             
         case 'DELETE':
-            if ($id) {
-                // Delete order
-                $deleted = $orderModel->delete($id);
+            if ($orderIdOrAction) {
+                // Delete order (requires admin auth)
+                if (!Auth::isAdminAuthenticated()) {
+                    http_response_code(401);
+                    echo json_encode(['error' => 'Unauthorized - Admin login required']);
+                    exit;
+                }
+                
+                $deleted = $orderModel->delete($orderIdOrAction);
                 if (!$deleted) {
                     http_response_code(404);
                     echo json_encode(['error' => 'Order not found']);

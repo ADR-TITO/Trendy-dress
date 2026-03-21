@@ -16,34 +16,7 @@ spl_autoload_register(function ($class) {
 });
 
 use App\Models\WebsiteContent;
-
-/**
- * Check if the current request is from an authenticated admin.
- * Accepts EITHER a valid PHP session OR a Bearer token.
- */
-function isAdminAuthenticated(): bool {
-    // Method 1: PHP session cookie
-    if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true) {
-        return true;
-    }
-
-    // Method 2: Bearer token from Authorization header
-    $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
-    if (strpos($authHeader, 'Bearer ') === 0) {
-        $token = substr($authHeader, 7);
-        if (!empty($token) && isset($_SESSION['auth_token']) && hash_equals($_SESSION['auth_token'], $token)) {
-            return true;
-        }
-        $tokenFile = sys_get_temp_dir() . '/trendy_admin_' . hash('sha256', $token) . '.tok';
-        if (file_exists($tokenFile)) {
-            $storedData = json_decode(file_get_contents($tokenFile), true);
-            if ($storedData && isset($storedData['expires']) && $storedData['expires'] > time()) {
-                return true;
-            }
-        }
-    }
-    return false;
-}
+use App\Utils\Auth;
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -68,7 +41,7 @@ try {
             // Save website content (requires admin auth)
             
             // Check authentication (consistent with admin routes)
-            if (!isAdminAuthenticated()) {
+            if (!Auth::isAdminAuthenticated()) {
                 http_response_code(401);
                 echo json_encode(['error' => 'Unauthorized - Admin login required']);
                 exit;

@@ -30,40 +30,7 @@ spl_autoload_register(function ($class) {
 });
 
 use App\Models\Product;
-
-/**
- * Check if the current request is from an authenticated admin.
- * Accepts EITHER a valid PHP session OR a Bearer token set during login.
- * This dual-check makes auth work on shared hosting where session cookies
- * are often blocked by the browser for cross-origin requests.
- */
-function isAdminAuthenticated(): bool {
-    // Method 1: PHP session cookie (works when frontend and backend are same origin)
-    if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true) {
-        return true;
-    }
-
-    // Method 2: Bearer token from Authorization header
-    // (works when session cookies are blocked cross-origin on shared hosting)
-    $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
-    if (strpos($authHeader, 'Bearer ') === 0) {
-        $token = substr($authHeader, 7);
-        if (!empty($token) && isset($_SESSION['auth_token']) && hash_equals($_SESSION['auth_token'], $token)) {
-            return true;
-        }
-        // Also try checking against all active sessions (for cross-request scenarios)
-        // Store token in a transient file-based store as last resort
-        $tokenFile = sys_get_temp_dir() . '/trendy_admin_' . hash('sha256', $token) . '.tok';
-        if (file_exists($tokenFile)) {
-            $storedData = json_decode(file_get_contents($tokenFile), true);
-            if ($storedData && isset($storedData['expires']) && $storedData['expires'] > time()) {
-                return true;
-            }
-        }
-    }
-
-    return false;
-}
+use App\Utils\Auth;
 
 // When a login happens (from auth.php), store the token in a temp file so
 // it can be verified by products.php even when session state isn't shared
@@ -157,7 +124,7 @@ try {
             
         case 'POST':
             // Create new product (auth check)
-            if (!isAdminAuthenticated()) {
+            if (!Auth::isAdminAuthenticated()) {
                 http_response_code(401);
                 echo json_encode(['error' => 'Unauthorized - Please log in as admin']);
                 exit;
@@ -178,7 +145,7 @@ try {
             
         case 'PUT':
             // Admin-only: Check if user is logged in (session OR token)
-            if (!isAdminAuthenticated()) {
+            if (!Auth::isAdminAuthenticated()) {
                 http_response_code(401);
                 echo json_encode(['error' => 'Unauthorized - Please log in as admin']);
                 exit;
@@ -214,7 +181,7 @@ try {
             
         case 'PATCH':
             // Admin-only: Check if user is logged in (session OR token)
-            if (!isAdminAuthenticated()) {
+            if (!Auth::isAdminAuthenticated()) {
                 http_response_code(401);
                 echo json_encode(['error' => 'Unauthorized - Please log in as admin']);
                 exit;
@@ -248,7 +215,7 @@ try {
             
         case 'DELETE':
             // Admin-only: Check if user is logged in (session OR token)
-            if (!isAdminAuthenticated()) {
+            if (!Auth::isAdminAuthenticated()) {
                 http_response_code(401);
                 echo json_encode(['error' => 'Unauthorized - Please log in as admin']);
                 exit;

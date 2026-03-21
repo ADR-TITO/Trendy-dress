@@ -6796,7 +6796,14 @@ async function saveContent() {
         console.log('✅ Content saved to backend');
     } catch (error) {
         console.error('❌ Failed to save to backend:', error.message);
-        showNotification('Error: Could not save content - backend unavailable', 'error');
+        const isAuthError = error.message.toLowerCase().includes('unauthorized') || error.message.toLowerCase().includes('login required');
+        const errorMsg = isAuthError 
+            ? 'Error: Session expired or unauthorized. Please log in again.' 
+            : 'Error: Could not save content - backend unavailable';
+        showNotification(errorMsg, 'error');
+        if (isAuthError && typeof logout === 'function') {
+            setTimeout(() => logout(), 2000);
+        }
         return;
     }
 
@@ -6817,7 +6824,14 @@ async function saveSettings() {
         console.log('✅ Settings saved to backend');
     } catch (error) {
         console.error('❌ Failed to save to backend:', error.message);
-        showNotification('Error: Could not save settings - backend unavailable', 'error');
+        const isAuthError = error.message.toLowerCase().includes('unauthorized') || error.message.toLowerCase().includes('login required');
+        const errorMsg = isAuthError 
+            ? 'Error: Session expired or unauthorized. Please log in again.' 
+            : 'Error: Could not save settings - backend unavailable';
+        showNotification(errorMsg, 'error');
+        if (isAuthError && typeof logout === 'function') {
+            setTimeout(() => logout(), 2000);
+        }
         return;
     }
 
@@ -8145,13 +8159,22 @@ async function toggleDeliveryStatus(orderId, isDelivered) {
 
     } catch (error) {
         console.error('Error toggling delivery status:', error);
-        alert(`Error updating delivery status: ${error.message}`);
+        const isAuthError = error.message.toLowerCase().includes('unauthorized') || error.message.toLowerCase().includes('login required');
+        const errorMsg = isAuthError 
+            ? 'Error: Session expired or unauthorized. Please log in again.' 
+            : `Error updating delivery status: ${error.message}`;
+        
+        alert(errorMsg);
 
         // Revert checkbox
         const checkbox = document.getElementById(`deliveryCheck_${orderId}`);
         if (checkbox) {
             checkbox.checked = !isDelivered;
             checkbox.disabled = false;
+        }
+
+        if (isAuthError && typeof logout === 'function') {
+            setTimeout(() => logout(), 2000);
         }
     }
 }
