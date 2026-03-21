@@ -1646,7 +1646,7 @@ async function displayProducts(filterCategory = 'all') {
 
                 ${!hasStock ? '<div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 3rem; font-weight: bold; color: rgba(255,0,0,0.5); transform: rotate(-30deg); z-index: 5; pointer-events: none;">SOLD</div>' : ''}
 
-                <div style="padding: 15px; background: #fff; border-radius: 0 0 20px 20px;">
+                <div style="padding: 15px 15px 25px 15px; background: #fff; border-radius: 0 0 20px 20px;">
                     <div style="font-size: 0.7rem; color: var(--primary-color); font-weight: 600; text-transform: uppercase;">${getCategoryDisplayName(main.category)}</div>
                     <h3 style="margin: 5px 0; font-size: 1rem; color: #333;">${main.name}</h3>
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; flex-wrap: wrap; gap: 10px;">
