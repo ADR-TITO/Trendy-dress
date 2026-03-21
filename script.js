@@ -6945,53 +6945,57 @@ function handleImageError(img) {
     img.parentElement.appendChild(placeholder);
 }
 
-// Compress image to reduce file size — with iOS EXIF orientation fix
+// Compress image to reduce file size — cross-platform with EXIF orientation fix
 function compressImage(file, maxWidth = 1200, maxHeight = 1200, quality = 0.82) {
     return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = function (e) {
-            const img = new Image();
-            img.onload = function () {
-                // Read EXIF orientation to fix upside-down/rotated images from iOS cameras
-                let orientation = 1;
-                try {
-                    const arrayBuf = e.target.result;
-                    const view = new DataView(arrayBuf);
-                    if (view.getUint16(0, false) === 0xFFD8) {
-                        let offset = 2;
-                        while (offset < view.byteLength) {
-                            const marker = view.getUint16(offset, false);
-                            offset += 2;
-                            if (marker === 0xFFE1) {
-                                if (view.getUint32(offset += 2, false) === 0x45786966) {
-                                    const little = view.getUint16(offset += 6, false) === 0x4949;
-                                    offset += view.getUint32(offset + 4, little);
-                                    const tags = view.getUint16(offset, little);
-                                    offset += 2;
-                                    for (let i = 0; i < tags; i++) {
-                                        if (view.getUint16(offset + (i * 12), little) === 0x0112) {
-                                            orientation = view.getUint16(offset + (i * 12) + 8, little);
-                                        }
+        // Step 1: Read raw bytes to extract EXIF orientation
+        const exifReader = new FileReader();
+        exifReader.onload = function(exifEvent) {
+            let orientation = 1;
+            try {
+                const view = new DataView(exifEvent.target.result);
+                if (view.getUint16(0, false) === 0xFFD8) { // JPEG magic bytes
+                    let offset = 2;
+                    while (offset < view.byteLength - 2) {
+                        const marker = view.getUint16(offset, false);
+                        offset += 2;
+                        if (marker === 0xFFE1) {
+                            if (view.getUint32(offset + 2, false) === 0x45786966) {
+                                const little = view.getUint16(offset + 8, false) === 0x4949;
+                                const ifdOffset = offset + 10 + view.getUint32(offset + 12, little);
+                                const tags = view.getUint16(ifdOffset, little);
+                                for (let i = 0; i < tags; i++) {
+                                    if (view.getUint16(ifdOffset + 2 + i * 12, little) === 0x0112) {
+                                        orientation = view.getUint16(ifdOffset + 2 + i * 12 + 8, little);
+                                        break;
                                     }
                                 }
-                                break;
-                            } else if ((marker & 0xFF00) !== 0xFF00) break;
-                            else offset += view.getUint16(offset, false);
-                        }
+                            }
+                            break;
+                        } else if ((marker & 0xFF00) !== 0xFF00) break;
+                        else offset += view.getUint16(offset, false);
                     }
-                } catch (exifErr) {
-                    console.warn('Could not read EXIF orientation:', exifErr);
                 }
+            } catch (e) {
+                console.warn('EXIF read warning (non-fatal):', e.message);
+            }
 
-                const canvas = document.createElement('canvas');
-                let width = img.width;
-                let height = img.height;
+            // Step 2: Load the image using the original file (preserves MIME type — critical for Safari/Mac)
+            const img = new Image();
+            const objectUrl = URL.createObjectURL(file); // Use original file, not a re-wrapped Blob
 
-                // Resize maintaining aspect ratio
+            img.onload = function() {
+                URL.revokeObjectURL(objectUrl); // Free memory after load
+
+                let width = img.naturalWidth;
+                let height = img.naturalHeight;
+
+                // Downscale if needed, maintaining aspect ratio
                 if (width > maxWidth) { height = Math.round((height * maxWidth) / width); width = maxWidth; }
                 if (height > maxHeight) { width = Math.round((width * maxHeight) / height); height = maxHeight; }
 
-                // For rotated orientations (5,6,7,8), swap canvas dimensions
+                const canvas = document.createElement('canvas');
+                // Swap dimensions for 90°/270° rotations
                 if (orientation >= 5 && orientation <= 8) {
                     canvas.width = height;
                     canvas.height = width;
@@ -7004,7 +7008,7 @@ function compressImage(file, maxWidth = 1200, maxHeight = 1200, quality = 0.82) 
                 ctx.imageSmoothingEnabled = true;
                 ctx.imageSmoothingQuality = 'high';
 
-                // Apply EXIF transform
+                // Apply EXIF orientation transform
                 switch (orientation) {
                     case 2: ctx.transform(-1, 0, 0, 1, width, 0); break;
                     case 3: ctx.transform(-1, 0, 0, -1, width, height); break;
@@ -7018,19 +7022,23 @@ function compressImage(file, maxWidth = 1200, maxHeight = 1200, quality = 0.82) 
 
                 ctx.drawImage(img, 0, 0, width, height);
 
-                // Try JPEG first; fall back to PNG (e.g. for HEIC converted by iOS WebKit)
-                let compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
-                if (!compressedDataUrl || compressedDataUrl.length < 100) {
-                    compressedDataUrl = canvas.toDataURL('image/png');
-                }
-                resolve(compressedDataUrl);
+                // Output JPEG, fallback to PNG for formats Safari can't JPEG-encode (e.g. HEIC)
+                let result = canvas.toDataURL('image/jpeg', quality);
+                if (!result || result.length < 200) result = canvas.toDataURL('image/png');
+                resolve(result);
             };
-            img.onerror = reject;
-            // Create object URL for faster image loading on all browsers
-            img.src = URL.createObjectURL(file instanceof Blob ? file : new Blob([e.target.result]));
+
+            img.onerror = function() {
+                URL.revokeObjectURL(objectUrl);
+                reject(new Error('Image failed to load — file may be corrupt or unsupported.'));
+            };
+
+            img.src = objectUrl;
         };
-        reader.onerror = reject;
-        reader.readAsArrayBuffer(file); // ArrayBuffer to read EXIF
+
+        exifReader.onerror = reject;
+        // Read only first 64KB for EXIF (much faster than reading whole file; EXIF is always near the start)
+        exifReader.readAsArrayBuffer(file.slice(0, 65536));
     });
 }
 
