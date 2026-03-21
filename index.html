@@ -68,9 +68,6 @@
                 <button class="admin-btn" onclick="openAdminPanel()" id="adminBtn" style="display: none;">
                     <i class="fas fa-cog"></i> Admin
                 </button>
-                <button class="my-orders-btn" onclick="openMyOrdersModal()" id="myOrdersBtn" style="background: none; border: none; font-size: 1rem; cursor: pointer; color: var(--text-color); margin-right: 15px; font-weight: 500; display: flex; align-items: center; gap: 5px;">
-                    <i class="fas fa-box-open"></i> <span class="hide-mobile">My Orders</span>
-                </button>
                 <div class="cart-icon" onclick="toggleCart()">
                     <i class="fas fa-shopping-cart"></i>
                     <span class="cart-count" id="cartCount">0</span>
@@ -125,19 +122,46 @@
     <!-- Shopping Cart Sidebar -->
     <div class="cart-sidebar" id="cartSidebar">
         <div class="cart-header">
-            <h2>Shopping Cart</h2>
+            <div class="cart-tabs">
+                <button class="cart-tab active" id="cartTabBtn" onclick="switchCartTab('cart')">
+                    <i class="fas fa-shopping-cart"></i> Cart
+                </button>
+                <button class="cart-tab" id="ordersTabBtn" onclick="switchCartTab('orders')">
+                    <i class="fas fa-box-open"></i> My Orders
+                </button>
+            </div>
             <button class="close-cart" onclick="toggleCart()">
                 <i class="fas fa-times"></i>
             </button>
         </div>
-        <div class="cart-items" id="cartItems">
-            <p class="empty-cart">Your cart is empty</p>
-        </div>
-        <div class="cart-footer">
-            <div class="cart-total">
-                <strong>Total: KSh <span id="cartTotal">0</span></strong>
+
+        <!-- Current Cart Section -->
+        <div id="cartSection">
+            <div class="cart-items" id="cartItems">
+                <p class="empty-cart">Your cart is empty</p>
             </div>
-            <button class="btn-checkout" onclick="checkout()">Checkout</button>
+            <div class="cart-footer">
+                <div class="cart-total">
+                    <strong>Total: KSh <span id="cartTotal">0</span></strong>
+                </div>
+                <button class="btn-checkout" onclick="checkout()">Checkout Order</button>
+            </div>
+        </div>
+
+        <!-- My Orders Section -->
+        <div id="myOrdersSection" style="display: none;">
+            <div class="cart-items" id="myOrdersSidebarList">
+                <div style="text-align: center; padding: 40px 20px; color: #666;">
+                    <i class="fas fa-box-open" style="font-size: 3rem; margin-bottom: 15px; opacity: 0.3;"></i>
+                    <p>No orders found on this device.</p>
+                </div>
+            </div>
+            <div class="one-route-info" style="padding: 15px; background: #f8f9fa; border-top: 1px solid #eee; text-align: center;">
+                <p style="color: var(--primary-color); font-weight: 600; font-size: 0.9rem; margin: 0;">
+                    <i class="fas fa-truck"></i> One Route Delivery: Within 24hrs!
+                </p>
+                <small style="color: #666; font-size: 0.8rem;">Your parcel is tracked and safe</small>
+            </div>
         </div>
     </div>
     <div class="cart-overlay" id="cartOverlay" onclick="toggleCart()"></div>
@@ -988,26 +1012,7 @@
     </div>
     <div class="modal-overlay" id="successModalOverlay" onclick="closeSuccessModal()"></div>
 
-    <!-- My Orders Modal -->
-    <div class="modal" id="myOrdersModal">
-        <div class="modal-content" style="max-width: 600px;">
-            <div class="modal-header">
-                <h2>My Orders</h2>
-                <button class="close-modal" onclick="closeMyOrdersModal()">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
-                <div id="myOrdersList" style="display: flex; flex-direction: column; gap: 15px;">
-                    <div style="text-align: center; padding: 40px 20px; color: #666;">
-                        <i class="fas fa-box-open" style="font-size: 3rem; margin-bottom: 15px; opacity: 0.3;"></i>
-                        <p>No orders found on this device.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="modal-overlay" id="myOrdersModalOverlay" onclick="closeMyOrdersModal()"></div>
+
 
     <!-- Performance monitoring (non-critical, deferred) -->
     <script src="performance-monitor.js" defer></script> <!-- Defer main scripts to not block rendering -->

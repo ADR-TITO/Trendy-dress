@@ -277,7 +277,7 @@ class ApiService {
     // Get all products (now includes images by default for proper display)
     async getProducts(category = 'all', includeImages = true, retryCount = 0) {
         await this.ensureInitialized();
-        const maxRetries = 2; // Retry up to 2 times (3 total attempts)
+        const maxRetries = includeImages ? 2 : 1; // Faster fallback for metadata
 
         try {
             // Include images by default so products display correctly
@@ -288,8 +288,8 @@ class ApiService {
                 : `${this.baseURL}/products${includeImages ? '?includeImages=true' : '?includeImages=false'}&_t=${timestamp}`;
 
             // Optimized timeouts - reduced for faster failure detection
-            // Products without images should load quickly (< 5s)
-            const timeoutDuration = includeImages ? 15000 : 5000; // 15s with images, 5s without
+            // Products without images should load quickly (< 3s)
+            const timeoutDuration = includeImages ? 15000 : 3000; // 15s with images, 3s without
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), timeoutDuration);
 

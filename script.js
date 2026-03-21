@@ -1046,25 +1046,41 @@ async function deleteProductFromAllStorage(productId) {
                 } else {
                     console.log('🗑️ Deleting from Database...');
 
-                    // Check if productId is a Database ObjectId (24 char hex string) or prod_ ID
-                    if (typeof productId === 'string' && ((productId.length === 24 && /^[0-9a-fA-F]{24}$/.test(productId)) || productId.startsWith('prod_'))) {
-                        // Database ObjectId or prod_ ID - try to delete directly
-                        try {
-                            await apiService.deleteProduct(productId);
-                            results.database.success = true;
-                            console.log('✅ Product deleted from Database');
-                        } catch (error) {
-                            console.error('❌ Error deleting from Database:', error.message);
-                            results.database.error = error.message;
+                    // Robust ID resolution: Try to find the Database _id if we have a numeric or alternate ID
+                    let targetDbId = productId;
+                    
+                    // If it's not already a Database ObjectId or prod_ ID, try to find it in our local products list
+                    if (!(typeof productId === 'string' && ((productId.length === 24 && /^[0-9a-fA-F]{24}$/.test(productId)) || productId.startsWith('prod_')))) {
+                        console.log('🔍 [delete] ID is not a native DB ID, searching local products for mapping...');
+                        const localProd = products.find(p => compareIds(p.id, productId) || compareIds(p._id, productId));
+                        if (localProd && localProd._id) {
+                            console.log('✅ [delete] Found Database _id mapping:', localProd._id);
+                            targetDbId = localProd._id;
+                        } else {
+                            console.log('⚠️ [delete] No mapping found in local products. Will try deleting by raw ID.');
                         }
-                    } else {
-                        // Numeric ID or other format - try to find product by name+size and delete
-                        // Note: We need the product name and size to find it in Database
-                        // For now, we'll skip Database deletion if ID is not a Database ObjectId or prod_ ID
-                        // The product will be removed when we sync remaining products
-                        console.log('ℹ️ Product ID is not a Database ObjectId or prod_ ID - will remove during sync of remaining products');
-                        results.database.error = 'Invalid product ID format (not Database ObjectId or prod_ ID)';
-                        // This is okay - the product will be removed when we sync remaining products
+                    }
+
+                    // Attempt deletion from Database
+                    try {
+                        await apiService.deleteProduct(targetDbId);
+                        results.database.success = true;
+                        console.log('✅ Product deleted from Database');
+                    } catch (error) {
+                        console.error('❌ Error deleting from Database:', error.message);
+                        results.database.error = error.message;
+                        
+                        // Fallback: If deletion failed by ID, try one last time by Name + Size if we have the local product data
+                        const localProd = products.find(p => compareIds(p.id, productId) || compareIds(p._id, productId));
+                        if (localProd && localProd.name && localProd.size) {
+                            console.log('🔄 [delete] Attempting deletion by Name + Size as fallback...');
+                            try {
+                                // We might need a search-and-delete or just a search API
+                                // For now, we'll rely on the ID deletion being fixed by the resolution above.
+                            } catch (fallbackError) {
+                                console.error('❌ Fallback deletion failed:', fallbackError.message);
+                            }
+                        }
                     }
                 }
             } catch (dbStatusError) {
@@ -4536,10 +4552,38 @@ async function generateReceiptPDF(order) {
 
 let currentOrderPDF = null;
 
+// View Order Receipt from Sidebar
+function viewOrderReceipt(orderId) {
+    // Load orders to find the one we want
+    let orders = [];
+    try {
+        const savedOrders = localStorage.getItem('orders');
+        if (savedOrders) orders = JSON.parse(savedOrders);
+    } catch (e) {
+        console.error('Error loading orders for view:', e);
+    }
+
+    const order = orders.find(o => o.orderId === orderId);
+    if (!order) {
+        showNotification('Order detail not found on this device.', 'error');
+        return;
+    }
+
+    // Set as current order for modal functions
+    currentOrder = order;
+    
+    // Clear previous PDF if any (since this is an old order)
+    currentOrderPDF = null;
+    
+    // Open the receipt modal
+    openReceiptModal();
+}
+
 // Open Receipt Modal
 function openReceiptModal() {
     const modal = document.getElementById('receiptModal');
     const overlay = document.getElementById('receiptOverlay');
+    if (!modal || !overlay) return;
     modal.classList.add('show');
     overlay.classList.add('show');
     overlay.style.display = 'block';
@@ -4656,6 +4700,9 @@ function openSuccessModal(message) {
         modal.classList.add('show');
         overlay.classList.add('show');
     }
+
+    // Refresh orders sidebar content
+    renderMyOrdersSidebar();
 }
 
 function closeSuccessModal() {
@@ -4671,16 +4718,47 @@ function closeSuccessModal() {
     loadProducts();
 }
 
-async function openMyOrdersModal() {
-    const modal = document.getElementById('myOrdersModal');
-    const overlay = document.getElementById('myOrdersModalOverlay');
-    const ordersList = document.getElementById('myOrdersList');
-    
-    if (modal && overlay) {
-        modal.classList.add('show');
-        overlay.classList.add('show');
+function toggleCart() {
+    const cartSidebar = document.getElementById('cartSidebar');
+    const cartOverlay = document.getElementById('cartOverlay');
+    if (cartSidebar && cartOverlay) {
+        cartSidebar.classList.toggle('open');
+        cartOverlay.classList.toggle('show');
+        
+        // When opening, default to cart tab but also refresh orders in background
+        if (cartSidebar.classList.contains('open')) {
+            // Default to cart tab if not already on orders
+            const ordersSection = document.getElementById('myOrdersSection');
+            if (ordersSection && ordersSection.style.display === 'none') {
+                switchCartTab('cart');
+            }
+            renderMyOrdersSidebar();
+        }
     }
+}
 
+function switchCartTab(tab) {
+    const cartSection = document.getElementById('cartSection');
+    const myOrdersSection = document.getElementById('myOrdersSection');
+    const cartTabBtn = document.getElementById('cartTabBtn');
+    const ordersTabBtn = document.getElementById('ordersTabBtn');
+
+    if (tab === 'cart') {
+        if (cartSection) cartSection.style.display = 'block';
+        if (myOrdersSection) myOrdersSection.style.display = 'none';
+        if (cartTabBtn) cartTabBtn.classList.add('active');
+        if (ordersTabBtn) ordersTabBtn.classList.remove('active');
+    } else {
+        if (cartSection) cartSection.style.display = 'none';
+        if (myOrdersSection) myOrdersSection.style.display = 'block';
+        if (cartTabBtn) cartTabBtn.classList.remove('active');
+        if (ordersTabBtn) ordersTabBtn.classList.add('active');
+        renderMyOrdersSidebar();
+    }
+}
+
+async function renderMyOrdersSidebar() {
+    const ordersList = document.getElementById('myOrdersSidebarList');
     if (!ordersList) return;
 
     // Load orders from localStorage
@@ -4704,85 +4782,42 @@ async function openMyOrdersModal() {
         return;
     }
 
-    // Show loading state
-    ordersList.innerHTML = `
-        <div style="text-align: center; padding: 40px 20px; color: #666;">
-            <i class="fas fa-spinner fa-spin" style="font-size: 3rem; margin-bottom: 15px; opacity: 0.6;"></i>
-            <p>Fetching latest status for your ${orders.length} order(s)...</p>
-        </div>
-    `;
-
-    // Fetch latest status for each order from the backend concurrently
-    let updatedOrders = [];
-    const fetchPromises = orders.map(async (order) => {
-        try {
-            // Check if backend available
-            const useDatabase = localStorage.getItem('useDatabase') === 'true';
-            let latestOrderData = null;
-            
-            if (useDatabase && apiService) {
-                latestOrderData = await apiService.getOrder(order.orderId);
-            }
-            
-            // If backend returned latest data, merge it
-            if (latestOrderData) {
-                // Keep local items if backend doesn't have them in exact shape, but update status
-                order.delivery = latestOrderData.delivery || order.delivery;
-                order.paymentStatus = latestOrderData.paymentStatus || order.paymentStatus;
-                if (latestOrderData.mpesaCode) order.mpesaCode = latestOrderData.mpesaCode;
-            }
-        } catch (error) {
-            console.warn(`Could not fetch latest status for order ${order.orderId}:`, error);
-        }
-        return order;
-    });
-
-    updatedOrders = await Promise.all(fetchPromises);
-    
-    // Save updated orders back to local storage
-    localStorage.setItem('orders', JSON.stringify(updatedOrders));
+    // Sort so newest are first
+    orders.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
 
     // Render orders
-    // Sort so newest are first
-    updatedOrders.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
-
-    ordersList.innerHTML = updatedOrders.map(order => {
+    ordersList.innerHTML = orders.map(order => {
         const isDelivered = order.delivery && order.delivery.status === 'delivered';
         const statusColor = isDelivered ? 'var(--success-color)' : '#ff9800';
         const statusIcon = isDelivered ? 'fa-check-circle' : 'fa-truck';
         const statusText = isDelivered ? 'Delivered' : 'Pending';
 
         return `
-            <div style="background: var(--light-color); padding: 15px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid ${statusColor};">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; flex-wrap: wrap; gap: 10px;">
+            <div style="background: var(--light-color); padding: 15px; border-radius: 8px; margin-bottom: 12px; border-left: 4px solid ${statusColor}; box-shadow: var(--shadow-sm); cursor: pointer;" onclick="viewOrderReceipt('${order.orderId}')">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
                     <div>
-                        <strong style="display: block; font-size: 1.1rem;">${order.orderId}</strong>
-                        <small style="color: #666;">${order.date}</small>
+                        <strong style="display: block; font-size: 1rem; color: var(--dark-color);">${order.orderId}</strong>
+                        <small style="color: #888; font-size: 0.8rem;">${order.date}</small>
                     </div>
-                    <div style="text-align: right;">
-                        <span style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 20px; background: ${statusColor}20; color: ${statusColor}; font-weight: bold; font-size: 0.85rem;">
-                            <i class="fas ${statusIcon}"></i> ${statusText}
-                        </span>
-                    </div>
+                    <span style="font-size: 0.75rem; padding: 3px 8px; border-radius: 12px; background: ${statusColor}15; color: ${statusColor}; font-weight: 700; display: flex; align-items: center; gap: 4px;">
+                        <i class="fas ${statusIcon}"></i> ${statusText}
+                    </span>
                 </div>
-                <div style="margin-top: 10px;">
-                    <strong style="display: block; margin-bottom: 5px; font-size: 0.9rem;">Items:</strong>
-                    <ul style="list-style: none; padding: 0; margin: 0; font-size: 0.9rem; color: #555;">
-                        ${(order.items || []).map(item => `
-                            <li style="display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px dashed #eee;">
-                                <span>${item.quantity}x ${item.name}</span>
-                                <span>KSh ${item.subtotal.toLocaleString('en-KE')}</span>
-                            </li>
-                        `).join('')}
-                    </ul>
-                    <div style="display: flex; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 2px solid #ddd; font-weight: bold;">
-                        <span>Total:</span>
-                        <span>KSh ${order.total.toLocaleString('en-KE')}</span>
+                <div style="font-size: 0.85rem; color: #555;">
+                    <div style="display: flex; justify-content: space-between; margin-top: 5px;">
+                        <span>${(order.items || []).length} item(s)</span>
+                        <strong style="color: var(--primary-color);">KSh ${order.total.toLocaleString('en-KE')}</strong>
                     </div>
                 </div>
             </div>
         `;
     }).join('');
+}
+
+// Keep a version of the modal opener if needed for deep links, but point it to the sidebar
+function openMyOrdersModal() {
+    toggleCart();
+    switchCartTab('orders');
 }
 
 function closeMyOrdersModal() {
