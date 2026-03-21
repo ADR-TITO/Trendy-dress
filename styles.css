@@ -2207,8 +2207,8 @@ h1, h2, h3, h4, h5, h6, .logo {
 }/* Product Details Modal - Premium Split View */
 #productDetailsModal {
     z-index: 3000;
-    max-width: none;
-    width: auto;
+    max-width: none !important;
+    width: auto !important;
 }
 
 .product-details-content {
@@ -2219,7 +2219,7 @@ h1, h2, h3, h4, h5, h6, .logo {
     border-radius: 18px;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
     background: white;
-    max-height: 90vh;
+    max-height: 88vh; /* Smaller for iPhone — avoids browser chrome overlap */
 }
 
 .close-modal-overlap {
@@ -2252,7 +2252,9 @@ h1, h2, h3, h4, h5, h6, .logo {
 .product-details-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    height: min(480px, 82vh);
+    height: 460px;       /* Fixed px — avoids iOS vh unpredictability */
+    max-height: 80vh;    /* Safety cap for very small screens */
+    overflow: hidden;
 }
 
 .product-details-image-side {
