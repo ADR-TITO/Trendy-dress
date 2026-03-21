@@ -6945,55 +6945,92 @@ function handleImageError(img) {
     img.parentElement.appendChild(placeholder);
 }
 
-// Compress image to reduce file size
-function compressImage(file, maxWidth = 800, maxHeight = 800, quality = 0.7) {
+// Compress image to reduce file size — with iOS EXIF orientation fix
+function compressImage(file, maxWidth = 1200, maxHeight = 1200, quality = 0.82) {
     return new Promise((resolve, reject) => {
-        // Handle both File and Blob objects
         const reader = new FileReader();
         reader.onload = function (e) {
             const img = new Image();
             img.onload = function () {
+                // Read EXIF orientation to fix upside-down/rotated images from iOS cameras
+                let orientation = 1;
+                try {
+                    const arrayBuf = e.target.result;
+                    const view = new DataView(arrayBuf);
+                    if (view.getUint16(0, false) === 0xFFD8) {
+                        let offset = 2;
+                        while (offset < view.byteLength) {
+                            const marker = view.getUint16(offset, false);
+                            offset += 2;
+                            if (marker === 0xFFE1) {
+                                if (view.getUint32(offset += 2, false) === 0x45786966) {
+                                    const little = view.getUint16(offset += 6, false) === 0x4949;
+                                    offset += view.getUint32(offset + 4, little);
+                                    const tags = view.getUint16(offset, little);
+                                    offset += 2;
+                                    for (let i = 0; i < tags; i++) {
+                                        if (view.getUint16(offset + (i * 12), little) === 0x0112) {
+                                            orientation = view.getUint16(offset + (i * 12) + 8, little);
+                                        }
+                                    }
+                                }
+                                break;
+                            } else if ((marker & 0xFF00) !== 0xFF00) break;
+                            else offset += view.getUint16(offset, false);
+                        }
+                    }
+                } catch (exifErr) {
+                    console.warn('Could not read EXIF orientation:', exifErr);
+                }
+
                 const canvas = document.createElement('canvas');
                 let width = img.width;
                 let height = img.height;
 
-                // Calculate new dimensions while maintaining aspect ratio
-                if (width > height) {
-                    if (width > maxWidth) {
-                        height = (height * maxWidth) / width;
-                        width = maxWidth;
-                    }
+                // Resize maintaining aspect ratio
+                if (width > maxWidth) { height = Math.round((height * maxWidth) / width); width = maxWidth; }
+                if (height > maxHeight) { width = Math.round((width * maxHeight) / height); height = maxHeight; }
+
+                // For rotated orientations (5,6,7,8), swap canvas dimensions
+                if (orientation >= 5 && orientation <= 8) {
+                    canvas.width = height;
+                    canvas.height = width;
                 } else {
-                    if (height > maxHeight) {
-                        width = (width * maxHeight) / height;
-                        height = maxHeight;
-                    }
+                    canvas.width = width;
+                    canvas.height = height;
                 }
 
-                canvas.width = width;
-                canvas.height = height;
-
                 const ctx = canvas.getContext('2d');
-                // Enable image smoothing for better quality
                 ctx.imageSmoothingEnabled = true;
                 ctx.imageSmoothingQuality = 'high';
+
+                // Apply EXIF transform
+                switch (orientation) {
+                    case 2: ctx.transform(-1, 0, 0, 1, width, 0); break;
+                    case 3: ctx.transform(-1, 0, 0, -1, width, height); break;
+                    case 4: ctx.transform(1, 0, 0, -1, 0, height); break;
+                    case 5: ctx.transform(0, 1, 1, 0, 0, 0); break;
+                    case 6: ctx.transform(0, 1, -1, 0, height, 0); break;
+                    case 7: ctx.transform(0, -1, -1, 0, height, width); break;
+                    case 8: ctx.transform(0, -1, 1, 0, 0, width); break;
+                    default: break;
+                }
+
                 ctx.drawImage(img, 0, 0, width, height);
 
-                // Convert to base64 with compression
-                const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+                // Try JPEG first; fall back to PNG (e.g. for HEIC converted by iOS WebKit)
+                let compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+                if (!compressedDataUrl || compressedDataUrl.length < 100) {
+                    compressedDataUrl = canvas.toDataURL('image/png');
+                }
                 resolve(compressedDataUrl);
             };
             img.onerror = reject;
-            img.src = e.target.result;
+            // Create object URL for faster image loading on all browsers
+            img.src = URL.createObjectURL(file instanceof Blob ? file : new Blob([e.target.result]));
         };
         reader.onerror = reject;
-
-        // Handle both File and Blob
-        if (file instanceof Blob) {
-            reader.readAsDataURL(file);
-        } else {
-            reader.readAsDataURL(file);
-        }
+        reader.readAsArrayBuffer(file); // ArrayBuffer to read EXIF
     });
 }
 
@@ -8110,15 +8147,6 @@ function openProductDetails(productId) {
             : `KSh ${Math.round(finalPrice).toLocaleString()}`;
     }
 
-    // Populate description
-    const descElement = document.getElementById('detailsDescription');
-    if (descElement) {
-        if (product.description) {
-            descElement.textContent = product.description;
-        } else {
-            descElement.textContent = "Experience the perfect blend of style and comfort with this premium choice. Crafted from high-quality materials, it's designed to make you stand out on any occasion.";
-        }
-    }
 
     // Populate sizes
     const sizesContainer = document.getElementById('detailsSizes');

@@ -809,7 +809,9 @@
                             <label for="productImageFile" class="file-upload-label">
                                 <i class="fas fa-upload"></i> Browse & Upload Image
                             </label>
-                            <input type="file" id="productImageFile" accept="image/*"
+                            <input type="file" id="productImageFile"
+                                accept="image/*,image/heic,image/heif,.heic,.heif,.jpg,.jpeg,.png,.webp,.gif"
+                                capture="environment"
                                 onchange="handleProductImageUpload(event)" style="display: none;">
                             <small style="color: #666; font-size: 0.85rem; display: block; margin-top: 5px;">Click
                                 to
@@ -1037,11 +1039,6 @@
                         </div>
                     </div>
 
-                    <div class="details-section">
-                        <h3>Product Description</h3>
-                        <p id="detailsDescription">Experience the perfect blend of style and comfort with this premium choice. Crafted from high-quality materials, it's designed to make you stand out on any occasion.</p>
-                    </div>
-
                     <div class="details-footer">
                         <button class="btn-primary" id="detailsAddToCartBtn" style="width: 100%; padding: 18px; font-size: 1.1rem; border-radius: 12px;">
                             <i class="fas fa-shopping-cart"></i> Add to Cart
@@ -1055,9 +1052,9 @@
 
     <!-- Performance monitoring (non-critical, deferred) -->
     <script src="performance-monitor.js" defer></script> <!-- Defer main scripts to not block rendering -->
-    <script src="storage-manager.js?v=5.2" defer></script>
-    <script src="api-service.js?v=5.2" defer></script>
-    <script src="script.js?v=5.2" defer></script>
+    <script src="storage-manager.js?v=5.3" defer></script>
+    <script src="api-service.js?v=5.3" defer></script>
+    <script src="script.js?v=5.3" defer></script>
 </body>
 
 </html>
