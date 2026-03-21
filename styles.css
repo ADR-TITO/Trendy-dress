@@ -946,6 +946,9 @@ h1, h2, h3, h4, h5, h6, .logo {
     width: 40px;
     height: 40px;
     border-radius: 6px;
+    object-fit: cover;
+    background: #f8f9fa;
+    flex-shrink: 0;
 }
 
 .mini-item-name {
@@ -1753,9 +1756,27 @@ h1, h2, h3, h4, h5, h6, .logo {
 
 .order-item {
     display: flex;
-    justify-content: space-between;
+    align-items: center;
     padding: 10px 0;
     border-bottom: 1px solid var(--border-color);
+}
+
+.order-item-img {
+    width: 45px;
+    height: 45px;
+    border-radius: 6px;
+    object-fit: cover;
+    margin-right: 12px;
+    background: #f8f9fa;
+    flex-shrink: 0;
+    border: 1px solid rgba(0,0,0,0.05);
+}
+
+.order-item-info {
+    flex: 1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .order-item:last-child {
@@ -2492,6 +2513,7 @@ h1, h2, h3, h4, h5, h6, .logo {
     object-fit: cover;
     margin-right: 15px;
     border: 1px solid #f1f5f9;
+    flex-shrink: 0;
 }
 
 .admin-order-item-info {

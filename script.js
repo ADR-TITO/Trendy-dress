@@ -2130,8 +2130,11 @@ function updateOrderSummary() {
         <div class="order-items">
             ${cart.map(item => `
                 <div class="order-item">
-                    <span>${item.name} x ${item.quantity}</span>
-                    <span>KSh ${(item.price * item.quantity).toLocaleString('en-KE')}</span>
+                    <img src="${item.image || 'placeholder-product.png'}" alt="${item.name}" class="order-item-img" onerror="handleImageError(this)">
+                    <div class="order-item-info">
+                        <span>${item.name} x ${item.quantity}</span>
+                        <span>KSh ${(item.price * item.quantity).toLocaleString('en-KE')}</span>
+                    </div>
                 </div>
             `).join('')}
         </div>
@@ -7848,9 +7851,12 @@ async function loadAdminOrdersInternal(searchQuery = '', completedOnly = false) 
                                 <strong style="color: #666; font-size: 0.85rem;">Items (${order.items?.length || 0}):</strong>
                                 <div style="margin-top: 8px; max-height: 150px; overflow-y: auto;">
                                     ${(order.items || []).map(item => `
-                                        <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f0f0f0;">
-                                            <span style="font-size: 0.9rem;">${item.name} x${item.quantity}</span>
-                                            <span style="font-weight: bold; color: var(--primary-color);">KSh ${item.subtotal?.toLocaleString('en-KE') || '0'}</span>
+                                        <div style="display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f0f0f0;">
+                                            <img src="${item.image || 'placeholder-product.png'}" alt="${item.name}" class="mini-item-img" onerror="handleImageError(this)">
+                                            <div style="flex: 1; display: flex; justify-content: space-between; align-items: center;">
+                                                <span style="font-size: 0.9rem;">${item.name} x${item.quantity}</span>
+                                                <span style="font-weight: bold; color: var(--primary-color);">KSh ${item.subtotal?.toLocaleString('en-KE') || '0'}</span>
+                                            </div>
                                         </div>
                                     `).join('')}
                                 </div>
