@@ -110,6 +110,57 @@ class Product {
         }
     }
     
+    private function saveBase64Image($base64String, $id) {
+        if (empty($base64String)) return null;
+        if (strpos($base64String, 'data:image/') !== 0) return $base64String;
+
+        try {
+            $parts = explode(';', $base64String);
+            if (count($parts) < 2) return $base64String;
+            
+            $dataParts = explode(',', $parts[1]);
+            if (count($dataParts) < 2) return $base64String;
+            
+            $imageData = base64_decode($dataParts[1]);
+            if (!$imageData) return $base64String;
+            
+            $image = @imagecreatefromstring($imageData);
+            if (!$image) return $base64String;
+            
+            // Resize image to max 800px width
+            $origWidth = imagesx($image);
+            $origHeight = imagesy($image);
+            $maxWidth = 800; // Responsive size
+            
+            if ($origWidth > $maxWidth) {
+                $newHeight = ($maxWidth / $origWidth) * $origHeight;
+                $resized = imagecreatetruecolor($maxWidth, $newHeight);
+                imagealphablending($resized, false);
+                imagesavealpha($resized, true);
+                $transparent = imagecolorallocatealpha($resized, 255, 255, 255, 127);
+                imagefilledrectangle($resized, 0, 0, $maxWidth, $newHeight, $transparent);
+                imagecopyresampled($resized, $image, 0, 0, 0, 0, $maxWidth, $newHeight, $origWidth, $origHeight);
+                imagedestroy($image);
+                $image = $resized;
+            }
+            
+            $dir = __DIR__ . '/../../uploads';
+            if (!is_dir($dir)) mkdir($dir, 0755, true);
+            
+            $filename = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $id) . '_' . uniqid() . '.webp';
+            $filepath = $dir . '/' . $filename;
+            
+            // Save as WebP with 80% quality
+            imagewebp($image, $filepath, 80);
+            imagedestroy($image);
+            
+            return '/backend-php/uploads/' . $filename;
+        } catch (\Exception $e) {
+            error_log("Error saving WebP: " . $e->getMessage());
+            return $base64String; // Fallback to original
+        }
+    }
+
     /**
      * Create new product
      */
@@ -122,6 +173,8 @@ class Product {
             
             // Generate ID if not provided
             $id = $data['id'] ?? $data['_id'] ?? uniqid('prod_', true);
+            
+            $imageUrl = $this->saveBase64Image($data['image'] ?? null, $id);
             
             $sql = "INSERT INTO products (id, name, price, description, category, size, quantity, discount, image) 
                     VALUES (:id, :name, :price, :description, :category, :size, :quantity, :discount, :image)";
@@ -136,7 +189,7 @@ class Product {
                 ':size' => $data['size'] ?? '',
                 ':quantity' => $data['quantity'] ?? 0,
                 ':discount' => $data['discount'] ?? 0,
-                ':image' => $data['image'] ?? null
+                ':image' => $imageUrl
             ]);
             
             return $this->findById($id);
@@ -188,8 +241,10 @@ class Product {
                 $params[':discount'] = $data['discount'];
             }
             if (isset($data['image'])) {
+                // Determine if we need to convert
+                $imageUrl = $this->saveBase64Image($data['image'], $id);
                 $fields[] = "image = :image";
-                $params[':image'] = $data['image'];
+                $params[':image'] = $imageUrl;
             }
             
             if (empty($fields)) {

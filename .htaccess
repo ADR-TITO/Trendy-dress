@@ -1,17 +1,10 @@
-# Enable GZIP compression for faster transfer
+# Enable Brotli and GZIP compression for faster transfer
+<IfModule mod_brotli.c>
+    AddOutputFilterByType BROTLI_COMPRESS text/html text/plain text/xml text/css text/javascript application/javascript application/x-javascript application/json
+</IfModule>
+
 <IfModule mod_deflate.c>
-    AddOutputFilterByType DEFLATE text/html
-    AddOutputFilterByType DEFLATE text/plain
-    AddOutputFilterByType DEFLATE text/xml
-    AddOutputFilterByType DEFLATE text/css
-    AddOutputFilterByType DEFLATE text/javascript
-    AddOutputFilterByType DEFLATE application/xml
-    AddOutputFilterByType DEFLATE application/xhtml+xml
-    AddOutputFilterByType DEFLATE application/rss+xml
-    AddOutputFilterByType DEFLATE application/javascript
-    AddOutputFilterByType DEFLATE application/x-javascript
-    AddOutputFilterByType DEFLATE application/x-font-ttf
-    AddOutputFilterByType DEFLATE font/opentype
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/xml application/xhtml+xml application/rss+xml application/javascript application/x-javascript application/font-ttf application/font-woff2 font/opentype
 </IfModule>
 
 # Enable browser caching
@@ -21,47 +14,35 @@
     # Cache HTML for 1 hour
     ExpiresByType text/html "access plus 1 hour"
     
-    # Cache CSS and JavaScript for 30 days
-    ExpiresByType text/css "access plus 30 days"
-    ExpiresByType application/javascript "access plus 30 days"
-    ExpiresByType text/javascript "access plus 30 days"
+    # Cache CSS and JavaScript for 1 year (Using versioned filenames)
+    ExpiresByType text/css "access plus 1 year"
+    ExpiresByType application/javascript "access plus 1 year"
+    ExpiresByType text/javascript "access plus 1 year"
     
-    # Cache images for 60 days
-    ExpiresByType image/jpeg "access plus 60 days"
-    ExpiresByType image/gif "access plus 60 days"
-    ExpiresByType image/png "access plus 60 days"
-    ExpiresByType image/webp "access plus 60 days"
-    ExpiresByType image/svg+xml "access plus 60 days"
-    ExpiresByType image/x-icon "access plus 60 days"
-    ExpiresByType image/vnd.microsoft.icon "access plus 60 days"
+    # Cache images for 1 year
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/gif "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/webp "access plus 1 year"
+    ExpiresByType image/svg+xml "access plus 1 year"
+    ExpiresByType image/x-icon "access plus 1 year"
     
     # Cache fonts for 1 year
-    ExpiresByType application/font-ttf "access plus 1 year"
-    ExpiresByType application/x-font-ttf "access plus 1 year"
-    ExpiresByType application/x-font-opentype "access plus 1 year"
-    ExpiresByType application/x-font-woff "access plus 1 year"
-    ExpiresByType application/x-font-woff2 "access plus 1 year"
-    ExpiresByType font/ttf "access plus 1 year"
-    ExpiresByType font/otf "access plus 1 year"
-    ExpiresByType font/woff "access plus 1 year"
+    ExpiresByType application/font-woff2 "access plus 1 year"
     ExpiresByType font/woff2 "access plus 1 year"
     
     # Default expiry
-    ExpiresDefault "access plus 2 weeks"
+    ExpiresDefault "access plus 1 month"
 </IfModule>
 
 # Add cache control headers
 <IfModule mod_headers.c>
     <FilesMatch "\.(jpg|jpeg|png|gif|webp|ico|svg)$">
-        Header set Cache-Control "max-age=2592000, public"
+        Header set Cache-Control "max-age=31536000, public, immutable"
     </FilesMatch>
     
-    <FilesMatch "\.(js)$">
-        Header set Cache-Control "max-age=2592000, public"
-    </FilesMatch>
-    
-    <FilesMatch "\.(css)$">
-        Header set Cache-Control "max-age=2592000, public"
+    <FilesMatch "\.(js|css)$">
+        Header set Cache-Control "max-age=31536000, public, immutable"
     </FilesMatch>
     
     <FilesMatch "\.(html|htm)$">
@@ -69,7 +50,7 @@
     </FilesMatch>
     
     <FilesMatch "\.(ttf|ttc|otf|eot|woff|woff2|font.css)$">
-        Header set Cache-Control "max-age=31536000, public"
+        Header set Cache-Control "max-age=31536000, public, immutable"
     </FilesMatch>
 </IfModule>
 

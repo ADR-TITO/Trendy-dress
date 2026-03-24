@@ -8,11 +8,12 @@
     <!-- Modern Typography -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@400;500;600;700;800&display=swap"
-        rel="stylesheet">
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@400;500;600;700;800&display=swap">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Critical Path CSS -->
-    <link rel="stylesheet" href="styles.css?v=2.2">
+    <style id="critical-css">*{margin:0;padding:0;box-sizing:border-box}:root{--primary-color:#ff3366;--secondary-color:#ff6b8b;--dark-color:#0f172a;--light-color:#f8fafc;--text-color:#334155;--border-color:#e2e8f0;--success-color:#10b981;--primary-rgb:255,51,102;--surface-color:rgba(255, 255, 255, 0.85);--shadow-sm:0 1px 2px 0 rgba(0, 0, 0, 0.05);--shadow:0 4px 6px -1px rgba(0, 0, 0, 0.1),0 2px 4px -1px rgba(0, 0, 0, 0.06);--shadow-hover:0 20px 25px -5px rgba(0, 0, 0, 0.1),0 10px 10px -5px rgba(0, 0, 0, 0.04);--shadow-glow:0 0 20px rgba(255, 51, 102, 0.3);--font-heading:'Outfit',sans-serif;--font-body:'Inter',sans-serif;--transition-fast:0.2s cubic-bezier(0.4, 0, 0.2, 1);--transition-smooth:0.3s cubic-bezier(0.4, 0, 0.2, 1);--transition-spring:0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)}body{font-family:var(--font-body);color:var(--text-color);line-height:1.6;background-color:#f1f5f9;overflow-x:hidden}.logo,h1,h2,h3,h4,h5,h6{font-family:var(--font-heading);font-weight:700}.container{max-width:1200px;margin:0 auto;padding:0 20px}.navbar{background:var(--surface-color);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,255,255,.5);box-shadow:var(--shadow-sm);position:sticky;top:0;z-index:1000;padding:1rem 0;transition:all var(--transition-smooth)}.nav-container{max-width:1200px;margin:0 auto;padding:0 20px;display:flex;justify-content:space-between;align-items:center}.logo{display:flex;align-items:center;gap:10px;font-size:1.5rem;font-weight:700;color:var(--primary-color)}.logo i{font-size:2rem}.nav-menu{display:flex;list-style:none;gap:2rem}.nav-link{text-decoration:none;color:var(--text-color);font-weight:500;transition:color .3s;position:relative}.nav-link.active,.nav-link:hover{color:var(--primary-color)}.nav-link.active::after{content:'';position:absolute;bottom:-5px;left:0;width:100%;height:2px;background:var(--primary-color)}.nav-icons{display:flex;align-items:center;gap:1.5rem}.admin-btn,.login-btn,.orders-btn{padding:10px 20px;background:var(--primary-color);color:#fff;border:none;border-radius:50px;cursor:pointer;font-weight:600;transition:all var(--transition-smooth);display:flex;align-items:center;gap:8px;box-shadow:0 4px 6px -1px rgba(255,51,102,.2)}.orders-btn{background:var(--dark-color);box-shadow:0 4px 6px -1px rgba(15,23,42,.2)}.admin-btn:hover,.login-btn:hover,.orders-btn:hover{background:var(--secondary-color);transform:translateY(-2px);box-shadow:var(--shadow-glow)}.hero{position:relative;background:linear-gradient(135deg,#0f172a,#1e293b,#334155);background-size:200% 200%;animation:gradientShift 15s ease infinite;color:#fff;padding:120px 20px;text-align:center;margin-bottom:60px;min-height:600px;display:flex;align-items:center;justify-content:center;border-radius:0 0 30px 30px;box-shadow:var(--shadow);overflow:hidden}</style>
+    <link rel="preload" href="styles.min.css?v=3.0" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="styles.min.css?v=3.0"></noscript>
     <!-- Preconnect to CDN for faster loading -->
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
     <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
@@ -1052,9 +1053,10 @@
 
     <!-- Performance monitoring (non-critical, deferred) -->
     <script src="performance-monitor.js" defer></script> <!-- Defer main scripts to not block rendering -->
-    <script src="storage-manager.js?v=5.4" defer></script>
-    <script src="api-service.js?v=5.4" defer></script>
-    <script src="script.js?v=5.4" defer></script>
+    <script src="storage-manager.min.js?v=6.0" defer></script>
+    <script src="api-service.min.js?v=6.0" defer></script>
+    <script src="script.min.js?v=6.0" defer></script>
+    <script src="admin.js?v=6.0" defer></script>
 </body>
 
 </html>
