@@ -85,22 +85,25 @@
         </div>
     </nav>
 
-    <!-- Hero Section -->
-    <section id="home" class="hero">
-        <div class="hero-overlay"></div>
-        <div class="hero-content">
-            <h1>Fashion That Speaks Your Style</h1>
-            <p>Discover the latest trends in dresses and tracksuits</p>
-            <a href="#products" class="btn-primary">Shop Now</a>
+
+    <!-- Category Filter -->
+    <section class="category-filter">
+        <div class="container">
+            <div class="filter-buttons">
+                <button class="filter-btn active" data-category="all">All Products</button>
+                <div class="filter-buttons-wrapper">
+                    <button class="filter-btn" data-category="dresses">Dresses</button>
+                    <button class="filter-btn" data-category="tracksuits">Tracksuits</button>
+                    <button class="filter-btn" data-category="khaki-pants-jeans">Khaki Pants & Jeans</button>
+                </div>
+            </div>
         </div>
     </section>
-
-
 
     <!-- Products Section -->
     <section id="products" class="products-section">
         <div class="container">
-            <h2 class="section-title">Featured Products</h2>
+            <h2 class="section-title">Our Products</h2>
             <div class="products-grid" id="productsGrid">
                 <!-- Default Loading Spinner (Visible immediately on load) -->
                 <div style="grid-column: 1/-1; text-align: center; padding: 60px 20px; color: #666;">

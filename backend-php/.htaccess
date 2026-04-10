@@ -4,14 +4,29 @@ RewriteEngine On
 # Set the base path for rewrite rules
 RewriteBase /backend-php/
 
-# Allow CORS
-Header set Access-Control-Allow-Origin "*"
-Header set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+# Security Headers
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "DENY"
+    Header set X-XSS-Protection "1; mode=block"
+    Header set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+</IfModule>
+
+# Restrict CORS (Update with your production domain)
+Header set Access-Control-Allow-Origin "https://trendydresses.co.ke"
+Header set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
 Header set Access-Control-Allow-Headers "Content-Type, Authorization"
 
-# Handle preflight requests
-RewriteCond %{REQUEST_METHOD} OPTIONS
-RewriteRule ^(.*)$ $1 [R=204,L]
+# Block access to .env and other sensitive files
+<FilesMatch "^\.env|composer\.json|composer\.lock|.*\.sql|.*\.log|.*\.bak|.*\.sh|.*\.ps1|.*\.py|.*\.bat$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
 
 # Route all API requests to index.php
 RewriteCond %{REQUEST_FILENAME} !-f

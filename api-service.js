@@ -283,9 +283,10 @@ class ApiService {
             // Include images by default so products display correctly
             // Add timestamp to prevent caching
             const timestamp = Date.now();
+            const nodeBaseURL = 'http://localhost:4000/api'; // Point to Node backend for discounts processing
             const url = category && category !== 'all'
-                ? `${this.baseURL}/products?category=${category}${includeImages ? '&includeImages=true' : '&includeImages=false'}&_t=${timestamp}`
-                : `${this.baseURL}/products${includeImages ? '?includeImages=true' : '?includeImages=false'}&_t=${timestamp}`;
+                ? `${nodeBaseURL}/products?category=${category}${includeImages ? '&includeImages=true' : '&includeImages=false'}&_t=${timestamp}`
+                : `${nodeBaseURL}/products${includeImages ? '?includeImages=true' : '?includeImages=false'}&_t=${timestamp}`;
 
             // Optimized timeouts - reduced for faster failure detection
             // Products without images should load quickly (< 3s)
@@ -301,6 +302,10 @@ class ApiService {
 
             let response;
             try {
+                // Get Auth Token from local storage directly for Node API
+                const authToken = localStorage.getItem('authToken');
+                const authHeader = authToken ? { 'Authorization': `Bearer ${authToken}` } : {};
+                
                 response = await fetch(url, {
                     signal: controller.signal,
                     cache: 'no-store', // CRITICAL: Disable browser caching
@@ -308,7 +313,8 @@ class ApiService {
                         'Accept': 'application/json',
                         'Cache-Control': 'no-cache, no-store, must-revalidate',
                         'Pragma': 'no-cache',
-                        'Expires': '0'
+                        'Expires': '0',
+                        ...authHeader
                     },
                 });
                 clearTimeout(timeoutId);

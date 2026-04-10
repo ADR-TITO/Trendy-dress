@@ -5,16 +5,16 @@
 }
 
 :root {
-    /* Modern Color Palette */
-    --primary-color: #ff3366;
-    --secondary-color: #ff6b8b;
-    --dark-color: #0f172a;
-    --light-color: #f8fafc;
-    --text-color: #334155;
-    --border-color: #e2e8f0;
-    --success-color: #10b981;
-    --primary-rgb: 255, 51, 102;
-    --surface-color: rgba(255, 255, 255, 0.85);
+    /* Modern Luxury Color Palette (Monochrome) */
+    --primary-color: #111111;
+    --secondary-color: #444444;
+    --dark-color: #000000;
+    --light-color: #ffffff;
+    --text-color: #333333;
+    --border-color: #eaeaea;
+    --success-color: #27ae60;
+    --primary-rgb: 17, 17, 17;
+    --surface-color: rgba(255, 255, 255, 0.98);
     
     /* Modern Shadows */
     --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
@@ -189,7 +189,7 @@ h1, h2, h3, h4, h5, h6, .logo {
 /* Hero Section */
 .hero {
     position: relative;
-    background: linear-gradient(135deg, #0f172a, #1e293b, #334155);
+    background: linear-gradient(135deg, #111111, #2a2a2a, #000000);
     background-size: 200% 200%;
     animation: gradientShift 15s ease infinite;
     color: white;
@@ -200,8 +200,8 @@ h1, h2, h3, h4, h5, h6, .logo {
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 0 0 30px 30px;
-    box-shadow: var(--shadow);
+    border-radius: 0;
+    box-shadow: none;
     overflow: hidden;
 }
 
@@ -217,7 +217,7 @@ h1, h2, h3, h4, h5, h6, .logo {
     left: 0;
     right: 0;
     bottom: 0;
-    background: radial-gradient(circle at center, rgba(15, 23, 42, 0) 0%, rgba(15, 23, 42, 0.8) 100%);
+    background: radial-gradient(circle at center, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.6) 100%);
     z-index: 1;
 }
 
@@ -249,19 +249,20 @@ h1, h2, h3, h4, h5, h6, .logo {
 .btn-primary {
     display: inline-block;
     padding: 16px 42px;
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    background: var(--primary-color);
     color: white;
     text-decoration: none;
-    border-radius: 50px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-    transition: all var(--transition-spring);
-    box-shadow: 0 10px 20px -5px rgba(255, 51, 102, 0.4);
+    border-radius: 0;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    transition: all var(--transition-smooth);
+    box-shadow: none;
     animation: fadeInUp 1s 0.4s both;
     position: relative;
     overflow: hidden;
     z-index: 1;
-    border: none;
+    border: 1px solid var(--primary-color);
     cursor: pointer;
 }
 
@@ -272,16 +273,16 @@ h1, h2, h3, h4, h5, h6, .logo {
     left: 0;
     width: 100%;
     height: 100%;
-    background: linear-gradient(135deg, var(--secondary-color), var(--primary-color));
+    background: transparent;
     z-index: -1;
     transition: opacity var(--transition-smooth);
     opacity: 0;
 }
 
 .btn-primary:hover {
-    transform: translateY(-4px) scale(1.02);
-    box-shadow: var(--shadow-glow), 0 15px 25px -5px rgba(255, 51, 102, 0.4);
-    color: white;
+    background: transparent;
+    color: var(--primary-color);
+    transform: none;
 }
 
 .btn-primary:hover::after {
@@ -385,18 +386,23 @@ h1, h2, h3, h4, h5, h6, .logo {
 }
 
 .products-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 30px;
-    /* No limits - displays all products regardless of quantity */
-    grid-auto-rows: auto;
+    column-count: 4;
+    column-gap: 24px;
+    display: block;
+    padding-bottom: 50px;
+}
+
+@media (max-width: 1024px) {
+    .products-grid {
+        column-count: 3;
+    }
 }
 
 /* Mobile: 2 columns (2 products visible per scroll) */
 @media (max-width: 768px) {
     .products-grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 15px;
+        column-count: 2;
+        column-gap: 12px;
     }
     .product-card {
         min-height: unset;
@@ -406,8 +412,8 @@ h1, h2, h3, h4, h5, h6, .logo {
 /* Very small screens: Keep 2 columns but smaller gap */
 @media (max-width: 480px) {
     .products-grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 10px;
+        column-count: 2;
+        column-gap: 8px;
     }
     .product-card {
         min-height: unset;
@@ -416,20 +422,20 @@ h1, h2, h3, h4, h5, h6, .logo {
 
 .product-card {
     background: white;
-    border-radius: 20px;
-    overflow: visible; /* Changed from hidden to ensure no cropping */
-    box-shadow: var(--shadow);
-    transition: all var(--transition-smooth);
+    border-radius: 0; /* Premium flat look */
+    overflow: hidden; 
+    box-shadow: none; 
+    transition: transform var(--transition-smooth), opacity 0.5s ease-out;
     cursor: pointer;
-    content-visibility: auto;
-    min-height: auto;
-    border: 1px solid rgba(0, 0, 0, 0.03);
+    border: 1px solid transparent;
     position: relative;
+    break-inside: avoid;
+    margin-bottom: 24px;
 }
 
 .product-card:hover {
-    box-shadow: var(--shadow-hover);
-    /* Removed transform to keep it "zoomed out" / stable */
+    box-shadow: none;
+    border-color: var(--primary-color);
 }
 
 .product-image-container {

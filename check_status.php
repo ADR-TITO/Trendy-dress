@@ -10,7 +10,8 @@ require_once __DIR__ . '/backend-php/config/database.php';
 try {
     $pdo = Database::getConnection();
 } catch (Exception $e) {
-    die(json_encode(['success' => false, 'message' => "Connection failed: " . $e->getMessage()]));
+    error_log("Payment status check connection failed: " . $e->getMessage());
+    die(json_encode(['success' => false, 'message' => "An internal error occurred."]));
 }
 
 if (isset($_GET['checkout_request_id'])) {

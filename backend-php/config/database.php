@@ -20,11 +20,15 @@ class Database {
             // Load .env file manually if dotenv not available
             self::loadEnvFile();
             
-            // Get database credentials from environment or defaults
-            $host = $_ENV['DB_HOST'] ?? getenv('DB_HOST') ?: 'localhost';
-            $dbname = $_ENV['DB_NAME'] ?? getenv('DB_NAME') ?: 'trendydr_Shpo';
-            $username = $_ENV['DB_USER'] ?? getenv('DB_USER') ?: 'trendydr_Adrian';
-            $password = $_ENV['DB_PASS'] ?? getenv('DB_PASS') ?: 'i"d)Z8NGP}8"?aa';
+            // Get database credentials from environment
+            $host = $_ENV['DB_HOST'] ?? getenv('DB_HOST');
+            $dbname = $_ENV['DB_NAME'] ?? getenv('DB_NAME');
+            $username = $_ENV['DB_USER'] ?? getenv('DB_USER');
+            $password = $_ENV['DB_PASS'] ?? getenv('DB_PASS');
+            
+            if (empty($host) || empty($dbname) || empty($username) || empty($password)) {
+                throw new Exception('Database configuration is incomplete. Please check your .env file.');
+            }
             
             // Hide password in logs
             $logHost = $host;
@@ -99,8 +103,8 @@ class Database {
             'connected' => self::$connected,
             'readyState' => self::$connected ? 1 : 0,
             'readyStateText' => self::$connected ? 'connected' : 'disconnected',
-            'host' => $_ENV['DB_HOST'] ?? getenv('DB_HOST') ?: 'localhost',
-            'name' => $_ENV['DB_NAME'] ?? getenv('DB_NAME') ?: 'trendydr_Shpo'
+            'host' => $_ENV['DB_HOST'] ?? getenv('DB_HOST') ?: 'unknown',
+            'name' => $_ENV['DB_NAME'] ?? getenv('DB_NAME') ?: 'unknown'
         ];
     }
     

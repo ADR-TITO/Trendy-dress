@@ -149,7 +149,9 @@ async function saveProduct(event) {
             size: document.getElementById('productSize').value,
             image: document.getElementById('productImage').value,
             quantity: parseInt(document.getElementById('productQuantity').value) || 0,
-            discount: parseInt(document.getElementById('productDiscount').value) || 0
+            discount: parseInt(document.getElementById('productDiscount').value) || 0,
+            isDiscountHidden: document.getElementById('isDiscountHidden').checked,
+            discountVisibleTo: document.getElementById('discountVisibleTo').value
         };
 
         if (id) {
@@ -166,6 +168,11 @@ async function saveProduct(event) {
         await saveProducts();
         await loadProducts();
         loadAdminProducts();
+        
+        // Notify other clients about the product change
+        if (typeof socket !== 'undefined' && socket) {
+            socket.emit('admin_product_updated', { id, name: productData.name });
+        }
     } catch (error) {
         showNotification(error.message, 'error');
     } finally {
@@ -183,6 +190,8 @@ function editProduct(productId) {
     document.getElementById('productCategory').value = product.category;
     document.getElementById('productPrice').value = product.price;
     document.getElementById('productDiscount').value = product.discount || 0;
+    document.getElementById('isDiscountHidden').checked = product.isDiscountHidden || false;
+    document.getElementById('discountVisibleTo').value = product.discountVisibleTo || 'public';
     document.getElementById('productQuantity').value = product.quantity || 0;
     document.getElementById('productSize').value = product.size;
     document.getElementById('productImage').value = product.image || '';
@@ -364,4 +373,116 @@ window.refreshProducts = async () => {
     displayProducts(currentCategory);
     if (document.getElementById('adminPanel').classList.contains('open')) loadAdminProducts();
     showNotification('Products refreshed');
+};
+
+/* Administrative & UI Helpers */
+function getFinalPrice(product) {
+    if (!product) return 0;
+    const price = parseFloat(product.price) || 0;
+    const discount = parseInt(product.discount) || 0;
+    return price - (price * (discount / 100));
+}
+
+function getSizeDisplay(size) {
+    if (!size) return 'N/A';
+    const s = size.toString().toUpperCase();
+    const map = { 'S': 'Small', 'M': 'Medium', 'L': 'Large', 'XL': 'Extra Large', 'XXL': 'Double XL' };
+    return map[s] || s;
+}
+
+function closeModal() {
+    const modals = ['productModal', 'adminOrderDetailsModal', 'deleteConfirmationModal'];
+    modals.forEach(id => {
+        const m = document.getElementById(id);
+        if (m) m.classList.remove('show');
+    });
+    const overlay = document.getElementById('modalOverlay');
+    if (overlay) overlay.classList.remove('show');
+    const adminOverlay = document.getElementById('adminOrderDetailsOverlay');
+    if (adminOverlay) adminOverlay.classList.remove('show');
+}
+
+function previewProductImage(src) {
+    const preview = document.getElementById('productImagePreview');
+    const input = document.getElementById('productImage');
+    if (preview) {
+        preview.src = src || 'placeholder-product.png';
+        preview.style.display = src ? 'block' : 'none';
+    }
+    if (input) input.value = src || '';
+}
+
+function previewHeroImage(src) {
+    const preview = document.getElementById('heroImagePreview');
+    if (preview) {
+        preview.src = src || '';
+        preview.style.display = src ? 'block' : 'none';
+    }
+}
+
+function showDeleteConfirmationModal(productName) {
+    const modal = document.getElementById('deleteConfirmationModal');
+    const overlay = document.getElementById('modalOverlay');
+    const text = document.getElementById('deleteConfirmationText');
+    if (text) text.textContent = `Are you sure you want to delete "${productName}"?`;
+    if (modal && overlay) {
+        modal.classList.add('show');
+        overlay.classList.add('show');
+    }
+}
+
+async function confirmDelete() {
+    if (!window.pendingDelete) return;
+    const { id, index } = window.pendingDelete;
+    try {
+        await apiService.deleteProduct(id);
+        products.splice(index, 1);
+        showNotification('Product deleted!', 'success');
+        closeModal();
+        await saveProducts();
+        loadAdminProducts();
+    } catch (e) {
+        showNotification('Delete failed: ' + e.message, 'error');
+    } finally {
+        window.pendingDelete = null;
+    }
+}
+
+// Expose these to window so script.js or inline HTML can call them
+window.getFinalPrice = getFinalPrice;
+window.getSizeDisplay = getSizeDisplay;
+window.closeModal = closeModal;
+window.previewProductImage = previewProductImage;
+window.previewHeroImage = previewHeroImage;
+window.confirmDelete = confirmDelete;
+
+// Manual Push Notifications
+window.triggerNotification = async () => {
+    const title = prompt('Notification Title:');
+    if (!title) return;
+    const body = prompt('Notification Body:');
+    if (!body) return;
+    
+    try {
+        const response = await fetch('http://localhost:4000/api/notifications/send', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+            },
+            body: JSON.stringify({ title, body })
+        });
+        const result = await response.json();
+        if (typeof showNotification === 'function') {
+            showNotification(result.message, result.success ? 'success' : 'error');
+        } else {
+            alert(result.message);
+        }
+    } catch (e) {
+        if (typeof showNotification === 'function') {
+            showNotification('Failed to send notification: ' + e.message, 'error');
+        } else {
+            alert('Failed to send notification');
+        }
+    }
 };

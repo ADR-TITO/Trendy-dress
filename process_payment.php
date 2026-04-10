@@ -52,11 +52,10 @@ try {
 
 } catch (Throwable $e) {
     http_response_code(500);
+    error_log("Payment processing error: " . $e->getMessage() . " in " . $e->getFile() . ":" . $e->getLine());
     echo json_encode([
         'success' => false,
-        'message' => 'Server error: ' . $e->getMessage(),
-        'file' => basename($e->getFile()),
-        'line' => $e->getLine()
+        'message' => 'An internal server error occurred while processing your payment.'
     ]);
 }
 ?>

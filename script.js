@@ -23,6 +23,74 @@ let websiteContent = {
     contactAddress: 'Nairobi, Moi avenue, Imenti HSE Glory Exhibition Basement, Shop B4'
 };
 
+// Socket.io initialization
+let socket;
+try {
+    socket = io('http://localhost:4000');
+    socket.on('connect', () => console.log('Connected to realtime server'));
+    socket.on('product_edited', (data) => {
+        console.log('Realtime product update received!', data);
+        if (typeof showNotification === 'function') {
+            showNotification('Catalogue updated. Refreshing...', 'info');
+        }
+        if (typeof refreshProducts === 'function') {
+            refreshProducts();
+        } else if (typeof loadProducts === 'function') {
+            loadProducts().then(() => {
+                if (typeof displayProducts === 'function') displayProducts(currentCategory);
+            });
+        }
+    });
+} catch (e) {
+    console.error('Socket.io connection failed:', e);
+}
+
+// FCM Push Notifications Setup
+window.requestNotificationPermission = function() {
+    if (!firebase.apps.length) {
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+        try {
+            firebase.initializeApp(firebaseConfig);
+        } catch(e) { console.error('Firebase init error', e); return; }
+    }
+    
+    Notification.requestPermission().then(permission => {
+        if (permission === 'granted') {
+            console.log('Notification permission granted.');
+            const messaging = firebase.messaging();
+            // Replace YOUR_VAPID_KEY with your actual web push certificate key
+            messaging.getToken({ vapidKey: 'YOUR_VAPID_KEY' }).then((currentToken) => {
+                if (currentToken) {
+                    const user = JSON.parse(localStorage.getItem('authUser') || '{}');
+                    fetch('http://localhost:4000/api/notifications/register', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ token: currentToken, userId: user.id || null })
+                    }).then(() => console.log('FCM Token registered with server'));
+                }
+            }).catch((err) => console.log('An error occurred while retrieving token. ', err));
+            
+            messaging.onMessage((payload) => {
+                if (typeof showNotification === 'function') {
+                    showNotification(`New Notification: ${payload.notification.title}`, 'info');
+                }
+            });
+        }
+    });
+};
+
+window.addEventListener('load', () => {
+    // Optionally trigger on load if authenticated:
+    // if (localStorage.getItem('authToken')) requestNotificationPermission();
+});
+
 /* Core Utilities */
 function getDeviceId() {
     let deviceId = localStorage.getItem('deviceId');
@@ -1692,13 +1760,17 @@ async function displayProducts(filterCategory = 'all') {
                 ${!hasStock ? '<div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 3rem; font-weight: bold; color: rgba(255,0,0,0.5); transform: rotate(-30deg); z-index: 5; pointer-events: none;">SOLD</div>' : ''}
 
                 <div style="padding: 15px 15px 25px 15px; background: #fff; border-radius: 0 0 20px 20px;">
-                    <div style="font-size: 0.7rem; color: var(--primary-color); font-weight: 600; text-transform: uppercase;">${getCategoryDisplayName(main.category)}</div>
+                    <div style="font-size: 0.7rem; color: var(--primary-color); font-weight: 600; text-transform: uppercase;">
+                        ${getCategoryDisplayName(main.category)}
+                        ${(main.discount > 0 && main.discountVisibleTo === 'loggedIn') ? '<span style="background:var(--primary-color);color:#fff;font-size:0.6rem;padding:2px 5px;border-radius:3px;margin-left:5px;">Members Only Offer</span>' : ''}
+                    </div>
                     <h3 style="margin: 5px 0; font-size: 1rem; color: #333;">${main.name}</h3>
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; flex-wrap: wrap; gap: 10px;">
                         <div style="display: flex; gap: 5px; flex-wrap: wrap; flex: 1;">${sizeOptions}</div>
                         <div style="text-align: right; min-width: 80px;">
                             ${discount > 0 ? `<div style="text-decoration: line-through; color: #999; font-size: 0.7rem;">KSh ${main.price.toLocaleString()}</div>` : ''}
                             <div style="font-weight: bold; color: var(--primary-color); font-size: 1.1rem;">KSh ${Math.round(finalPrice).toLocaleString()}</div>
+                            ${main.hideDiscountMessage ? `<div style="font-size: 0.65rem; color: #ff9800; font-weight:bold; margin-top:2px; cursor:pointer;" onclick="event.stopPropagation(); document.getElementById('tabBtnLogin').click(); openLoginModal();">Login for special offer</div>` : ''}
                         </div>
                     </div>
                 </div>
@@ -5149,36 +5221,86 @@ function closeLoginModal() {
     if (form) form.reset();
 }
 
-async function handleLogin(event) {
-    event.preventDefault();
-    const username = document.getElementById('username').value;
-    const password = document.getElementById('password').value;
-    const loginBtn = document.querySelector('#loginForm button[type="submit"]');
-    if (!loginBtn) return;
-    const originalBtnText = loginBtn.textContent;
+/* Shared UI Helpers */
+function getFinalPrice(product) {
+    if (!product) return 0;
+    const price = parseFloat(product.price) || 0;
+    const discount = parseInt(product.discount) || 0;
+    return price - (price * (discount / 100));
+}
 
-    try {
-        loginBtn.textContent = 'Logging in...';
-        loginBtn.disabled = true;
+function getSizeDisplay(size) {
+    if (!size) return 'N/A';
+    const s = size.toString().toUpperCase();
+    const map = { 'S': 'Small', 'M': 'Medium', 'L': 'Large', 'XL': 'Extra Large', 'XXL': 'Double XL' };
+    return map[s] || s;
+}
 
-        const result = await apiService.login(username, password);
-
-        if (result.success) {
-            isAdmin = true;
-            if (typeof checkAdminStatus === 'function') await checkAdminStatus();
-            closeLoginModal();
-            showNotification('Login successful!');
-        } else {
-            alert(result.message || 'Login failed');
-        }
-    } catch (error) {
-        console.error('Login error:', error);
-        alert('Login failed: ' + error.message);
-    } finally {
-        loginBtn.textContent = originalBtnText;
-        loginBtn.disabled = false;
+function switchAuthTab(mode) {
+    document.getElementById('authMode').value = mode;
+    const btnLogin = document.getElementById('tabBtnLogin');
+    const btnRegister = document.getElementById('tabBtnRegister');
+    const submitBtn = document.getElementById('authSubmitBtn');
+    
+    if (mode === 'login') {
+        btnLogin.className = 'btn-primary';
+        btnRegister.className = 'btn-secondary';
+        submitBtn.textContent = 'Login';
+    } else {
+        btnLogin.className = 'btn-secondary';
+        btnRegister.className = 'btn-primary';
+        submitBtn.textContent = 'Sign Up';
     }
 }
+
+async function handleAuthSubmit(event) {
+    event.preventDefault();
+    const mode = document.getElementById('authMode').value;
+    const email = document.getElementById('authEmail').value;
+    const password = document.getElementById('authPassword').value;
+    const submitBtn = document.getElementById('authSubmitBtn');
+    
+    if (!submitBtn) return;
+    const originalBtnText = submitBtn.textContent;
+
+    try {
+        submitBtn.textContent = mode === 'login' ? 'Logging in...' : 'Signing up...';
+        submitBtn.disabled = true;
+
+        const endpoint = mode === 'login' ? 'http://localhost:4000/api/auth/login' : 'http://localhost:4000/api/auth/register';
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+        
+        const result = await response.json();
+
+        if (result.success) {
+            localStorage.setItem('authToken', result.token);
+            localStorage.setItem('authUser', JSON.stringify(result.user));
+            
+            if (result.user.role === 'admin') {
+                isAdmin = true;
+                if (typeof checkAdminStatus === 'function') await checkAdminStatus();
+            }
+            
+            closeLoginModal();
+            showNotification(mode === 'login' ? 'Login successful!' : 'Account created successfully!');
+            // Refresh page or update UI state
+            window.location.reload();
+        } else {
+            alert(result.message || (mode === 'login' ? 'Login failed' : 'Registration failed'));
+        }
+    } catch (error) {
+        console.error('Auth error:', error);
+        alert('Authentication failed: ' + error.message);
+    } finally {
+        submitBtn.textContent = originalBtnText;
+        submitBtn.disabled = false;
+    }
+}
+
 
 /**
  * Core Data Management
@@ -5500,14 +5622,14 @@ async function loadProducts() {
                     localStorage.setItem('productsInitialized', 'true');
                 }
             }
-        } catch (error) {
-            console.error('❌ CRITICAL: Error initializing products:', error);
         }
+    } catch (error) {
+        console.error('❌ CRITICAL: Error initializing products:', error);
     }
-
-    // Initialize the storefront
-    initStorefront();
 }
+
+// Initialize the storefront
+initStorefront();
 
 // Admin logic and administrative assets have been moved to admin.js for performance optimization.
 

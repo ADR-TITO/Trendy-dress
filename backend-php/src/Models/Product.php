@@ -61,6 +61,13 @@ class Product {
                 // Add discount field if it exists
                 if (isset($product['discount'])) {
                     $item['discount'] = (int)$product['discount'];
+                    $item['discountPercentage'] = (int)$product['discount'];
+                }
+                if (isset($product['isDiscountHidden'])) {
+                    $item['isDiscountHidden'] = (bool)$product['isDiscountHidden'];
+                }
+                if (isset($product['discountVisibleTo'])) {
+                    $item['discountVisibleTo'] = $product['discountVisibleTo'];
                 }
                 
                 $result[] = $item;
@@ -101,6 +108,9 @@ class Product {
                 'size' => $product['size'],
                 'quantity' => (int)$product['quantity'],
                 'image' => $product['image'],
+                'discount' => isset($product['discount']) ? (int)$product['discount'] : 0,
+                'isDiscountHidden' => isset($product['isDiscountHidden']) ? (bool)$product['isDiscountHidden'] : false,
+                'discountVisibleTo' => isset($product['discountVisibleTo']) ? $product['discountVisibleTo'] : 'public',
                 'createdAt' => $product['createdAt'],
                 'updatedAt' => $product['updatedAt']
             ];
@@ -176,8 +186,8 @@ class Product {
             
             $imageUrl = $this->saveBase64Image($data['image'] ?? null, $id);
             
-            $sql = "INSERT INTO products (id, name, price, description, category, size, quantity, discount, image) 
-                    VALUES (:id, :name, :price, :description, :category, :size, :quantity, :discount, :image)";
+            $sql = "INSERT INTO products (id, name, price, description, category, size, quantity, discount, discountPercentage, isDiscountHidden, discountVisibleTo, image) 
+                    VALUES (:id, :name, :price, :description, :category, :size, :quantity, :discount, :discountPercentage, :isDiscountHidden, :discountVisibleTo, :image)";
             
             $stmt = $pdo->prepare($sql);
             $stmt->execute([
@@ -188,7 +198,10 @@ class Product {
                 ':category' => $data['category'] ?? 'others',
                 ':size' => $data['size'] ?? '',
                 ':quantity' => $data['quantity'] ?? 0,
-                ':discount' => $data['discount'] ?? 0,
+                ':discount' => $data['discount'] ?? $data['discountPercentage'] ?? 0,
+                ':discountPercentage' => $data['discountPercentage'] ?? $data['discount'] ?? 0,
+                ':isDiscountHidden' => isset($data['isDiscountHidden']) && $data['isDiscountHidden'] ? 1 : 0,
+                ':discountVisibleTo' => $data['discountVisibleTo'] ?? 'public',
                 ':image' => $imageUrl
             ]);
             
@@ -238,7 +251,17 @@ class Product {
             }
             if (isset($data['discount'])) {
                 $fields[] = "discount = :discount";
+                $fields[] = "discountPercentage = :discountPercentage";
                 $params[':discount'] = $data['discount'];
+                $params[':discountPercentage'] = $data['discount'];
+            }
+            if (isset($data['isDiscountHidden'])) {
+                $fields[] = "isDiscountHidden = :isDiscountHidden";
+                $params[':isDiscountHidden'] = $data['isDiscountHidden'] ? 1 : 0;
+            }
+            if (isset($data['discountVisibleTo'])) {
+                $fields[] = "discountVisibleTo = :discountVisibleTo";
+                $params[':discountVisibleTo'] = $data['discountVisibleTo'];
             }
             if (isset($data['image'])) {
                 // Determine if we need to convert
