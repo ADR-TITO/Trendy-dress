@@ -1393,11 +1393,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.log('💡 ========================================\n');
 
     // Run automatic check (can be disabled if too verbose)
-    try {
-        await checkAllStorageFacilities();
-    } catch (error) {
+    // Run automatic check (can be disabled if too verbose) - DO NOT AWAIT TO PREVENT BLOCKING
+    checkAllStorageFacilities().catch(error => {
         console.error('❌ Error checking storage facilities:', error);
-    }
+    });
 
     // Check if we should offer migration (when backend is available)
     if (backendAvailable) {
@@ -1433,9 +1432,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         const maxCount = Math.max(localCount, indexedCount);
 
         if (maxCount > 0) {
-            try {
-                const dbProducts = await apiService.getProducts('all');
-                const mongoCount = dbProducts ? dbProducts.length : 0;
+            // Run migration check in background to prevent blocking
+            setTimeout(async () => {
+                try {
+                    const dbProducts = await apiService.getProducts('all', false);
+                    const mongoCount = dbProducts ? dbProducts.length : 0;
 
                 if (mongoCount === 0) {
                     console.log(`\n💡 ========================================`);
@@ -1497,6 +1498,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
                 console.log(`💡 ========================================\n`);
             }
+            }, 2000); // Wait 2s before running background checks
         }
     }
 
@@ -5336,15 +5338,24 @@ async function saveProducts() {
 }
 
 async function loadProducts() {
-    // Show loading spinner
-    const productsGrid = document.getElementById('productsGrid');
-    if (productsGrid) {
-        productsGrid.innerHTML = `
-            <div style="grid-column: 1/-1; text-align: center; padding: 60px 20px; color: #666;">
-                <div class="spinner" style="border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
-                <p style="font-size: 1.1rem;">Loading products...</p>
-            </div>
-        `;
+    // Check if we have cached products first before showing spinner
+    const hasLocalProducts = localStorage.getItem('products');
+    let localProductsForSpinner = [];
+    if (hasLocalProducts) {
+        try { localProductsForSpinner = JSON.parse(hasLocalProducts); } catch(e){}
+    }
+    
+    // Show loading spinner ONLY if no cached products
+    if (!localProductsForSpinner || localProductsForSpinner.length === 0) {
+        const productsGrid = document.getElementById('productsGrid');
+        if (productsGrid) {
+            productsGrid.innerHTML = `
+                <div style="grid-column: 1/-1; text-align: center; padding: 60px 20px; color: #666;">
+                    <div class="spinner" style="border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
+                    <p style="font-size: 1.1rem;">Loading products...</p>
+                </div>
+            `;
+        }
     }
 
     try {
@@ -5435,11 +5446,11 @@ async function loadProducts() {
             localStorage.setItem('preferredStorage', 'database');
 
             try {
-                // AGGRESSIVE PRELOAD: Render up to 8 cached products instantly
+                // AGGRESSIVE PRELOAD: Render ALL cached products instantly
                 if (localProductCount > 0) {
-                    console.log(`📦 PRELOADING ${Math.min(8, localProductCount)} products from cache to eliminate UI delay`);
+                    console.log(`📦 PRELOADING ${localProductCount} products from cache to eliminate UI delay`);
                     products.length = 0;
-                    const validCache = localProducts.slice(0, 8).map(p => ({
+                    const validCache = localProducts.map(p => ({
                         ...p,
                         id: p._id || p.id,
                         image: p.image || ''
@@ -5467,9 +5478,9 @@ async function loadProducts() {
                 products.push(...loadedProducts);
                 displayProducts(currentCategory);
                 
-                // CACHE: Save top 8 products to localStorage for instant preloading next time
+                // CACHE: Save full products list to localStorage for instant preloading next time
                 try {
-                    localStorage.setItem('products', JSON.stringify(loadedProducts.slice(0, 8)));
+                    localStorage.setItem('products', JSON.stringify(loadedProducts));
                 } catch (e) {
                     console.warn('Could not cache products to localStorage');
                 }
