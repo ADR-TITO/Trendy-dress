@@ -281,12 +281,10 @@ class ApiService {
 
         try {
             // Include images by default so products display correctly
-            // Add timestamp to prevent caching
-            const timestamp = Date.now();
             const nodeBaseURL = 'http://localhost:4000/api'; // Point to Node backend for discounts processing
             const url = category && category !== 'all'
-                ? `${nodeBaseURL}/products?category=${category}${includeImages ? '&includeImages=true' : '&includeImages=false'}&_t=${timestamp}`
-                : `${nodeBaseURL}/products${includeImages ? '?includeImages=true' : '?includeImages=false'}&_t=${timestamp}`;
+                ? `${nodeBaseURL}/products?category=${category}${includeImages ? '&includeImages=true' : '&includeImages=false'}`
+                : `${nodeBaseURL}/products${includeImages ? '?includeImages=true' : '?includeImages=false'}`;
 
             // Optimized timeouts - reduced for faster failure detection
             // Products without images should load quickly (< 3s)
@@ -308,12 +306,8 @@ class ApiService {
                 
                 response = await fetch(url, {
                     signal: controller.signal,
-                    cache: 'no-store', // CRITICAL: Disable browser caching
                     headers: {
                         'Accept': 'application/json',
-                        'Cache-Control': 'no-cache, no-store, must-revalidate',
-                        'Pragma': 'no-cache',
-                        'Expires': '0',
                         ...authHeader
                     },
                 });
