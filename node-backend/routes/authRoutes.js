@@ -67,7 +67,7 @@ router.post('/register', async (req, res) => {
 
                 // Remove await to avoid delaying the API response
                 transporter.sendMail(mailOptions).then(() => {
-                    console.log(\`Welcome email sent to \${email}\`);
+                    console.log(`Welcome email sent to ${email}`);
                 }).catch((emailError) => {
                     console.error('Failed to send welcome email:', emailError);
                 });

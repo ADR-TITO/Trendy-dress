@@ -5300,10 +5300,57 @@ function triggerHiddenAdmin() {
         return;
     }
     
-    // Otherwise open login modal
-    if (typeof openLoginModal === 'function') {
-        openLoginModal();
-        showNotification('Enter admin credentials to proceed', 'info');
+    // Open specialized Admin Secret Modal
+    const adminModal = document.getElementById('adminSecretModal');
+    const overlay = document.getElementById('modalOverlay');
+    if (adminModal && overlay) {
+        adminModal.classList.add('show');
+        overlay.classList.add('show');
+    }
+}
+
+async function handleAdminSecretSubmit(event) {
+    event.preventDefault();
+    const btn = event.target.querySelector('button[type="submit"]');
+    const originalText = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = 'Verifying...'; }
+
+    const email = document.getElementById('adminAuthEmail').value;
+    const password = document.getElementById('adminAuthPassword').value;
+
+    try {
+        const response = await fetch('http://localhost:4000/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+        
+        const result = await response.json();
+
+        if (result.success) {
+            if (result.user.role === 'admin') {
+                localStorage.setItem('authToken', result.token);
+                localStorage.setItem('authUser', JSON.stringify(result.user));
+                
+                isAdmin = true;
+                if (typeof checkAdminStatus === 'function') await checkAdminStatus();
+                
+                document.getElementById('adminSecretModal').classList.remove('show');
+                document.getElementById('modalOverlay').classList.remove('show');
+                
+                showNotification('Admin login successful!', 'success');
+                openAdminPanel();
+            } else {
+                alert('Access Denied: Your account does not have admin privileges.');
+            }
+        } else {
+            alert('Admin Login failed: ' + (result.message || 'Invalid credentials'));
+        }
+    } catch (error) {
+        console.error('Admin auth error:', error);
+        alert('Authentication failed: ' + error.message);
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = originalText; }
     }
 }
 
