@@ -1372,19 +1372,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadProducts(); // Load products from Database API using fetch() - NOT localStorage
 
     // START PERIODIC POLLING FOR STOCK SYNC
-    // This ensures stock levels are synced across all devices every 60 seconds
-    setInterval(async () => {
-        // Only poll if the tab is active/visible to save resources
-        if (document.visibilityState === 'visible') {
-            console.log('🔄 Periodic sync: Refreshing products from server...');
-            try {
-                // Use a silent load
-                await loadProducts();
-            } catch (pollError) {
-                console.warn('⚠️ Periodic sync failed:', pollError.message);
-            }
-        }
-    }, 60000); // Poll every 60 seconds
+    // (Disabled because it causes the DOM to wipe and reconstruct while users are scrolling.
+    // Stock levels are now either updated silently or handled via socket events.)
 
     // Automatically check all storage facilities for products
     console.log('\n💡 ========================================');
@@ -5303,6 +5292,21 @@ async function handleAuthSubmit(event) {
     }
 }
 
+// Hidden Admin Trigger
+function triggerHiddenAdmin() {
+    // If already logged in as admin, just open panel
+    if (isAdmin) {
+        openAdminPanel();
+        return;
+    }
+    
+    // Otherwise open login modal
+    if (typeof openLoginModal === 'function') {
+        openLoginModal();
+        showNotification('Enter admin credentials to proceed', 'info');
+    }
+}
+
 
 /**
  * Core Data Management
@@ -5465,12 +5469,18 @@ async function loadProducts() {
                 const dbProducts = await apiService.getProducts('all', false);
                 console.log(`📦 Loaded ${dbProducts.length} product records from Database`);
 
-                // Step 2: Use Database products as authoritative
-                loadedProducts = dbProducts.map(p => ({
-                    ...p,
-                    id: p._id || p.id,
-                    image: p.image || ''
-                }));
+                // Step 2: Use Database products as authoritative, BUT preserve existing cached images so they don't disappear and refetch!
+                loadedProducts = dbProducts.map(p => {
+                    // Try to find the image in the current (cached) valid products first
+                    const cachedProduct = products.find(cp => (cp.id || cp._id) == (p.id || p._id));
+                    const preservedImage = cachedProduct ? cachedProduct.image : '';
+                    
+                    return {
+                        ...p,
+                        id: p._id || p.id,
+                        image: p.image || preservedImage || ''
+                    };
+                });
                 loadSource = 'Database';
 
                 // Step 3: Trigger immediate render of metadata

@@ -3,6 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const pool = require('../db');
+const nodemailer = require('nodemailer');
 
 // Register
 router.post('/register', async (req, res) => {
@@ -34,6 +35,46 @@ router.post('/register', async (req, res) => {
             process.env.JWT_SECRET,
             { expiresIn: '24h' }
         );
+
+        // Send Welcome Email
+        if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+            try {
+                const transporter = nodemailer.createTransport({
+                    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+                    port: process.env.SMTP_PORT || 587,
+                    secure: process.env.SMTP_PORT == 465,
+                    auth: {
+                        user: process.env.SMTP_USER,
+                        pass: process.env.SMTP_PASS
+                    }
+                });
+
+                const mailOptions = {
+                    from: process.env.EMAIL_FROM || '"Trendy Dresses" <trendy@example.com>',
+                    to: email,
+                    subject: 'Welcome to Trendy Dresses!',
+                    html: `
+                        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                            <h2 style="color: #ff3366;">Welcome to Trendy Dresses!</h2>
+                            <p>Hello,</p>
+                            <p>Thank you for signing up! Your account has been successfully created.</p>
+                            <p>You can now browse our latest collections of dresses and tracksuits, and save your favorite items to your cart.</p>
+                            <br>
+                            <p>Best regards,<br><strong>Trendy Dresses Team</strong></p>
+                        </div>
+                    `
+                };
+
+                // Remove await to avoid delaying the API response
+                transporter.sendMail(mailOptions).then(() => {
+                    console.log(\`Welcome email sent to \${email}\`);
+                }).catch((emailError) => {
+                    console.error('Failed to send welcome email:', emailError);
+                });
+            } catch (configError) {
+                console.error('Nodemailer configuration error:', configError);
+            }
+        }
 
         res.status(201).json({ 
             success: true, 
