@@ -1798,6 +1798,10 @@ async function displayProducts(filterCategory = 'all') {
                             };
                             const p = products.find(prod => (prod.id || prod._id) == img.dataset.productId);
                             if (p) p.image = data.image;
+                        } else {
+                            // Backend literally has no image for this product
+                            card.classList.remove('img-lazy-pending', 'loading-image');
+                            if (typeof handleImageError === 'function') handleImageError(img);
                         }
                     } catch (e) {
                         console.error('Lazy load error:', e);
