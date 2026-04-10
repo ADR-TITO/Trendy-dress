@@ -5435,6 +5435,21 @@ async function loadProducts() {
             localStorage.setItem('preferredStorage', 'database');
 
             try {
+                // AGGRESSIVE PRELOAD: Render up to 8 cached products instantly
+                if (localProductCount > 0) {
+                    console.log(`📦 PRELOADING ${Math.min(8, localProductCount)} products from cache to eliminate UI delay`);
+                    products.length = 0;
+                    const validCache = localProducts.slice(0, 8).map(p => ({
+                        ...p,
+                        id: p._id || p.id,
+                        image: p.image || ''
+                    }));
+                    products.push(...validCache);
+                    if (typeof displayProducts === 'function') {
+                        displayProducts(currentCategory);
+                    }
+                }
+
                 // Step 1: Load products metadata from Database
                 const dbProducts = await apiService.getProducts('all', false);
                 console.log(`📦 Loaded ${dbProducts.length} product records from Database`);
@@ -5451,6 +5466,13 @@ async function loadProducts() {
                 products.length = 0;
                 products.push(...loadedProducts);
                 displayProducts(currentCategory);
+                
+                // CACHE: Save top 8 products to localStorage for instant preloading next time
+                try {
+                    localStorage.setItem('products', JSON.stringify(loadedProducts.slice(0, 8)));
+                } catch (e) {
+                    console.warn('Could not cache products to localStorage');
+                }
 
                 // Step 4: Background sync to IndexedDB
                 storageManager.init().then(() => {

@@ -323,7 +323,7 @@ window.handleImageError = (img) => {
     img.parentElement.appendChild(placeholder);
 };
 
-window.compressImage = (file, maxWidth = 1200, maxHeight = 1200, quality = 0.82) => {
+window.compressImage = (file, maxWidth = 800, maxHeight = 800, quality = 0.75) => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -336,7 +336,7 @@ window.compressImage = (file, maxWidth = 1200, maxHeight = 1200, quality = 0.82)
                 canvas.width = w; canvas.height = h;
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, w, h);
-                resolve(canvas.toDataURL('image/jpeg', quality));
+                resolve(canvas.toDataURL('image/webp', quality));
             };
             img.src = e.target.result;
         };
