@@ -71,7 +71,9 @@ window.requestNotificationPermission = function() {
                 if (currentToken) {
                     const user = JSON.parse(localStorage.getItem('authUser') || '{}');
                     const isProd = window.location.hostname.includes('trendydresses.co.ke');
-                    fetch(window.location.protocol + '//' + window.location.hostname + (isProd ? '' : ':4000') + '/api/notifications/register', {
+                    const registerURL = window.location.protocol + '//' + window.location.hostname + (isProd ? '' : ':4000') + '/api/notifications/register';
+                    
+                    fetch(registerURL, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ token: currentToken, userId: user.id || null })
@@ -5264,7 +5266,9 @@ async function handleAuthSubmit(event) {
         submitBtn.textContent = mode === 'login' ? 'Logging in...' : 'Signing up...';
         submitBtn.disabled = true;
 
-        const endpoint = mode === 'login' ? 'http://localhost:4000/api/auth/login' : 'http://localhost:4000/api/auth/register';
+        const isProd = window.location.hostname.includes('trendydresses.co.ke');
+        const authBaseURL = isProd ? apiService.baseURL + '/auth' : 'http://' + window.location.hostname + ':4000/api/auth';
+        const endpoint = mode === 'login' ? `${authBaseURL}/login` : `${authBaseURL}/register`;
         const response = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -5325,7 +5329,9 @@ async function handleAdminSecretSubmit(event) {
     const password = document.getElementById('adminAuthPassword').value;
 
     try {
-        const response = await fetch('http://localhost:4000/api/auth/login', {
+        const isProd = window.location.hostname.includes('trendydresses.co.ke');
+        const authLoginURL = isProd ? apiService.baseURL + '/auth/login' : 'http://' + window.location.hostname + ':4000/api/auth/login';
+        const response = await fetch(authLoginURL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password })

@@ -280,13 +280,14 @@ class ApiService {
         const maxRetries = includeImages ? 2 : 1; // Faster fallback for metadata
 
         try {
-            // Point to Node backend for discounts processing
+            // Include images by default
+            // USE PHP BACKEND (this.baseURL) for production products to avoid port 4000 issues
             const isProd = window.location.hostname.includes('trendydresses.co.ke');
-            const nodeBaseURL = window.location.protocol + '//' + window.location.hostname + (isProd ? '' : ':4000') + '/api';
+            const targetBaseURL = isProd ? this.baseURL : (window.location.protocol + '//' + window.location.hostname + ':4000/api');
             
             const url = category && category !== 'all'
-                ? `${nodeBaseURL}/products?category=${category}${includeImages ? '&includeImages=true' : '&includeImages=false'}`
-                : `${nodeBaseURL}/products${includeImages ? '?includeImages=true' : '?includeImages=false'}`;
+                ? `${targetBaseURL}/products?category=${category}${includeImages ? '&includeImages=true' : '&includeImages=false'}`
+                : `${targetBaseURL}/products${includeImages ? '?includeImages=true' : '?includeImages=false'}`;
 
             // Optimized timeouts - reduced for faster failure detection
             // Products without images should load quickly (< 3s)
@@ -797,11 +798,14 @@ class ApiService {
     // Login
     async login(username, password) {
         try {
-            // Add a timeout to prevent infinite hangs
+            const isProd = window.location.hostname.includes('trendydresses.co.ke');
+            // Prefer PHP auth in production if Node is not proxied
+            const nodeURL = isProd ? `${this.baseURL}/auth/login` : `http://${window.location.hostname}:4000/api/auth/login`;
+
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
 
-            const response = await fetch(`${this.baseURL}/auth/login`, {
+            const response = await fetch(nodeURL, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -817,7 +821,7 @@ class ApiService {
             if (!response.ok) {
                 // If login fails, ensure any old token is removed
                 ApiService.removeAuthToken();
-                console.error('Login failed response data:', data); // Add this line for better debugging
+                console.error('Login failed response data:', data);
                 throw new Error(data.message || 'Login failed');
             }
 
