@@ -84,7 +84,8 @@ try {
             }
 
             $data = json_decode(file_get_contents('php://input'), true);
-            $username = $data['username'] ?? '';
+            // Support both 'username' and 'email' keys from frontend
+            $username = $data['username'] ?? $data['email'] ?? '';
             $password = $data['password'] ?? '';
 
             if (empty($username) || empty($password)) {
