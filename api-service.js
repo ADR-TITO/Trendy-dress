@@ -280,9 +280,10 @@ class ApiService {
         const maxRetries = includeImages ? 2 : 1; // Faster fallback for metadata
 
         try {
-            // Include images by default so products display correctly
+            // Point to Node backend for discounts processing
             const isProd = window.location.hostname.includes('trendydresses.co.ke');
-            const nodeBaseURL = window.location.protocol + '//' + window.location.hostname + (isProd ? '' : ':4000') + '/api'; // Point to Node backend for discounts processing
+            const nodeBaseURL = window.location.protocol + '//' + window.location.hostname + (isProd ? '' : ':4000') + '/api';
+            
             const url = category && category !== 'all'
                 ? `${nodeBaseURL}/products?category=${category}${includeImages ? '&includeImages=true' : '&includeImages=false'}`
                 : `${nodeBaseURL}/products${includeImages ? '?includeImages=true' : '?includeImages=false'}`;
@@ -573,7 +574,9 @@ class ApiService {
     // Get all orders from Database
     async getOrders() {
         try {
-            const response = await fetch(`${this.baseURL}/orders`, {
+            const isProd = window.location.hostname.includes('trendydresses.co.ke');
+            const nodeURL = window.location.protocol + '//' + window.location.hostname + (isProd ? '' : ':4000') + '/api/orders';
+            const response = await fetch(nodeURL, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
