@@ -54,9 +54,9 @@ try {
             
             $pdo = Database::getConnection();
             
-            // Check if username already exists in either table
-            $stmt = $pdo->prepare("SELECT id FROM admins WHERE username = :username UNION SELECT id FROM users WHERE username = :username LIMIT 1");
-            $stmt->execute([':username' => $username]);
+            // Check if username already exists in either table (using unique parameter names to avoid PDO errors)
+            $stmt = $pdo->prepare("SELECT id FROM admins WHERE username = :u1 UNION SELECT id FROM users WHERE username = :u2 LIMIT 1");
+            $stmt->execute([':u1' => $username, ':u2' => $username]);
             if ($stmt->fetch()) {
                 throw new Exception('Username already taken', 400);
             }
