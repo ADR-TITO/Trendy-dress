@@ -5281,10 +5281,8 @@ async function handleAuthSubmit(event) {
             localStorage.setItem('authToken', result.token);
             localStorage.setItem('authUser', JSON.stringify(result.user));
             
-            if (result.user.role === 'admin') {
-                isAdmin = true;
-                if (typeof checkAdminStatus === 'function') await checkAdminStatus();
-            }
+            // Verify role and update UI accordingly
+            await checkAdminStatus();
             
             closeLoginModal();
             showNotification(mode === 'login' ? 'Login successful!' : 'Account created successfully!');

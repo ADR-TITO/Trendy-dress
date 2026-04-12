@@ -67,9 +67,15 @@ try {
             $stmt->execute([':username' => $username, ':password' => $passwordHash]);
             $userId = $pdo->lastInsertId();
 
+            // AUTO-LOGIN: Set session variables immediately
+            $_SESSION['user_logged_in'] = true;
+            $_SESSION['user_username'] = $username;
+            $_SESSION['user_id'] = $userId;
+            $_SESSION['user_role'] = 'customer';
+
             echo json_encode([
                 'success' => true,
-                'message' => 'Registration successful',
+                'message' => 'Registration successful and logged in',
                 'user' => [
                     'id' => $userId,
                     'username' => $username,
