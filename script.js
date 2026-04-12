@@ -5724,6 +5724,90 @@ async function loadProducts() {
     }
 }
 
+// Function definitions to restore lost logic
+async function loadWebsiteContent() {
+    try {
+        const content = await apiService.getWebsiteContent();
+        if (content) {
+            websiteContent = { ...websiteContent, ...content };
+            updateWebsiteContent();
+            updateContactDisplay();
+            updateWebsiteIcon();
+        }
+    } catch (error) {
+        console.warn('⚠️ Could not fetch website content from API:', error);
+    }
+}
+
+function updateWebsiteContent() {
+    if (!websiteContent) return;
+    
+    // Update Home/Hero section
+    const heroTitle = document.querySelector('.hero h1');
+    const heroDesc = document.querySelector('.hero p');
+    if (heroTitle) heroTitle.textContent = websiteContent.heroTitle || 'Fashion That Speaks Your Style';
+    if (heroDesc) heroDesc.textContent = websiteContent.heroDescription || 'Discover the latest trends in dresses and tracksuits';
+    
+    // Update About section
+    const aboutText = document.getElementById('aboutText');
+    if (aboutText) aboutText.textContent = websiteContent.aboutText || '';
+    
+    // Update Contact info
+    const contactPhone = document.getElementById('contactPhone');
+    const contactEmail = document.getElementById('contactEmail');
+    const contactAddress = document.getElementById('contactAddress');
+    
+    if (contactPhone) contactPhone.textContent = websiteContent.contactPhone || '254724904692';
+    if (contactEmail) contactEmail.textContent = websiteContent.contactEmail || 'Trendy dresses790@gmail.com';
+    if (contactAddress) contactAddress.textContent = websiteContent.contactAddress || 'Nairobi';
+}
+
+function updateContactDisplay() {
+    // Utility to ensure contact information is consistent across all UI elements
+    const footerPhone = document.getElementById('footerPhone');
+    if (footerPhone) footerPhone.textContent = websiteContent.contactPhone || '';
+}
+
+function updateWebsiteIcon() {
+    const favicon = document.getElementById('websiteFavicon');
+    if (favicon && websiteContent.websiteIcon) {
+        favicon.href = websiteContent.websiteIcon;
+    }
+}
+
+async function checkAdminStatus() {
+    try {
+        const auth = await apiService.checkAuth();
+        isAdmin = auth.authenticated;
+        const adminBtn = document.getElementById('adminBtn');
+        if (adminBtn) {
+            adminBtn.style.display = isAdmin ? 'flex' : 'none';
+        }
+        return isAdmin;
+    } catch (error) {
+        isAdmin = false;
+        return false;
+    }
+}
+
+function initStorefront() {
+    console.log('🚀 Initializing storefront...');
+    
+    // Ensure critical data is loaded
+    if (typeof loadProducts === 'function') {
+        loadProducts().then(() => {
+            if (typeof displayProducts === 'function') displayProducts('all');
+        });
+    }
+    
+    // Load dynamic content
+    loadWebsiteContent();
+    checkAdminStatus();
+    
+    // Initialize secondary components
+    if (typeof loadCart === 'function') loadCart();
+}
+
 // Initialize the storefront
 initStorefront();
 

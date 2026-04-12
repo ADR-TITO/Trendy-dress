@@ -313,6 +313,25 @@ window.toggleDeliveryStatus = async (orderId, delivered) => {
         loadCompletedOrders();
     } catch (e) { showNotification(e.message, 'error'); }
 };
+async function cancelOrder(orderId) {
+    if (!confirm(`Are you sure you want to cancel order ${orderId}? This will remove it from the records.`)) {
+        return;
+    }
+
+    try {
+        showNotification('Cancelling order...', 'info');
+        await apiService.deleteOrder(orderId);
+        showNotification(`Order ${orderId} cancelled successfully`, 'success');
+        
+        // Refresh orders list
+        if (typeof loadAdminOrders === 'function') loadAdminOrders();
+        if (typeof loadCompletedOrders === 'function') loadCompletedOrders();
+    } catch (error) {
+        console.error('Error cancelling order:', error);
+        showNotification(`Failed to cancel order: ${error.message}`, 'error');
+    }
+}
+
 window.cancelOrder = cancelOrder;
 
 /* Admin Image & Utility Helpers */
@@ -464,7 +483,9 @@ window.triggerNotification = async () => {
     if (!body) return;
     
     try {
-        const response = await fetch('http://localhost:4000/api/notifications/send', {
+        const isProd = window.location.hostname.includes('trendydresses.co.ke');
+        const nodeURL = window.location.protocol + '//' + window.location.hostname + (isProd ? '' : ':4000') + '/api/notifications/send';
+        const response = await fetch(nodeURL, {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',

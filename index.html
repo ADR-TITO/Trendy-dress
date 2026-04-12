@@ -1017,7 +1017,15 @@
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js"></script>
 
     <!-- Performance monitoring (non-critical, deferred) -->
-    <script src="http://localhost:4000/socket.io/socket.io.js"></script>
+    <script>
+        (function() {
+            const isProd = window.location.hostname.includes('trendydresses.co.ke');
+            const script = document.createElement('script');
+            script.src = window.location.protocol + '//' + window.location.hostname + (isProd ? '' : ':4000') + '/socket.io/socket.io.js';
+            script.async = false;
+            document.head.appendChild(script);
+        })();
+    </script>
     <script src="performance-monitor.js" defer></script> <!-- Defer main scripts to not block rendering -->
     <script src="storage-manager.js?v=7.0" defer></script>
     <script src="api-service.js?v=7.0" defer></script>
