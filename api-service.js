@@ -50,7 +50,7 @@ async function detectBackendPort() {
     // Try PHP backend ports
     for (const port of phpPorts) {
         try {
-            const testURL = `http://localhost:${port}/api/server-info`;
+            const testURL = `${window.location.protocol}//${window.location.hostname}:${port}/api/server-info`;
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 500);
 
@@ -64,7 +64,7 @@ async function detectBackendPort() {
 
             if (response.ok) {
                 const serverInfo = await response.json();
-                const detectedURL = serverInfo.baseURL || `http://localhost:${port}/api`;
+                const detectedURL = serverInfo.baseURL || `${window.location.protocol}//${window.location.hostname}:${port}/api`;
                 console.log(`✅ Detected PHP backend on port ${port}`);
                 return detectedURL;
             }
@@ -76,7 +76,7 @@ async function detectBackendPort() {
 
     // Fallback: Use PHP default port (8000 for development, 80 for production)
     console.warn('⚠️ Could not auto-detect PHP backend, using default port 8000');
-    return 'http://localhost:8000/api';
+    return window.location.protocol + '//' + window.location.hostname + ':8000/api';
 }
 
 // Initialize backend URL
@@ -90,7 +90,7 @@ const getBackendURL = async () => {
         while (isDetectingPort) {
             await new Promise(resolve => setTimeout(resolve, 100));
         }
-        return detectedBackendURL || 'http://localhost:8000/api'; // PHP default (development)
+        return detectedBackendURL || window.location.protocol + '//' + window.location.hostname + ':8000/api'; // PHP default (development)
     }
 
     isDetectingPort = true;
@@ -102,7 +102,7 @@ const getBackendURL = async () => {
         return detectedBackendURL;
     } catch (error) {
         console.error('❌ Error detecting backend port:', error);
-        return 'http://localhost:8000/api'; // PHP default (development)
+        return window.location.protocol + '//' + window.location.hostname + ':8000/api'; // PHP default (development)
     } finally {
         isDetectingPort = false;
     }
@@ -113,7 +113,7 @@ const getBackendURL = async () => {
 let API_BASE_URL = (window.location.hostname === 'trendydresses.co.ke' ||
     window.location.hostname === 'www.trendydresses.co.ke')
     ? window.location.origin + '/backend-php/api'  // PHP backend in backend-php folder (cPanel default)
-    : 'http://localhost:8000/api';  // PHP default port (8000 for development)
+    : window.location.protocol + '//' + window.location.hostname + ':8000/api';  // PHP default port (8000 for development)
 
 class ApiService {
     constructor() {
@@ -281,7 +281,8 @@ class ApiService {
 
         try {
             // Include images by default so products display correctly
-            const nodeBaseURL = 'http://localhost:4000/api'; // Point to Node backend for discounts processing
+            const isProd = window.location.hostname.includes('trendydresses.co.ke');
+            const nodeBaseURL = window.location.protocol + '//' + window.location.hostname + (isProd ? '' : ':4000') + '/api'; // Point to Node backend for discounts processing
             const url = category && category !== 'all'
                 ? `${nodeBaseURL}/products?category=${category}${includeImages ? '&includeImages=true' : '&includeImages=false'}`
                 : `${nodeBaseURL}/products${includeImages ? '?includeImages=true' : '?includeImages=false'}`;

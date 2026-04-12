@@ -26,7 +26,8 @@ let websiteContent = {
 // Socket.io initialization
 let socket;
 try {
-    socket = io('http://localhost:4000');
+    const isProd = window.location.hostname.includes('trendydresses.co.ke');
+    socket = io(window.location.protocol + '//' + window.location.hostname + (isProd ? '' : ':4000'));
     socket.on('connect', () => console.log('Connected to realtime server'));
     socket.on('product_edited', (data) => {
         console.log('Realtime product update received!', data);
@@ -69,7 +70,8 @@ window.requestNotificationPermission = function() {
             messaging.getToken({ vapidKey: 'YOUR_VAPID_KEY' }).then((currentToken) => {
                 if (currentToken) {
                     const user = JSON.parse(localStorage.getItem('authUser') || '{}');
-                    fetch('http://localhost:4000/api/notifications/register', {
+                    const isProd = window.location.hostname.includes('trendydresses.co.ke');
+                    fetch(window.location.protocol + '//' + window.location.hostname + (isProd ? '' : ':4000') + '/api/notifications/register', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ token: currentToken, userId: user.id || null })

@@ -50,7 +50,8 @@ $allowedOrigins = [
     'http://127.0.0.1',
 ];
 $requestOrigin = $_SERVER['HTTP_ORIGIN'] ?? '';
-if (in_array($requestOrigin, $allowedOrigins) || strpos($requestOrigin, 'localhost') !== false || strpos($requestOrigin, '127.0.0.1') !== false) {
+$isLocalNetwork = strpos($requestOrigin, 'localhost') !== false || strpos($requestOrigin, '127.0.0.1') !== false || preg_match('/^https?:\/\/(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/', $requestOrigin);
+if (in_array($requestOrigin, $allowedOrigins) || $isLocalNetwork) {
     header("Access-Control-Allow-Origin: $requestOrigin");
     header('Access-Control-Allow-Credentials: true');
 } else {
