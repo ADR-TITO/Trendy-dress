@@ -5,11 +5,25 @@
 
 require_once __DIR__ . '/../config/database.php';
 
-// Start session securely
+// Start session securely with long-lived persistence
 if (session_status() === PHP_SESSION_NONE) {
+    $lifetime = 30 * 24 * 60 * 60; // 30 days
+    ini_set('session.cookie_lifetime', $lifetime);
+    ini_set('session.gc_maxlifetime', $lifetime);
     ini_set('session.cookie_httponly', 1);
     ini_set('session.use_only_cookies', 1);
     ini_set('session.cookie_secure', isset($_SERVER['HTTPS']));
+    
+    // Ensure cookie is available on the entire domain
+    session_set_cookie_params([
+        'lifetime' => $lifetime,
+        'path' => '/',
+        'domain' => $_SERVER['HTTP_HOST'] ?? '',
+        'secure' => isset($_SERVER['HTTPS']),
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ]);
+    
     session_start();
 }
 
@@ -28,6 +42,42 @@ if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
     if (isset($_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS']))
         header("Access-Control-Allow-Headers: {$_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS']}");
     exit(0);
+}
+
+/**
+ * Verify Bearer Token if session is missing
+ */
+function verifyTokenFallback() {
+    $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+    if (strpos($authHeader, 'Bearer ') === 0) {
+        $token = substr($authHeader, 7);
+        $tokenFile = sys_get_temp_dir() . '/trendy_admin_' . hash('sha256', $token) . '.tok';
+        
+        if (file_exists($tokenFile)) {
+            $tokenData = json_decode(file_get_contents($tokenFile), true);
+            if ($tokenData && $tokenData['expires'] > time()) {
+                // Restore session from token data
+                if (($tokenData['role'] ?? '') === 'admin') {
+                    $_SESSION['admin_logged_in'] = true;
+                    $_SESSION['admin_username'] = $tokenData['username'];
+                    $_SESSION['admin_id'] = $tokenData['admin_id'];
+                    $_SESSION['user_role'] = 'admin';
+                } else if (($tokenData['role'] ?? '') === 'customer') {
+                    $_SESSION['user_logged_in'] = true;
+                    $_SESSION['user_username'] = $tokenData['username'];
+                    $_SESSION['user_id'] = $tokenData['user_id'];
+                    $_SESSION['user_role'] = 'customer';
+                }
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+// Check for token fallback if session is empty
+if (!isset($_SESSION['user_role'])) {
+    verifyTokenFallback();
 }
 
 $route = $_GET['route'] ?? '';
@@ -73,9 +123,22 @@ try {
             $_SESSION['user_id'] = $userId;
             $_SESSION['user_role'] = 'customer';
 
+            // Generate a persistent token for 'Stay Logged In' (30 days)
+            $token = bin2hex(random_bytes(32));
+            $_SESSION['auth_token'] = $token;
+            $tokenFile = sys_get_temp_dir() . '/trendy_admin_' . hash('sha256', $token) . '.tok';
+            file_put_contents($tokenFile, json_encode([
+                'user_id'    => $userId,
+                'username'   => $username,
+                'role'       => 'customer',
+                'expires'    => time() + (30 * 24 * 3600),
+                'created_at' => time()
+            ]));
+
             echo json_encode([
                 'success' => true,
                 'message' => 'Registration successful and logged in',
+                'token' => $token,
                 'user' => [
                     'id' => $userId,
                     'username' => $username,
@@ -124,7 +187,7 @@ try {
                     'admin_id'   => $admin['id'],
                     'username'   => $admin['username'],
                     'role'       => 'admin',
-                    'expires'    => time() + (8 * 3600),
+                    'expires'    => time() + (30 * 24 * 3600), // 30 days
                     'created_at' => time()
                 ]));
                 
@@ -151,9 +214,22 @@ try {
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['user_role'] = 'customer';
                 
+                // Generate a persistent token for 'Stay Logged In' (30 days)
+                $token = bin2hex(random_bytes(32));
+                $_SESSION['auth_token'] = $token;
+                $tokenFile = sys_get_temp_dir() . '/trendy_admin_' . hash('sha256', $token) . '.tok';
+                file_put_contents($tokenFile, json_encode([
+                    'user_id'    => $user['id'],
+                    'username'   => $user['username'],
+                    'role'       => 'customer',
+                    'expires'    => time() + (30 * 24 * 3600),
+                    'created_at' => time()
+                ]));
+
                 echo json_encode([
                     'success' => true,
                     'message' => 'Login successful',
+                    'token' => $token,
                     'user' => [
                         'username' => $user['username'],
                         'role' => 'customer'
