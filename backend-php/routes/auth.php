@@ -41,7 +41,6 @@ try {
             }
 
             $data = json_decode(file_get_contents('php://input'), true);
-            // Support both 'username' and 'email' keys from frontend
             $username = $data['username'] ?? $data['email'] ?? '';
             $password = $data['password'] ?? '';
 
@@ -55,25 +54,26 @@ try {
             
             $pdo = Database::getConnection();
             
-            // Check if username already exists
-            $stmt = $pdo->prepare("SELECT id FROM admins WHERE username = :username LIMIT 1");
+            // Check if username already exists in either table
+            $stmt = $pdo->prepare("SELECT id FROM admins WHERE username = :username UNION SELECT id FROM users WHERE username = :username LIMIT 1");
             $stmt->execute([':username' => $username]);
             if ($stmt->fetch()) {
                 throw new Exception('Username already taken', 400);
             }
 
-            // Create new admin
+            // Create new CUSTOMER user (never an admin via public registration)
             $passwordHash = password_hash($password, PASSWORD_DEFAULT);
-            $stmt = $pdo->prepare("INSERT INTO admins (username, password_hash) VALUES (:username, :password)");
+            $stmt = $pdo->prepare("INSERT INTO users (username, password_hash, role) VALUES (:username, :password, 'customer')");
             $stmt->execute([':username' => $username, ':password' => $passwordHash]);
-            $adminId = $pdo->lastInsertId();
+            $userId = $pdo->lastInsertId();
 
             echo json_encode([
                 'success' => true,
                 'message' => 'Registration successful',
                 'user' => [
-                    'id' => $adminId,
-                    'username' => $username
+                    'id' => $userId,
+                    'username' => $username,
+                    'role' => 'customer'
                 ]
             ]);
             break;
@@ -84,7 +84,6 @@ try {
             }
 
             $data = json_decode(file_get_contents('php://input'), true);
-            // Support both 'username' and 'email' keys from frontend
             $username = $data['username'] ?? $data['email'] ?? '';
             $password = $data['password'] ?? '';
 
@@ -92,13 +91,16 @@ try {
                 throw new Exception('Username and password are required', 400);
             }
 
-            // Database authentication
             if (!Database::isConnected()) {
                 throw new Exception('Database not connected', 500);
             }
             
             $pdo = Database::getConnection();
-            $stmt = $pdo->prepare("SELECT * FROM admins WHERE username = :username LIMIT 1");
+            $admin = null;
+            $user = null;
+
+            // First check admins table
+            $stmt = $pdo->prepare("SELECT *, 'admin' as role FROM admins WHERE username = :username LIMIT 1");
             $stmt->execute([':username' => $username]);
             $admin = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -106,22 +108,17 @@ try {
                 $_SESSION['admin_logged_in'] = true;
                 $_SESSION['admin_username'] = $admin['username'];
                 $_SESSION['admin_id'] = $admin['id'];
+                $_SESSION['user_role'] = 'admin';
                 
-                // Generate a secure token tied to this session
-                // This allows the frontend to authenticate via Bearer token
-                // as a fallback when session cookies don't work cross-origin
                 $token = bin2hex(random_bytes(32));
                 $_SESSION['auth_token'] = $token;
                 
-                // Also persist the token to a temp file so it can be verified
-                // by other PHP requests even when session state isn't shared.
-                // This is critical on shared cPanel hosting where each request
-                // may get a different PHP process/session unless the cookie is sent.
                 $tokenFile = sys_get_temp_dir() . '/trendy_admin_' . hash('sha256', $token) . '.tok';
                 file_put_contents($tokenFile, json_encode([
                     'admin_id'   => $admin['id'],
                     'username'   => $admin['username'],
-                    'expires'    => time() + (8 * 3600), // 8 hours
+                    'role'       => 'admin',
+                    'expires'    => time() + (8 * 3600),
                     'created_at' => time()
                 ]));
                 
@@ -130,7 +127,30 @@ try {
                     'message' => 'Login successful',
                     'token' => $token,
                     'user' => [
-                        'username' => $admin['username']
+                        'username' => $admin['username'],
+                        'role' => 'admin'
+                    ]
+                ]);
+                exit;
+            }
+
+            // If not admin, check users table
+            $stmt = $pdo->prepare("SELECT *, 'customer' as role FROM users WHERE username = :username LIMIT 1");
+            $stmt->execute([':username' => $username]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($user && password_verify($password, $user['password_hash'])) {
+                $_SESSION['user_logged_in'] = true;
+                $_SESSION['user_username'] = $user['username'];
+                $_SESSION['user_id'] = $user['id'];
+                $_SESSION['user_role'] = 'customer';
+                
+                echo json_encode([
+                    'success' => true,
+                    'message' => 'Login successful',
+                    'user' => [
+                        'username' => $user['username'],
+                        'role' => 'customer'
                     ]
                 ]);
             } else {
@@ -170,10 +190,13 @@ try {
             break;
 
         case 'auth/check':
-            $isLoggedIn = isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true;
+            $isAdmin = isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true;
+            $isUser = isset($_SESSION['user_logged_in']) && $_SESSION['user_logged_in'] === true;
             echo json_encode([
-                'authenticated' => $isLoggedIn,
-                'username' => $isLoggedIn ? ($_SESSION['admin_username'] ?? 'Admin') : null
+                'authenticated' => $isAdmin || $isUser,
+                'isAdmin' => $isAdmin,
+                'role' => $_SESSION['user_role'] ?? 'guest',
+                'username' => $_SESSION['admin_username'] ?? $_SESSION['user_username'] ?? null
             ]);
             break;
 

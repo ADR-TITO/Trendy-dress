@@ -5784,11 +5784,22 @@ function updateWebsiteIcon() {
 async function checkAdminStatus() {
     try {
         const auth = await apiService.checkAuth();
-        isAdmin = auth.authenticated;
+        // STRICT CHECK: must be authenticated AND flagged as admin by backend
+        isAdmin = auth.authenticated && auth.isAdmin === true;
+
         const adminBtn = document.getElementById('adminBtn');
         if (adminBtn) {
             adminBtn.style.display = isAdmin ? 'flex' : 'none';
         }
+
+        // If not admin but authenticated context (customer), ensure admin panel is closed
+        if (auth.authenticated && !isAdmin) {
+            const adminPanel = document.getElementById('adminPanel');
+            if (adminPanel && adminPanel.classList.contains('active')) {
+                closeAdminPanel();
+            }
+        }
+
         return isAdmin;
     } catch (error) {
         isAdmin = false;
