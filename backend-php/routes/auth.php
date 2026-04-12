@@ -35,6 +35,49 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 try {
     switch ($route) {
+        case 'auth/register':
+            if ($method !== 'POST') {
+                throw new Exception('Method not allowed', 405);
+            }
+
+            $data = json_decode(file_get_contents('php://input'), true);
+            // Support both 'username' and 'email' keys from frontend
+            $username = $data['username'] ?? $data['email'] ?? '';
+            $password = $data['password'] ?? '';
+
+            if (empty($username) || empty($password)) {
+                throw new Exception('Username and password are required', 400);
+            }
+
+            if (!Database::isConnected()) {
+                throw new Exception('Database not connected', 500);
+            }
+            
+            $pdo = Database::getConnection();
+            
+            // Check if username already exists
+            $stmt = $pdo->prepare("SELECT id FROM admins WHERE username = :username LIMIT 1");
+            $stmt->execute([':username' => $username]);
+            if ($stmt->fetch()) {
+                throw new Exception('Username already taken', 400);
+            }
+
+            // Create new admin
+            $passwordHash = password_hash($password, PASSWORD_DEFAULT);
+            $stmt = $pdo->prepare("INSERT INTO admins (username, password_hash) VALUES (:username, :password)");
+            $stmt->execute([':username' => $username, ':password' => $passwordHash]);
+            $adminId = $pdo->lastInsertId();
+
+            echo json_encode([
+                'success' => true,
+                'message' => 'Registration successful',
+                'user' => [
+                    'id' => $adminId,
+                    'username' => $username
+                ]
+            ]);
+            break;
+
         case 'auth/login':
             if ($method !== 'POST') {
                 throw new Exception('Method not allowed', 405);
