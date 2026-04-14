@@ -222,6 +222,14 @@ async function loadAdminContent() {
     document.getElementById('contactEmail').value = websiteContent.contactEmail;
     document.getElementById('contactAddress').value = websiteContent.contactAddress;
     previewHeroImage(websiteContent.heroImage);
+    
+    // Update website icon preview if it exists
+    if (websiteContent.websiteIcon) {
+        const iconImg = document.getElementById('websiteIconPreviewImg');
+        const iconContainer = document.getElementById('websiteIconPreview');
+        if (iconImg) iconImg.src = websiteContent.websiteIcon;
+        if (iconContainer) iconContainer.style.display = 'block';
+    }
 }
 
 async function saveContent() {
@@ -422,20 +430,26 @@ function closeModal() {
 }
 
 function previewProductImage(src) {
-    const preview = document.getElementById('productImagePreview');
+    const previewContainer = document.getElementById('imagePreview');
+    const previewImg = document.getElementById('previewImg');
     const input = document.getElementById('productImage');
-    if (preview) {
-        preview.src = src || 'placeholder-product.png';
-        preview.style.display = src ? 'block' : 'none';
+    if (previewImg) {
+        previewImg.src = src || 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+    }
+    if (previewContainer) {
+        previewContainer.style.display = src ? 'block' : 'none';
     }
     if (input) input.value = src || '';
 }
 
 function previewHeroImage(src) {
-    const preview = document.getElementById('heroImagePreview');
-    if (preview) {
-        preview.src = src || '';
-        preview.style.display = src ? 'block' : 'none';
+    const previewContainer = document.getElementById('heroImagePreview');
+    const previewImg = document.getElementById('heroPreviewImg');
+    if (previewImg) {
+        previewImg.src = src || 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+    }
+    if (previewContainer) {
+        previewContainer.style.display = src ? 'block' : 'none';
     }
 }
 
@@ -474,6 +488,110 @@ window.closeModal = closeModal;
 window.previewProductImage = previewProductImage;
 window.previewHeroImage = previewHeroImage;
 window.confirmDelete = confirmDelete;
+
+// Image Upload Handlers
+window.handleHeroImageUpload = async (event) => {
+    const file = event.target.files[0];
+    if (file) {
+        try {
+            const dataUrl = await window.compressImage(file, 1920, 1080);
+            document.getElementById('heroImage').value = dataUrl;
+            previewHeroImage(dataUrl);
+            if (typeof showNotification === 'function') {
+                showNotification('Hero image processed. Ready to save.', 'success');
+            }
+        } catch (error) {
+            console.error('Error uploading hero image:', error);
+            if (typeof showNotification === 'function') {
+                showNotification('Failed to process image', 'error');
+            }
+        }
+    }
+};
+
+window.removeHeroImage = () => {
+    document.getElementById('heroImage').value = '';
+    const fileInput = document.getElementById('heroImageFile');
+    if (fileInput) fileInput.value = '';
+    previewHeroImage('');
+};
+
+window.handleWebsiteIconUpload = async (event) => {
+    const file = event.target.files[0];
+    if (file) {
+        try {
+            const dataUrl = await window.compressImage(file, 256, 256);
+            if (typeof websiteContent !== 'undefined') {
+                websiteContent.websiteIcon = dataUrl;
+            }
+            const img = document.getElementById('websiteIconPreviewImg');
+            if (img) img.src = dataUrl;
+            const container = document.getElementById('websiteIconPreview');
+            if (container) container.style.display = 'block';
+            if (typeof showNotification === 'function') {
+                showNotification('Website icon processed. Remember to save settings.', 'success');
+            }
+        } catch (error) {
+            console.error('Error uploading website icon:', error);
+            if (typeof showNotification === 'function') {
+                showNotification('Failed to process image', 'error');
+            }
+        }
+    }
+};
+
+window.removeWebsiteIcon = () => {
+    if (typeof websiteContent !== 'undefined') {
+        websiteContent.websiteIcon = '';
+    }
+    const fileInput = document.getElementById('websiteIconFile');
+    if (fileInput) fileInput.value = '';
+    const img = document.getElementById('websiteIconPreviewImg');
+    if (img) img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+    const container = document.getElementById('websiteIconPreview');
+    if (container) container.style.display = 'none';
+};
+
+window.handleProductImageUpload = async (event) => {
+    const file = event.target.files[0];
+    if (file) {
+        try {
+            const dataUrl = await window.compressImage(file, 800, 800);
+            document.getElementById('productImage').value = dataUrl;
+            previewProductImage(dataUrl);
+            if (typeof showNotification === 'function') {
+                showNotification('Product image processed.', 'success');
+            }
+        } catch (error) {
+            console.error('Error uploading product image:', error);
+            if (typeof showNotification === 'function') {
+                showNotification('Failed to process image', 'error');
+            }
+        }
+    }
+};
+
+window.removeProductImage = () => {
+    document.getElementById('productImage').value = '';
+    const fileInput = document.getElementById('productImageFile');
+    if (fileInput) fileInput.value = '';
+    previewProductImage('');
+};
+
+window.updateWebsiteContent = () => {
+    // Update DOM elements on main page when content is saved
+    const heroTitle = document.querySelector('.hero h1');
+    if (heroTitle && typeof websiteContent !== 'undefined') heroTitle.textContent = websiteContent.heroTitle;
+    
+    const heroDesc = document.querySelector('.hero p');
+    if (heroDesc && typeof websiteContent !== 'undefined') heroDesc.textContent = websiteContent.heroDescription;
+    
+    // Update background if present
+    const heroSection = document.querySelector('.hero');
+    if (heroSection && typeof websiteContent !== 'undefined' && websiteContent.heroImage) {
+        heroSection.style.backgroundImage = `url(${websiteContent.heroImage})`;
+    }
+};
 
 // Manual Push Notifications
 window.triggerNotification = async () => {
