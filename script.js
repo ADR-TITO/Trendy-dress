@@ -25,25 +25,30 @@ let websiteContent = {
 
 // Socket.io initialization
 let socket;
-try {
-    const isProd = window.location.hostname.includes('trendydresses.co.ke');
-    socket = io(window.location.protocol + '//' + window.location.hostname + (isProd ? '' : ':4000'));
-    socket.on('connect', () => console.log('Connected to realtime server'));
-    socket.on('product_edited', (data) => {
-        console.log('Realtime product update received!', data);
-        if (typeof showNotification === 'function') {
-            showNotification('Catalogue updated. Refreshing...', 'info');
-        }
-        if (typeof refreshProducts === 'function') {
-            refreshProducts();
-        } else if (typeof loadProducts === 'function') {
-            loadProducts().then(() => {
-                if (typeof displayProducts === 'function') displayProducts(currentCategory);
-            });
-        }
-    });
-} catch (e) {
-    console.error('Socket.io connection failed:', e);
+if (typeof io !== 'undefined') {
+    try {
+        const isProd = window.location.hostname.includes('trendydresses.co.ke');
+        socket = io(window.location.protocol + '//' + window.location.hostname + (isProd ? '' : ':4000'), {
+            reconnectionAttempts: 3,
+            timeout: 5000
+        });
+        socket.on('connect', () => console.log('Connected to realtime server'));
+        socket.on('product_edited', (data) => {
+            console.log('Realtime product update received!', data);
+            if (typeof showNotification === 'function') {
+                showNotification('Catalogue updated. Refreshing...', 'info');
+            }
+            if (typeof refreshProducts === 'function') {
+                refreshProducts();
+            } else if (typeof loadProducts === 'function') {
+                loadProducts().then(() => {
+                    if (typeof displayProducts === 'function') displayProducts(currentCategory);
+                });
+            }
+        });
+    } catch (e) {
+        console.warn('Socket.io connection warning:', e.message);
+    }
 }
 
 // FCM Push Notifications Setup
@@ -4269,7 +4274,12 @@ async function processSTKPushPayment(customerName, customerPhone, customerEmail,
                 // Query STK Push status
                 const statusResult = await apiService.querySTKPushStatus(checkoutRequestID);
 
-                if (statusResult.status === 'COMPLETED' || statusResult.resultCode === '0' || statusResult.success === true) {
+                const isSuccess = statusResult.status === 'COMPLETED' || 
+                                  statusResult.resultCode === '0' || 
+                                  statusResult.resultCode === 0 || 
+                                  (statusResult.success === true && statusResult.status !== 'PENDING');
+
+                if (isSuccess) {
                     // Payment successful! Check for transaction in database
                     console.log('✅ Payment completed via STK Push');
                     
@@ -4309,7 +4319,7 @@ async function processSTKPushPayment(customerName, customerPhone, customerEmail,
                     }
                     
                     return; // Exit polling
-                } else if (statusResult.status === 'PENDING' || statusResult.resultCode === '1032' || statusResult.status === 'WAITING') {
+                } else if (statusResult.status === 'PENDING' || statusResult.status === 'WAITING' || statusResult.resultCode === null || statusResult.resultCode === undefined) {
                     // Payment still pending - keep polling
                     if (attempts < maxAttempts) {
                         setTimeout(pollPaymentStatus, 2000);
@@ -4318,9 +4328,10 @@ async function processSTKPushPayment(customerName, customerPhone, customerEmail,
                         alert('Payment timeout. Please check your M-Pesa messages or use Till Number payment method.');
                     }
                 } else {
-                    // Payment failed or error
+                    // Payment failed or was cancelled by user
                     hidePaymentVerificationModal();
-                    alert(`Payment failed:\n\n${statusResult.message || statusResult.resultDesc || 'Unknown error'}`);
+                    alert(`Payment was not completed:\n\n${statusResult.message || statusResult.resultDesc || statusResult.error || 'Payment cancelled or failed'}`);
+                    return;
                 }
             } catch (error) {
                 console.error('Error polling STK Push status:', error);
@@ -4807,45 +4818,7 @@ function downloadReceipt() {
     }
 }
 
-// Send Receipt via WhatsApp (with notification)
-function sendReceiptViaWhatsApp() {
-    if (!currentOrder) return;
-
-    // Create message with order details
-    const message = `Hello! I've completed my purchase at Trendy Dresses.
-
-Order ID: ${currentOrder.orderId}
-Date: ${currentOrder.date}
-Customer: ${currentOrder.customer.name}
-Phone: ${currentOrder.customer.phone}
-Total: KSh ${currentOrder.total.toLocaleString('en-KE')}
-M-Pesa Code: ${currentOrder.mpesaCode}
-
-Please find the receipt attached. Thank you!`;
-
-    // Encode message for WhatsApp
-    const encodedMessage = encodeURIComponent(message);
-    const whatsappNumber = websiteContent.contactPhone;
-
-    // Open WhatsApp with message
-    const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`;
-    window.open(whatsappUrl, '_blank');
-
-    // Also download the PDF
-    downloadReceipt();
-
-    showNotification('Receipt sent via WhatsApp! Please attach the downloaded PDF.');
-}
-
-// Send Receipt via WhatsApp Silently (no notification on website)
-// This is a fallback method that opens WhatsApp with pre-filled message
-// The backend method is preferred for automatic sending
-function sendReceiptViaWhatsAppSilent() {
-    // Keep existing version but we'll use a user-triggered one mostly
-    sendReceiptViaWhatsApp();
-}
-
-// User-triggered WhatsApp receipt
+// Send Receipt via WhatsApp
 function sendReceiptViaWhatsApp() {
     if (!currentOrder) {
         showNotification('No order data found. Please try again or contact support.', 'error');
@@ -5266,19 +5239,18 @@ async function handleAuthSubmit(event) {
         submitBtn.textContent = mode === 'login' ? 'Logging in...' : 'Signing up...';
         submitBtn.disabled = true;
 
-        const isProd = window.location.hostname.includes('trendydresses.co.ke');
-        const authBaseURL = isProd ? apiService.baseURL + '/auth' : 'http://' + window.location.hostname + ':4000/api/auth';
+        const authBaseURL = apiService.baseURL + '/auth';
         const endpoint = mode === 'login' ? `${authBaseURL}/login` : `${authBaseURL}/register`;
         const response = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
+            body: JSON.stringify({ email, username: email, password })
         });
         
         const result = await response.json();
 
         if (result.success) {
-            localStorage.setItem('authToken', result.token);
+            ApiService.setAuthToken(result.token);
             localStorage.setItem('authUser', JSON.stringify(result.user));
             
             // Verify role and update UI accordingly
@@ -5327,19 +5299,18 @@ async function handleAdminSecretSubmit(event) {
     const password = document.getElementById('adminAuthPassword').value;
 
     try {
-        const isProd = window.location.hostname.includes('trendydresses.co.ke');
-        const authLoginURL = isProd ? apiService.baseURL + '/auth/login' : 'http://' + window.location.hostname + ':4000/api/auth/login';
+        const authLoginURL = apiService.baseURL + '/auth/login';
         const response = await fetch(authLoginURL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
+            body: JSON.stringify({ email, username: email, password })
         });
         
         const result = await response.json();
 
         if (result.success) {
             if (result.user.role === 'admin') {
-                localStorage.setItem('authToken', result.token);
+                ApiService.setAuthToken(result.token);
                 localStorage.setItem('authUser', JSON.stringify(result.user));
                 
                 isAdmin = true;

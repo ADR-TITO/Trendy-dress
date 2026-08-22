@@ -1,6 +1,16 @@
 <?php
 // process_payment.php
 
+header('Content-Type: application/json; charset=utf-8');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(204);
+    exit;
+}
+
 try {
     // Autoload classes (Simple autoloader for App namespace)
     spl_autoload_register(function ($class) {
@@ -17,10 +27,12 @@ try {
     require_once __DIR__ . '/backend-php/config/database.php';
     $pdo = Database::getConnection();
 
-    // Get input data
-    $phone_number = $_POST['phoneNumber'] ?? '';
-    $amount = $_POST['amount'] ?? 0;
-    $order_id = $_POST['orderId'] ?? ('ORDER_' . time()); // Fallback for testing
+    // Get input data (support both FormData and JSON)
+    $jsonData = json_decode(file_get_contents('php://input'), true) ?? [];
+    
+    $phone_number = $_POST['phoneNumber'] ?? $jsonData['phoneNumber'] ?? '';
+    $amount = $_POST['amount'] ?? $jsonData['amount'] ?? 0;
+    $order_id = $_POST['orderId'] ?? $jsonData['orderId'] ?? ('ORDER_' . time());
 
     if (empty($phone_number) || empty($amount)) {
         throw new Exception("Phone number and amount are required.");
@@ -29,8 +41,6 @@ try {
     // Use the central MpesaService
     $mpesaService = new \App\Services\MpesaService();
     
-    // The service fetches amount from DB based on orderId, but we can also pass it
-    // For process_payment.php (used by frontend), we initiate STK push
     $result = $mpesaService->initiateSTKPush(
         $phone_number,
         $order_id,
@@ -43,7 +53,9 @@ try {
         echo json_encode([
             'success' => true,
             'message' => 'Payment request sent successfully. Please check your phone.',
-            'checkout_request_id' => $result['CheckoutRequestID'] ?? ''
+            'checkout_request_id' => $result['CheckoutRequestID'] ?? '',
+            'checkoutRequestID' => $result['CheckoutRequestID'] ?? '',
+            'customerMessage' => $result['CustomerMessage'] ?? 'Success'
         ]);
     } else {
         $detail = $result['errorMessage'] ?? $result['CustomerMessage'] ?? json_encode($result);
@@ -55,7 +67,7 @@ try {
     error_log("Payment processing error: " . $e->getMessage() . " in " . $e->getFile() . ":" . $e->getLine());
     echo json_encode([
         'success' => false,
-        'message' => 'An internal server error occurred while processing your payment.'
+        'message' => $e->getMessage() ?: 'An internal server error occurred while processing your payment.'
     ]);
 }
 ?>

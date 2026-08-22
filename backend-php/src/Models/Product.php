@@ -134,37 +134,44 @@ class Product {
             $imageData = base64_decode($dataParts[1]);
             if (!$imageData) return $base64String;
             
-            $image = @imagecreatefromstring($imageData);
-            if (!$image) return $base64String;
-            
-            // Resize image to max 800px width
-            $origWidth = imagesx($image);
-            $origHeight = imagesy($image);
-            $maxWidth = 800; // Responsive size
-            
-            if ($origWidth > $maxWidth) {
-                $newHeight = ($maxWidth / $origWidth) * $origHeight;
-                $resized = imagecreatetruecolor($maxWidth, $newHeight);
-                imagealphablending($resized, false);
-                imagesavealpha($resized, true);
-                $transparent = imagecolorallocatealpha($resized, 255, 255, 255, 127);
-                imagefilledrectangle($resized, 0, 0, $maxWidth, $newHeight, $transparent);
-                imagecopyresampled($resized, $image, 0, 0, 0, 0, $maxWidth, $newHeight, $origWidth, $origHeight);
-                imagedestroy($image);
-                $image = $resized;
+            if (function_exists('imagecreatefromstring')) {
+                $image = @imagecreatefromstring($imageData);
+                if ($image) {
+                    // Resize image to max 800px width
+                    $origWidth = imagesx($image);
+                    $origHeight = imagesy($image);
+                    $maxWidth = 800; // Responsive size
+                    
+                    if ($origWidth > $maxWidth) {
+                        $newHeight = ($maxWidth / $origWidth) * $origHeight;
+                        $resized = imagecreatetruecolor($maxWidth, $newHeight);
+                        imagealphablending($resized, false);
+                        imagesavealpha($resized, true);
+                        $transparent = imagecolorallocatealpha($resized, 255, 255, 255, 127);
+                        imagefilledrectangle($resized, 0, 0, $maxWidth, $newHeight, $transparent);
+                        imagecopyresampled($resized, $image, 0, 0, 0, 0, $maxWidth, $newHeight, $origWidth, $origHeight);
+                        imagedestroy($image);
+                        $image = $resized;
+                    }
+                    
+                    $dir = __DIR__ . '/../../uploads';
+                    if (!is_dir($dir)) @mkdir($dir, 0755, true);
+                    
+                    $filename = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $id) . '_' . uniqid() . '.webp';
+                    $filepath = $dir . '/' . $filename;
+                    
+                    if (function_exists('imagewebp') && @imagewebp($image, $filepath, 80)) {
+                        imagedestroy($image);
+                        return '/backend-php/uploads/' . $filename;
+                    } elseif (function_exists('imagejpeg') && @imagejpeg($image, str_replace('.webp', '.jpg', $filepath), 80)) {
+                        imagedestroy($image);
+                        return '/backend-php/uploads/' . str_replace('.webp', '.jpg', $filename);
+                    }
+                    imagedestroy($image);
+                }
             }
             
-            $dir = __DIR__ . '/../../uploads';
-            if (!is_dir($dir)) mkdir($dir, 0755, true);
-            
-            $filename = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $id) . '_' . uniqid() . '.webp';
-            $filepath = $dir . '/' . $filename;
-            
-            // Save as WebP with 80% quality
-            imagewebp($image, $filepath, 80);
-            imagedestroy($image);
-            
-            return '/backend-php/uploads/' . $filename;
+            return $base64String;
         } catch (\Exception $e) {
             error_log("Error saving WebP: " . $e->getMessage());
             return $base64String; // Fallback to original
@@ -249,11 +256,12 @@ class Product {
                 $fields[] = "quantity = :quantity";
                 $params[':quantity'] = $data['quantity'];
             }
-            if (isset($data['discount'])) {
+            if (isset($data['discount']) || isset($data['discountPercentage'])) {
+                $discountVal = (int)($data['discount'] ?? $data['discountPercentage'] ?? 0);
                 $fields[] = "discount = :discount";
                 $fields[] = "discountPercentage = :discountPercentage";
-                $params[':discount'] = $data['discount'];
-                $params[':discountPercentage'] = $data['discount'];
+                $params[':discount'] = $discountVal;
+                $params[':discountPercentage'] = $discountVal;
             }
             if (isset($data['isDiscountHidden'])) {
                 $fields[] = "isDiscountHidden = :isDiscountHidden";
@@ -356,8 +364,8 @@ class Product {
         } catch (\Exception $e) {
             error_log("Error decrementing product quantity: " . $e->getMessage());
             throw $e;
+        }
     }
-}
 
     /**
      * Increment product quantity

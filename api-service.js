@@ -281,9 +281,7 @@ class ApiService {
 
         try {
             // Include images by default
-            // USE PHP BACKEND (this.baseURL) for production products to avoid port 4000 issues
-            const isProd = window.location.hostname.includes('trendydresses.co.ke');
-            const targetBaseURL = isProd ? this.baseURL : (window.location.protocol + '//' + window.location.hostname + ':4000/api');
+            const targetBaseURL = this.baseURL;
             
             const url = category && category !== 'all'
                 ? `${targetBaseURL}/products?category=${category}${includeImages ? '&includeImages=true' : '&includeImages=false'}`
@@ -303,15 +301,11 @@ class ApiService {
 
             let response;
             try {
-                // Get Auth Token from local storage directly for Node API
-                const authToken = localStorage.getItem('authToken');
-                const authHeader = authToken ? { 'Authorization': `Bearer ${authToken}` } : {};
-                
                 response = await fetch(url, {
                     signal: controller.signal,
                     headers: {
                         'Accept': 'application/json',
-                        ...authHeader
+                        ...ApiService.getAuthHeader()
                     },
                 });
                 clearTimeout(timeoutId);
@@ -575,9 +569,7 @@ class ApiService {
     // Get all orders from Database
     async getOrders() {
         try {
-            const isProd = window.location.hostname.includes('trendydresses.co.ke');
-            const nodeURL = window.location.protocol + '//' + window.location.hostname + (isProd ? '' : ':4000') + '/api/orders';
-            const response = await fetch(nodeURL, {
+            const response = await fetch(`${this.baseURL}/orders`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -781,37 +773,40 @@ class ApiService {
         }
     }
 
-    // Set and get authentication token
+    // Set and get authentication token (sync both jwt_token and authToken)
     static setAuthToken(token) {
-        localStorage.setItem('jwt_token', token);
+        if (token) {
+            localStorage.setItem('jwt_token', token);
+            localStorage.setItem('authToken', token);
+        }
     }
 
     static getAuthHeader() {
-        const token = localStorage.getItem('jwt_token');
+        const token = localStorage.getItem('jwt_token') || localStorage.getItem('authToken');
         return token ? { 'Authorization': `Bearer ${token}` } : {};
     }
 
     static removeAuthToken() {
         localStorage.removeItem('jwt_token');
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('authUser');
     }
 
     // Login
     async login(username, password) {
         try {
-            const isProd = window.location.hostname.includes('trendydresses.co.ke');
-            // Prefer PHP auth in production if Node is not proxied
-            const nodeURL = isProd ? `${this.baseURL}/auth/login` : `http://${window.location.hostname}:4000/api/auth/login`;
+            const loginURL = `${this.baseURL}/auth/login`;
 
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
 
-            const response = await fetch(nodeURL, {
+            const response = await fetch(loginURL, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 signal: controller.signal,
-                body: JSON.stringify({ username, password })
+                body: JSON.stringify({ username, email: username, password })
             });
 
             clearTimeout(timeoutId);
@@ -822,7 +817,7 @@ class ApiService {
                 // If login fails, ensure any old token is removed
                 ApiService.removeAuthToken();
                 console.error('Login failed response data:', data);
-                throw new Error(data.message || 'Login failed');
+                throw new Error(data.message || data.error || 'Login failed');
             }
 
             // If login successful, store the token
@@ -851,7 +846,7 @@ class ApiService {
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.message || 'Logout failed');
+                throw new Error(data.message || data.error || 'Logout failed');
             }
 
             // If logout successful, remove the token
@@ -860,6 +855,7 @@ class ApiService {
             return data;
         } catch (error) {
             console.error('Logout error:', error);
+            ApiService.removeAuthToken();
             throw error;
         }
     }

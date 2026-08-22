@@ -74,11 +74,10 @@ try {
     switch ($method) {
         case 'GET':
             if ($orderIdOrAction === 'verify') {
-                // Verify M-Pesa code
-                $data = json_decode(file_get_contents('php://input'), true);
-                $mpesaCode = $data['mpesaCode'] ?? '';
-                $amount = $data['amount'] ?? 0;
-                $transactionDate = $data['transactionDate'] ?? date('Y-m-d H:i:s');
+                // Verify M-Pesa code — params come from the query string on a GET request
+                $mpesaCode = $_GET['mpesaCode'] ?? '';
+                $amount    = isset($_GET['amount']) ? (float)$_GET['amount'] : 0;
+                $transactionDate = $_GET['transactionDate'] ?? date('Y-m-d H:i:s');
                 
                 if (empty($mpesaCode)) {
                     http_response_code(400);
@@ -134,7 +133,7 @@ try {
                     'valid' => true,
                     'transaction' => $transaction
                 ]);
-            } else if (!empty($orderIdOrAction) && strpos($orderIdOrAction, 'ORD-') === 0) {
+            } else if (!empty($orderIdOrAction) && $orderIdOrAction !== 'all' && $orderIdOrAction !== 'list') {
                 // Get single order by ID (for customer tracking)
                 try {
                     $order = $orderModel->findByOrderId($orderIdOrAction);

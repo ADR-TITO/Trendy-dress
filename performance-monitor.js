@@ -3,7 +3,9 @@
 
 (function() {
     // Store initial timestamp
-    const navigationStart = window.performance.timing.navigationStart;
+    const navigationStart = (window.performance && window.performance.timing) 
+        ? window.performance.timing.navigationStart 
+        : (window.performance && window.performance.timeOrigin ? window.performance.timeOrigin : Date.now());
 
     // Function to log performance metrics
     function logPerformanceMetrics() {

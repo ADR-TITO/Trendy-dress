@@ -128,6 +128,9 @@ class Database {
                 size VARCHAR(50),
                 quantity INT DEFAULT 0,
                 discount INT DEFAULT 0,
+                discountPercentage INT DEFAULT 0,
+                isDiscountHidden BOOLEAN DEFAULT FALSE,
+                discountVisibleTo VARCHAR(50) DEFAULT 'public',
                 image LONGTEXT,
                 createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -135,11 +138,19 @@ class Database {
                 INDEX idx_createdAt (createdAt)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
             
-            // AUTO-FIX: Ensure existing tables are upgraded to LONGTEXT
-            try {
-                $pdo->exec("ALTER TABLE products MODIFY COLUMN image LONGTEXT");
-            } catch (Exception $e) {
-                // Ignore if already LONGTEXT or other issues
+            // AUTO-FIX: Ensure existing products table has all columns & LONGTEXT
+            $productMigrations = [
+                "ALTER TABLE products MODIFY COLUMN image LONGTEXT",
+                "ALTER TABLE products ADD COLUMN discountPercentage INT DEFAULT 0",
+                "ALTER TABLE products ADD COLUMN isDiscountHidden BOOLEAN DEFAULT FALSE",
+                "ALTER TABLE products ADD COLUMN discountVisibleTo VARCHAR(50) DEFAULT 'public'"
+            ];
+            foreach ($productMigrations as $sql) {
+                try {
+                    $pdo->exec($sql);
+                } catch (Exception $e) {
+                    // Ignore if already exists / applied
+                }
             }
             
             // Orders table
@@ -195,10 +206,16 @@ class Database {
             // Website content table (settings, hero image, about text)
             $pdo->exec("CREATE TABLE IF NOT EXISTS website_content (
                 id VARCHAR(50) PRIMARY KEY,
-                content TEXT NOT NULL,
+                content LONGTEXT NOT NULL,
                 updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 updatedBy VARCHAR(255)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+            
+            try {
+                $pdo->exec("ALTER TABLE website_content MODIFY COLUMN content LONGTEXT NOT NULL");
+            } catch (Exception $e) {
+                // Ignore
+            }
             
             // Admins table
             $pdo->exec("CREATE TABLE IF NOT EXISTS admins (
@@ -209,15 +226,31 @@ class Database {
                 updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
-            // Users table (Customers)
+            // Users table (Customers & Microservice sync)
             $pdo->exec("CREATE TABLE IF NOT EXISTS users (
                 id INT AUTO_INCREMENT PRIMARY KEY,
-                username VARCHAR(50) UNIQUE NOT NULL,
-                password_hash VARCHAR(255) NOT NULL,
+                username VARCHAR(50) UNIQUE,
+                email VARCHAR(255) UNIQUE,
+                password VARCHAR(255),
+                password_hash VARCHAR(255),
                 role VARCHAR(20) DEFAULT 'customer',
+                notificationToken VARCHAR(255),
                 createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+            $userMigrations = [
+                "ALTER TABLE users ADD COLUMN email VARCHAR(255) UNIQUE",
+                "ALTER TABLE users ADD COLUMN password VARCHAR(255)",
+                "ALTER TABLE users ADD COLUMN notificationToken VARCHAR(255)"
+            ];
+            foreach ($userMigrations as $sql) {
+                try {
+                    $pdo->exec($sql);
+                } catch (Exception $e) {
+                    // Ignore
+                }
+            }
 
             // Check if default admin exists
             $stmt = $pdo->query("SELECT COUNT(*) FROM admins");

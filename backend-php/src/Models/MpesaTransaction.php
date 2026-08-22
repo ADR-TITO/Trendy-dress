@@ -59,23 +59,20 @@ class MpesaTransaction {
             $pdo = \Database::getConnection();
             
             $sql = "SELECT * FROM mpesa_transactions";
-            $params = [];
             
             if ($phoneNumber) {
                 // Handle phone number formats (07..., 2547...)
                 $cleanPhone = preg_replace('/^(?:254|\+254|0)?/', '', $phoneNumber);
                 $sql .= " WHERE phoneNumber LIKE :phone";
-                $params[':phone'] = '%' . $cleanPhone;
             }
             
             $sql .= " ORDER BY transactionDate DESC LIMIT :limit";
             
             $stmt = $pdo->prepare($sql);
+            $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
             if ($phoneNumber) {
                 $stmt->bindValue(':phone', '%' . $cleanPhone);
             }
-            $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
-            
             $stmt->execute();
             $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
@@ -101,7 +98,14 @@ class MpesaTransaction {
             }
             
             $sql = "INSERT INTO mpesa_transactions (receiptNumber, transactionDate, phoneNumber, amount, merchantRequestID, checkoutRequestID, orderId, resultCode, resultDesc) 
-                    VALUES (:receiptNumber, :transactionDate, :phoneNumber, :amount, :merchantRequestID, :checkoutRequestID, :orderId, :resultCode, :resultDesc)";
+                    VALUES (:receiptNumber, :transactionDate, :phoneNumber, :amount, :merchantRequestID, :checkoutRequestID, :orderId, :resultCode, :resultDesc)
+                    ON DUPLICATE KEY UPDATE 
+                        phoneNumber = VALUES(phoneNumber),
+                        amount = VALUES(amount),
+                        merchantRequestID = VALUES(merchantRequestID),
+                        orderId = VALUES(orderId),
+                        resultCode = VALUES(resultCode),
+                        resultDesc = VALUES(resultDesc)";
             
             $stmt = $pdo->prepare($sql);
             $stmt->execute([

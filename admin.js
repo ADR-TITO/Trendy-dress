@@ -30,7 +30,7 @@ function closeAdminPanel() {
     if (overlay) overlay.style.display = 'none';
 }
 
-function switchAdminTab(tabName) {
+function switchAdminTab(tabName, evt = null) {
     // Hide all tabs
     document.querySelectorAll('.admin-tab-content').forEach(tab => {
         tab.classList.remove('active');
@@ -43,7 +43,9 @@ function switchAdminTab(tabName) {
     const targetTab = document.getElementById(tabName + 'Tab');
     if (targetTab) targetTab.classList.add('active');
     
-    const clickedBtn = event.target?.closest('.admin-tab');
+    const clickedBtn = (evt && evt.target ? evt.target.closest('.admin-tab') : null) ||
+                       document.querySelector(`.admin-tab[onclick*="${tabName}"]`) ||
+                       document.querySelector(`.admin-tab[data-tab="${tabName}"]`);
     if (clickedBtn) {
         clickedBtn.classList.add('active');
     }
@@ -321,25 +323,67 @@ window.toggleDeliveryStatus = async (orderId, delivered) => {
         loadCompletedOrders();
     } catch (e) { showNotification(e.message, 'error'); }
 };
-async function cancelOrder(orderId) {
-    if (!confirm(`Are you sure you want to cancel order ${orderId}? This will remove it from the records.`)) {
+async function viewOrderDetails(orderId) {
+    let order = (window.allAdminOrders || []).find(o => o.orderId === orderId) ||
+                (window.allCompletedOrders || []).find(o => o.orderId === orderId);
+    
+    if (!order && typeof apiService !== 'undefined') {
+        try {
+            order = await apiService.getOrder(orderId);
+        } catch (e) {
+            console.error('Failed to fetch order details:', e);
+        }
+    }
+
+    if (!order) {
+        showNotification('Order details not found', 'error');
         return;
     }
 
-    try {
-        showNotification('Cancelling order...', 'info');
-        await apiService.deleteOrder(orderId);
-        showNotification(`Order ${orderId} cancelled successfully`, 'success');
-        
-        // Refresh orders list
-        if (typeof loadAdminOrders === 'function') loadAdminOrders();
-        if (typeof loadCompletedOrders === 'function') loadCompletedOrders();
-    } catch (error) {
-        console.error('Error cancelling order:', error);
-        showNotification(`Failed to cancel order: ${error.message}`, 'error');
+    window.currentOrder = order;
+
+    let itemsList = [];
+    if (Array.isArray(order.items)) {
+        itemsList = order.items;
+    } else if (typeof order.items === 'string') {
+        try { itemsList = JSON.parse(order.items); } catch(e) {}
+    }
+
+    const itemsSummary = itemsList
+        .map(i => `• ${i.name || 'Product'} (x${i.quantity || 1}) - KSh ${((i.price || 0) * (i.quantity || 1)).toLocaleString('en-KE')}`)
+        .join('\n');
+
+    const totalAmt = order.total || order.totalAmount || 0;
+    const delStatus = (order.delivery?.status || order.deliveryStatus || 'pending').toUpperCase();
+    const delOption = order.delivery?.optionText || order.delivery?.option || 'Pickup';
+    const delAddress = order.delivery?.address || 'N/A';
+
+    const details = `📋 ORDER DETAILS (${order.orderId})\n` +
+        `----------------------------------------\n` +
+        `Customer: ${order.customer?.name || order.customerName || 'N/A'}\n` +
+        `Phone: ${order.customer?.phone || order.customerPhone || 'N/A'}\n` +
+        `Email: ${order.customer?.email || order.customerEmail || 'N/A'}\n` +
+        `Date: ${order.date || order.createdAt || 'N/A'}\n\n` +
+        `Delivery Status: ${delStatus}\n` +
+        `Delivery Option: ${delOption}\n` +
+        `Address: ${delAddress}\n\n` +
+        `Items:\n${itemsSummary || 'No items listed'}\n\n` +
+        `Total: KSh ${Number(totalAmt).toLocaleString('en-KE')}\n` +
+        `Payment Method: ${order.paymentMethod || 'M-Pesa'}\n` +
+        `M-Pesa Code: ${order.mpesaCode || 'N/A'}`;
+
+    alert(details);
+
+    if (typeof generateReceiptPDF === 'function') {
+        try {
+            await generateReceiptPDF(order);
+        } catch (e) {
+            console.warn('PDF generation notice:', e.message);
+        }
     }
 }
 
+window.viewOrderDetails = viewOrderDetails;
 window.cancelOrder = cancelOrder;
 
 /* Admin Image & Utility Helpers */
@@ -607,7 +651,7 @@ window.triggerNotification = async () => {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                ...ApiService.getAuthHeader()
             },
             body: JSON.stringify({ title, body })
         });

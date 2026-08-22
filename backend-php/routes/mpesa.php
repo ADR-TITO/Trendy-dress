@@ -312,30 +312,15 @@ try {
                     break;
                 }
                 
+                $amount = isset($data['amount']) ? (float)$data['amount'] : null;
+                
                 $result = $mpesaService->initiateSTKPush(
                     $data['phoneNumber'] ?? '',
-                    $orderId, // Pass orderId instead of amount
+                    $orderId,
                     $data['accountReference'] ?? 'TrendyDresses',
-                    $data['transactionDesc'] ?? 'Payment for order ' . $orderId
+                    $data['transactionDesc'] ?? 'Payment for order ' . $orderId,
+                    $amount
                 );
-                
-                // Save pending transaction
-                if (isset($result['CheckoutRequestID'])) {
-                    $transactionModel = new MpesaTransaction();
-                    try {
-                        $transactionModel->create([
-                            'phoneNumber' => $data['phoneNumber'] ?? '',
-                            'amount' => $data['amount'] ?? 0,
-                            'merchantRequestID' => $result['MerchantRequestID'] ?? '',
-                            'checkoutRequestID' => $result['CheckoutRequestID'],
-                            'orderId' => $orderId, // Save orderId with pending transaction
-                            'transactionDate' => date('Y-m-d H:i:s')
-                            // receiptNumber will be auto-generated as PENDING_...
-                        ]);
-                    } catch (\Exception $e) {
-                        error_log("Error saving pending transaction: " . $e->getMessage());
-                    }
-                }
                 
                 // Return result with success flag
                 $result['success'] = isset($result['ResponseCode']) && $result['ResponseCode'] === '0';

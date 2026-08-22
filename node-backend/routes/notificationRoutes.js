@@ -63,11 +63,31 @@ router.post('/send', verifyAdmin, async (req, res) => {
                 return res.json({ success: true, message: 'No registered devices found' });
             }
             
-            const response = await admin.messaging().sendMulticast({
-                tokens: tokens,
-                notification: { title, body }
-            });
-            res.json({ success: true, message: `Notification sent to ${response.successCount} devices`, response });
+            if (typeof admin.messaging().sendEachForMulticast === 'function') {
+                const response = await admin.messaging().sendEachForMulticast({
+                    tokens: tokens,
+                    notification: { title, body }
+                });
+                res.json({ success: true, message: `Notification sent to ${response.successCount} devices`, response });
+            } else if (typeof admin.messaging().sendMulticast === 'function') {
+                const response = await admin.messaging().sendMulticast({
+                    tokens: tokens,
+                    notification: { title, body }
+                });
+                res.json({ success: true, message: `Notification sent to ${response.successCount} devices`, response });
+            } else {
+                // Fallback: send individually
+                let successCount = 0;
+                for (const t of tokens) {
+                    try {
+                        await admin.messaging().send({ token: t, notification: { title, body } });
+                        successCount++;
+                    } catch (e) {
+                        console.warn('Failed to send to token:', t, e.message);
+                    }
+                }
+                res.json({ success: true, message: `Notification sent to ${successCount} devices` });
+            }
         }
     } catch (error) {
         console.error('Error sending message:', error);

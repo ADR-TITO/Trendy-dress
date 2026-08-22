@@ -14,9 +14,9 @@ class Order {
         try {
             $pdo = \Database::getConnection();
             
-            $stmt = $pdo->prepare("SELECT * FROM orders WHERE orderId = :orderId");
+            $stmt = $pdo->prepare("SELECT * FROM orders WHERE orderId = :orderId OR id = :orderId");
             $stmt->execute([':orderId' => $orderId]);
-            $order = $stmt->fetch(PDO::FETCH_ASSOC);
+            $order = $stmt->fetch(\PDO::FETCH_ASSOC);
             
             if (!$order) {
                 return null;
@@ -191,7 +191,7 @@ class Order {
         try {
             $pdo = \Database::getConnection();
             
-            $sql = "UPDATE orders SET deliveryStatus = :status, deliveredBy = :deliveredBy WHERE orderId = :orderId";
+            $sql = "UPDATE orders SET deliveryStatus = :status, deliveredBy = :deliveredBy WHERE orderId = :orderId OR id = :orderId";
             $stmt = $pdo->prepare($sql);
             $stmt->execute([
                 ':status' => $status,
@@ -213,7 +213,7 @@ class Order {
         try {
             $pdo = \Database::getConnection();
             
-            $stmt = $pdo->prepare("DELETE FROM orders WHERE orderId = :orderId");
+            $stmt = $pdo->prepare("DELETE FROM orders WHERE orderId = :orderId OR id = :orderId");
             $stmt->execute([':orderId' => $orderId]);
             
             return $stmt->rowCount() > 0;
